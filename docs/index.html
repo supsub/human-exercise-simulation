@@ -67,11 +67,13 @@
 
 <header class="hero">
   <div class="wrap">
-    <span class="tag">MVP · wersja 0.1</span>
+    <span class="tag">MVP · wersja 0.2</span>
     <h1>Zobacz, jak pracują mięśnie <span>w czasie rzeczywistym</span></h1>
     <p class="lead">
       Human Exercise Simulation to interaktywny model 3D człowieka, który wykonuje ćwiczenia na polecenie
       („zrób 5 pompek”) i na żywo pokazuje, które mięśnie są aktywowane, w jakiej fazie ruchu i jak mocno.
+      Pokazuje też typowe błędy techniki i ich skutki, a w planerze treningu ocenia, czy tygodniowy plan
+      równomiernie rozwija całe ciało.
     </p>
     <div class="cta">
       <a class="btn primary" href="../index.html">▶ Otwórz demo</a>
@@ -87,10 +89,16 @@
     <h2>Jak to wygląda</h2>
     <p class="sub">Zrzuty ekranu z aktualnej wersji demo.</p>
     <div class="shots">
-      <figure><img src="img/pushup.png" alt="Pompka – dolna faza"><figcaption>Pompka, dolna pozycja: najmocniej pracują triceps, piersiowy większy i przedni akton mięśnia naramiennego.</figcaption></figure>
+      <figure><img src="img/pushup.png" alt="Pompka – dolna faza"><figcaption>Symulacja: pompka w dolnej pozycji. 34 mięśnie z podziałem na głowy, faza ruchu i oddech na żywo.</figcaption></figure>
       <div class="col">
-        <figure><img src="img/squat.png" alt="Przysiad"><figcaption>Przysiad: dominuje mięsień czworogłowy uda i pośladkowy wielki.</figcaption></figure>
-        <figure><img src="img/curl.png" alt="Uginanie przedramion"><figcaption>Uginanie z hantlami: biceps i zginacze przedramienia.</figcaption></figure>
+        <figure><img src="img/mistake.png" alt="Błąd techniki – kolana do środka"><figcaption>Typowy błąd: kolana uciekają do środka w przysiadzie. Przeciążone więzadła kolana są zaznaczone na czerwono.</figcaption></figure>
+        <figure><img src="img/curl.png" alt="Uginanie przedramion"><figcaption>Uginanie z hantlami: biceps, ramienny i ramienno-promieniowy.</figcaption></figure>
+      </div>
+    </div>
+    <div class="shots" style="margin-top:14px">
+      <figure><img src="img/plan.png" alt="Plan treningowy"><figcaption>Plan treningowy: tydzień Pn–Nd, mapa obciążenia mięśni na modelu, ocena planu i ostrzeżenia.</figcaption></figure>
+      <div class="col">
+        <figure><img src="img/picker.png" alt="Wybór ćwiczeń"><figcaption>Wybór ćwiczeń: na górze listy są ćwiczenia, które uzupełniają braki w planie.</figcaption></figure>
       </div>
     </div>
   </div>
@@ -137,7 +145,14 @@
         <p>Aktywacja każdego mięśnia zależy od głębokości ruchu i typu skurczu (koncentryczny, ekscentryczny, izometryczny), skalibrowana na danych EMG. <br><small>Docelowo: symulacja biomechaniczna.</small></p></div>
       <div class="arrow">→</div>
       <div class="card step"><div class="num">4 · WIZUALIZACJA</div><h3>Scena 3D</h3>
-        <p>Three.js w przeglądarce: kolor mięśnia od niebieskiego do czerwonego, panel z wartościami i oś czasu faz.</p></div>
+        <p>Three.js w przeglądarce: kolor mięśnia od niebieskiego do czerwonego, panel z wartościami, oś czasu faz, oddech i znaczniki przeciążeń.</p></div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <h3>Planer treningu – jak liczymy</h3>
+      <p>Każde ćwiczenie w katalogu ma wagę zaangażowania mięśni: 1 dla mięśnia głównego, 0,5–0,75 dla pomocniczego, 0,25 dla stabilizującego.
+        Tygodniowa objętość mięśnia to suma <i>serie × waga</i> („efektywne serie”). Porównujemy ją z orientacyjnymi progami
+        (3 / 8 / 20 serii) i sprawdzamy proporcje oraz regenerację. Algorytm zachłannie dobiera ćwiczenia, które najlepiej pokrywają braki.
+        Wszystko działa lokalnie, bez serwera.</p>
     </div>
   </div>
 </section>
@@ -149,18 +164,22 @@
     <table>
       <thead><tr><th style="width:150px">Status</th><th>Funkcja</th><th>Opis</th></tr></thead>
       <tbody>
-        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Model 3D człowieka</td><td>Stylizowany manekin ze szkieletem (14 stawów) i 17 grupami mięśni widocznymi na powierzchni ciała.</td></tr>
-        <tr><td><span class="status s-ok">GOTOWE</span></td><td>3 ćwiczenia</td><td>Pompka, przysiad, uginanie przedramion z hantlami. Każde z opisem i wskazówkami technicznymi.</td></tr>
-        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Aktywacja mięśni na żywo</td><td>Kolor mięśni i paski % MVC aktualizowane w każdej klatce, z uwzględnieniem opóźnienia reakcji mięśnia.</td></tr>
-        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Fazy ruchu</td><td>Oś czasu z fazami ekscentryczną, koncentryczną i izometryczną. Przewijanie, pauza i tempo od 0,25× do 2×.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Model 3D człowieka</td><td>Stylizowany manekin ze szkieletem (14 stawów) i <b>34 mięśniami z podziałem na głowy i części</b>: 4 głowy czworogłowego, 3 aktony naramiennego, 3 części czworobocznego, 2 głowy tricepsa i inne. Mięśnie mają kształt wrzecion i łez, a mięsień prosty brzucha pokazany jest jako „kaloryfer”.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>3 ćwiczenia z animacją</td><td>Pompka, przysiad, uginanie przedramion z hantlami. Każde ma opis, wskazówki techniczne i wskazówki oddechowe.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Aktywacja mięśni na żywo</td><td>Kolor mięśni i paski % MVC aktualizowane w każdej klatce, z uwzględnieniem opóźnienia reakcji mięśnia. Lista sortowana wg aktywacji lub grup anatomicznych.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Oddech</td><td>Klatka piersiowa i brzuch rozszerzają się przy wdechu, przy wydechu widać obłoczki. Oddech jest zsynchronizowany z fazami ruchu (np. wydech przy wypychaniu), a obok jest wskaźnik płuc.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Typowe błędy techniki</td><td>Dla każdego ćwiczenia 2–3 błędy (np. opadające biodra, łokcie na boki, kolana do środka, zaokrąglone plecy, bujanie). Płynne przejście między techniką poprawną i błędną, zmiana aktywacji mięśni, czerwone znaczniki przeciążonych struktur oraz opis: co się dzieje, dlaczego to problem i jak poprawić.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Plan treningowy</td><td>Wiele planów, tydzień Pn–Nd, dni treningowe i odpoczynku, ćwiczenia z serii × powtórzeniami. Zapis lokalny w przeglądarce.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Katalog 38 ćwiczeń</td><td>Ćwiczenia z wagą zaangażowania każdego mięśnia. Wyszukiwanie po nazwie i mięśniu, filtr kategorii, podgląd mięśni na modelu.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Analiza planu offline</td><td>Tygodniowa objętość (efektywne serie) na mięsień i partię, mapa na modelu 3D (tydzień lub pojedynczy dzień) i ocena pokrycia. Ostrzeżenia: proporcje pchanie/przyciąganie i przód/tył uda, regeneracja dzień po dniu, brak dnia wolnego, za długi trening.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Rekomendacje ćwiczeń</td><td>Algorytm dobiera ćwiczenia pokrywające zaniedbane mięśnie i proponuje dzień, który najmniej koliduje z regeneracją. Dodanie jednym kliknięciem.</td></tr>
         <tr><td><span class="status s-ok">GOTOWE</span></td><td>Polecenia tekstowe (PL)</td><td>„zrób 5 pompek”, „trzy przysiady”, „uginanie”, „stop”, „wolniej”, „odpocznij”.</td></tr>
-        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Interakcja z modelem</td><td>Obracanie kamery, podpowiedź z nazwą mięśnia po najechaniu, podświetlanie mięśnia z listy.</td></tr>
         <tr><td><span class="status s-wip">W TRAKCIE</span></td><td>Polecenia przez LLM</td><td>Dowolne sformułowania i parametry, np. „wolne pompki na szeroko, 3 sekundy w dół”.</td></tr>
-        <tr><td><span class="status s-wip">W TRAKCIE</span></td><td>Biblioteka ćwiczeń</td><td>Plank, wykroki, podciąganie, martwy ciąg, wiosłowanie. Warianty (szerokie i wąskie pompki).</td></tr>
+        <tr><td><span class="status s-wip">W TRAKCIE</span></td><td>Animacje dla całego katalogu</td><td>Plank, wykroki, podciąganie, martwy ciąg, wiosłowanie… Obecnie animowane są 3 z 38 ćwiczeń.</td></tr>
         <tr><td><span class="status s-plan">PLANOWANE</span></td><td>Realistyczny model anatomiczny</td><td>Siatka z dokładnymi kształtami mięśni (np. na bazie Z-Anatomy) zamiast manekina.</td></tr>
         <tr><td><span class="status s-plan">PLANOWANE</span></td><td>Symulacja biomechaniczna</td><td>Aktywacje liczone z fizyki ruchu (OpenSim / MuJoCo MyoSuite) zamiast krzywych z literatury.</td></tr>
-        <tr><td><span class="status s-plan">PLANOWANE</span></td><td>Personalizacja</td><td>Masa ciała, obciążenie i tempo zmieniają aktywację. Porównanie dwóch wariantów obok siebie.</td></tr>
-        <tr><td><span class="status s-plan">PLANOWANE</span></td><td>Analiza techniki z kamery</td><td>Estymacja pozy z wideo użytkownika, nałożenie na model i wskazanie błędów techniki.</td></tr>
+        <tr><td><span class="status s-plan">PLANOWANE</span></td><td>Progresja i historia treningów</td><td>Odhaczanie wykonanych treningów, ciężary, progresja obciążenia, kalendarz z historią.</td></tr>
+        <tr><td><span class="status s-plan">PLANOWANE</span></td><td>Analiza techniki z kamery</td><td>Estymacja pozy z wideo użytkownika i automatyczne wykrywanie błędów z katalogu „typowych błędów”.</td></tr>
         <tr><td><span class="status s-plan">PLANOWANE</span></td><td>Wersja angielska</td><td>Interfejs i polecenia w języku angielskim.</td></tr>
       </tbody>
     </table>
@@ -174,14 +193,17 @@
     <div class="roadmap">
       <div class="milestone done"><h3>Etap 1 – MVP (zrealizowany)</h3>
         <ul><li>Model 3D, 3 ćwiczenia, aktywacje z literatury EMG, polecenia tekstowe, oś faz.</li></ul></div>
+      <div class="milestone done"><h3>Etap 1.5 – Edukacja i planowanie (zrealizowany)</h3>
+        <ul><li>34 mięśnie z podziałem na głowy, oddech, typowe błędy techniki ze znacznikami przeciążeń.</li>
+          <li>Planer tygodniowy z katalogiem 38 ćwiczeń, analizą offline i rekomendacjami.</li></ul></div>
       <div class="milestone next"><h3>Etap 2 – Rozszerzenie treści</h3>
-        <ul><li>Polecenia przez LLM, 10+ ćwiczeń i warianty, realistyczny model anatomiczny.</li>
-          <li>Weryfikacja wartości aktywacji przez fizjoterapeutę lub biomechanika.</li></ul></div>
+        <ul><li>Polecenia przez LLM, animacje dla całego katalogu, realistyczny model anatomiczny.</li>
+          <li>Weryfikacja wartości aktywacji i opisów błędów przez fizjoterapeutę lub biomechanika.</li></ul></div>
       <div class="milestone"><h3>Etap 3 – Silnik biomechaniczny</h3>
         <ul><li>Dynamika odwrotna i optymalizacja sił mięśni: aktywacje liczone, a nie zapisane na sztywno.</li>
           <li>Wpływ obciążenia, tempa i budowy ciała.</li></ul></div>
       <div class="milestone"><h3>Etap 4 – Produkt</h3>
-        <ul><li>Analiza wideo użytkownika, plany treningowe, wersja mobilna i VR, SDK dla aplikacji fitness.</li></ul></div>
+        <ul><li>Konta i synchronizacja planów, historia i progresja, analiza wideo użytkownika, wersja mobilna i VR, SDK dla aplikacji fitness.</li></ul></div>
     </div>
   </div>
 </section>
@@ -209,6 +231,7 @@
     <table>
       <thead><tr><th style="width:150px">Data</th><th style="width:90px">Wersja</th><th>Zmiany</th></tr></thead>
       <tbody>
+        <tr><td>23.11.2026</td><td>0.2</td><td>Model z 34 mięśniami (podział na głowy i części, kształty wrzecionowate), animacja oddechu zsynchronizowana z fazami, typowe błędy techniki (8 błędów w 3 ćwiczeniach) ze znacznikami przeciążeń, planer treningowy z katalogiem 38 ćwiczeń, mapą obciążenia na modelu, analizą i rekomendacjami offline. Nawigacja Symulacja / Plan.</td></tr>
         <tr><td>23.11.2026</td><td>0.1</td><td>Pierwsze MVP: manekin 3D z 17 grupami mięśni, pompka, przysiad i uginanie przedramion, aktywacje na żywo, oś faz, polecenia tekstowe po polsku, strona projektu.</td></tr>
       </tbody>
     </table>

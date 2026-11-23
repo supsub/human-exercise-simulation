@@ -16,59 +16,118 @@
 </head>
 <body>
   <canvas id="scene"></canvas>
+  <div id="markers" class="markers"></div>
 
-  <header class="panel top-left">
-    <div class="brand">
-      <h1>Human Exercise Simulation</h1>
-      <a href="docs/index.html" class="about">O projekcie →</a>
-    </div>
-    <form id="cmd-form" autocomplete="off">
-      <input id="cmd" type="text" placeholder="Wpisz polecenie, np. „zrób 5 pompek”" autofocus />
-      <button type="submit">Wykonaj</button>
-    </form>
-    <div id="chips" class="chips"></div>
-    <div id="feedback" class="feedback"></div>
-  </header>
+  <nav class="topnav">
+    <span class="logo">Human Exercise Simulation</span>
+    <a class="tab" data-view="sim" href="#sim">Symulacja</a>
+    <a class="tab" data-view="plan" href="#plan">Plan treningowy</a>
+    <a class="tab about" href="docs/index.html">O projekcie →</a>
+  </nav>
 
-  <aside class="panel left">
-    <h2 id="ex-name">Pozycja stojąca</h2>
-    <p id="ex-desc" class="muted">Wydaj polecenie, aby rozpocząć ćwiczenie.</p>
-    <ul id="ex-cues" class="cues"></ul>
-    <div class="phase-box">
-      <div class="label">Aktualna faza</div>
-      <div id="phase-name" class="phase-name">—</div>
-      <div id="phase-kind" class="phase-kind"></div>
-      <div id="reps" class="reps"></div>
-    </div>
-  </aside>
+  <!-- ===================== SYMULACJA ===================== -->
+  <div id="sim-view">
+    <header class="panel top-left">
+      <form id="cmd-form" autocomplete="off">
+        <input id="cmd" type="text" placeholder="Wpisz polecenie, np. „zrób 5 pompek”" />
+        <button type="submit">Wykonaj</button>
+      </form>
+      <div id="chips" class="chips"></div>
+      <div id="feedback" class="feedback"></div>
+    </header>
 
-  <aside class="panel right">
-    <div class="right-head">
-      <h2>Aktywacja mięśni</h2>
-      <select id="sort-mode" title="Kolejność">
-        <option value="activation">wg aktywacji</option>
-        <option value="anatomy">wg anatomii</option>
+    <aside class="panel left">
+      <h2 id="ex-name">Pozycja stojąca</h2>
+      <p id="ex-desc" class="muted">Wydaj polecenie, aby rozpocząć ćwiczenie.</p>
+      <details class="cues-box"><summary>Wskazówki techniczne</summary><ul id="ex-cues" class="cues"></ul></details>
+      <div class="mistakes-box" hidden>
+        <div class="label">Typowe błędy – porównaj</div>
+        <div id="mistakes" class="mistakes"></div>
+      </div>
+      <div class="phase-box">
+        <div class="phase-main">
+          <div>
+            <div class="label">Aktualna faza</div>
+            <div id="phase-name" class="phase-name">—</div>
+            <div id="phase-kind" class="phase-kind"></div>
+            <div id="reps" class="reps"></div>
+          </div>
+          <div class="breath" title="Poziom powietrza w płucach">
+            <div class="lungs"><div id="breath-fill" class="breath-fill"></div></div>
+          </div>
+        </div>
+        <div id="breath-label" class="breath-label">Oddech</div>
+        <div id="breath-tip" class="breath-tip"></div>
+      </div>
+    </aside>
+
+    <div id="mistake-card" class="panel mistake-card" hidden></div>
+
+    <aside class="panel right">
+      <div class="right-head">
+        <h2>Aktywacja mięśni</h2>
+        <select id="sort-mode" title="Kolejność">
+          <option value="activation">wg aktywacji</option>
+          <option value="anatomy">wg grup</option>
+        </select>
+      </div>
+      <div class="legend">
+        <span>0%</span><div class="legend-bar"></div><span>100% MVC</span>
+      </div>
+      <div id="muscle-list" class="muscle-list"></div>
+      <p class="disclaimer">Wartości przybliżone (% maksymalnego dowolnego skurczu, MVC), modelowane na podstawie badań EMG. Służą celom edukacyjnym.</p>
+    </aside>
+
+    <footer class="panel bottom">
+      <button id="play" class="play" title="Odtwórz / pauza (spacja)">▶</button>
+      <div id="timeline" class="timeline" title="Kliknij lub przeciągnij, aby przewinąć">
+        <div id="playhead" class="playhead" hidden></div>
+      </div>
+      <select id="speed" title="Tempo">
+        <option value="0.25">0,25×</option>
+        <option value="0.5">0,5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
       </select>
-    </div>
-    <div class="legend">
-      <span>0%</span><div class="legend-bar"></div><span>100% MVC</span>
-    </div>
-    <div id="muscle-list" class="muscle-list"></div>
-    <p class="disclaimer">Wartości przybliżone (% maksymalnego dowolnego skurczu, MVC), modelowane na podstawie badań EMG. Służą celom edukacyjnym.</p>
-  </aside>
+    </footer>
+  </div>
 
-  <footer class="panel bottom">
-    <button id="play" class="play" title="Odtwórz / pauza (spacja)">▶</button>
-    <div id="timeline" class="timeline" title="Kliknij lub przeciągnij, aby przewinąć">
-      <div id="playhead" class="playhead" hidden></div>
+  <!-- ===================== PLAN TRENINGOWY ===================== -->
+  <div id="plan-view" hidden>
+    <aside class="panel plan-left">
+      <div class="plan-head">
+        <select id="plan-select" title="Wybierz plan"></select>
+        <button id="plan-new" title="Nowy, pusty plan">+ Nowy</button>
+        <button id="plan-rename" title="Zmień nazwę">✎</button>
+        <button id="plan-delete" title="Usuń plan">🗑</button>
+      </div>
+      <div id="plan-days" class="plan-days"></div>
+      <button id="plan-example" class="link small">+ dodaj przykładowy plan</button>
+    </aside>
+
+    <aside class="panel plan-right">
+      <div id="plan-focus" class="plan-focus"></div>
+      <div id="plan-legend" class="plan-legend"></div>
+      <div id="plan-score" class="plan-score"></div>
+      <h3>Tygodniowa objętość wg partii <span class="muted small">(efektywne serie)</span></h3>
+      <div id="plan-groups" class="plan-groups"></div>
+      <h3>Uwagi do planu</h3>
+      <div id="plan-warnings" class="plan-warnings"></div>
+      <h3>Rekomendowane ćwiczenia</h3>
+      <div id="plan-recs" class="plan-recs"></div>
+      <p class="disclaimer">Analiza liczona lokalnie, bez internetu. Progi (3 / 8 / 20 serii tygodniowo) są orientacyjne i dotyczą treningu siłowo-sylwetkowego.</p>
+    </aside>
+
+    <div id="picker" class="modal" hidden>
+      <div class="modal-box">
+        <div class="modal-head"><h2 id="picker-title">Dodaj ćwiczenie</h2><button id="picker-close" class="icon">✕</button></div>
+        <input id="picker-search" type="text" placeholder="Szukaj ćwiczenia lub mięśnia, np. „pośladkowy”" />
+        <div id="picker-cats" class="chips"></div>
+        <div id="picker-list" class="picker-list"></div>
+        <div class="muted small">Najedź na ćwiczenie, aby zobaczyć zaangażowane mięśnie na modelu.</div>
+      </div>
     </div>
-    <select id="speed" title="Tempo">
-      <option value="0.25">0,25×</option>
-      <option value="0.5">0,5×</option>
-      <option value="1" selected>1×</option>
-      <option value="2">2×</option>
-    </select>
-  </footer>
+  </div>
 
   <div id="tooltip" class="tooltip" hidden></div>
   <script type="module" src="src/main.js"></script>

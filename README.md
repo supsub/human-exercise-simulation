@@ -14,7 +14,9 @@ Następnie otwórz <http://localhost:8000>. Three.js ładuje się z CDN, więc p
 
 Parametry URL przydatne do demo i testów:
 - `?cmd=zrób 5 pompek` uruchamia polecenie od razu,
-- `&t=0.6` zatrzymuje animację w danym punkcie cyklu (0–1).
+- `&t=0.6` zatrzymuje animację w danym punkcie cyklu (0–1),
+- `&mistake=sag` pokazuje typowy błąd (id z `mistakes` w pliku ćwiczenia),
+- `index.html?focus=mon#plan` pokazuje plan z wybranym dniem, a `?picker=wed#plan` otwiera okno wyboru ćwiczeń.
 
 `node tools/check.mjs` wypisuje kąty stawów i aktywacje bez przeglądarki (szybki test sanity).
 
@@ -29,10 +31,15 @@ Parametry URL przydatne do demo i testów:
 | `src/exercises/*.js` | definicje ćwiczeń: fazy, poza(głębokość), parametry aktywacji |
 | `src/exercises/common.js` | oś czasu faz i model aktywacji |
 | `src/commands.js` | parser poleceń po polsku |
-| `src/main.js` | scena, UI, pętla animacji |
+| `src/scene.js` | wspólna scena 3D: kamera, światła, kolorowanie mięśni, znaczniki przeciążeń, oddech |
+| `src/simView.js` | widok Symulacja: ćwiczenia, oś czasu, błędy techniki |
+| `src/plan/catalog.js` | katalog ćwiczeń do planu (waga zaangażowania mięśni) |
+| `src/plan/analysis.js` | analiza planu: objętość, ostrzeżenia, rekomendacje (bez UI) |
+| `src/plan/planView.js` | widok Plan treningowy |
+| `src/main.js` | przełączanie widoków (#sim / #plan) |
 
 ## Dodanie ćwiczenia
 
-1. Utwórz `src/exercises/<nazwa>.js` z `phases`, `pose(depth)` i `muscles` (`rest`, `peak`, `w`), wzorując się na `pushup.js`.
-2. Dopisz je do `src/exercises/index.js`.
+1. Utwórz `src/exercises/<nazwa>.js` z `phases` (z `breath`), `pose(depth, params)`, `muscles` (`rest`, `peak`, `w`) i opcjonalnie `mistakes`, wzorując się na `pushup.js`.
+2. Dopisz je do `src/exercises/index.js`, a w `src/plan/catalog.js` ustaw `animated: "<id>"`.
 3. Zaktualizuj `docs/index.html` (tabela funkcjonalności i dziennik zmian).
