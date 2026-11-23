@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Human Exercise Simulation – o projekcie</title>
+  <style>
+    :root { --bg:#0d1219; --card:#151c27; --border:rgba(255,255,255,.08); --text:#e6ebf2; --muted:#93a0b4;
+      --accent:#4fb3ff; --ok:#5fd38a; --wip:#f2c94c; --plan:#8d98aa; --hot:#eb3b3b; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+    a { color: var(--accent); }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+    header.hero { padding: 72px 0 48px; background: radial-gradient(1200px 400px at 70% -10%, rgba(79,179,255,.18), transparent),
+      radial-gradient(800px 300px at 10% 0%, rgba(235,59,59,.12), transparent); border-bottom: 1px solid var(--border); }
+    .tag { display:inline-block; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent);
+      border:1px solid rgba(79,179,255,.35); border-radius:999px; padding:3px 10px; }
+    h1 { font-size: 44px; line-height:1.15; margin: 16px 0 12px; }
+    h1 span { background: linear-gradient(90deg,#3fa7d6,#f2c94c,#eb3b3b); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .lead { font-size: 19px; color: #c4ccd8; max-width: 720px; }
+    .cta { display:flex; gap:12px; margin-top: 26px; flex-wrap: wrap; }
+    .btn { display:inline-block; padding: 11px 20px; border-radius: 10px; text-decoration:none; font-weight:600; }
+    .btn.primary { background: var(--accent); color:#06121f; }
+    .btn.ghost { border:1px solid var(--border); color: var(--text); }
+    .meta { margin-top: 18px; color: var(--muted); font-size: 14px; }
+    section { padding: 56px 0; border-bottom: 1px solid var(--border); }
+    h2 { font-size: 28px; margin: 0 0 8px; }
+    .sub { color: var(--muted); margin: 0 0 28px; }
+    .grid { display:grid; gap:18px; }
+    .g2 { grid-template-columns: repeat(2, 1fr); } .g3 { grid-template-columns: repeat(3, 1fr); } .g4 { grid-template-columns: repeat(4, 1fr); }
+    .card { background: var(--card); border:1px solid var(--border); border-radius: 14px; padding: 20px; }
+    .card h3 { margin: 0 0 6px; font-size: 17px; }
+    .card p { margin: 0; color: #c4ccd8; font-size: 15px; }
+    .shots { display:grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .shots figure { margin:0; background: var(--card); border:1px solid var(--border); border-radius: 14px; overflow:hidden; }
+    .shots img { width:100%; display:block; }
+    .shots figcaption { padding: 8px 12px; font-size: 13px; color: var(--muted); }
+    .shots .col { display:grid; gap:14px; }
+    .flow { display:flex; align-items:stretch; gap: 10px; flex-wrap: wrap; }
+    .flow .step { flex:1; min-width: 180px; }
+    .flow .arrow { align-self:center; color: var(--muted); font-size: 22px; }
+    .step .num { font-size: 12px; color: var(--accent); font-weight: 700; letter-spacing: .06em; }
+    code { background:#0b1017; border:1px solid var(--border); border-radius:6px; padding: 1px 6px; font-size: 13.5px; }
+    .status { display:inline-block; font-size:12px; font-weight:700; padding: 2px 8px; border-radius: 999px; margin-right: 6px; }
+    .s-ok { background: rgba(95,211,138,.15); color: var(--ok); }
+    .s-wip { background: rgba(242,201,76,.15); color: var(--wip); }
+    .s-plan { background: rgba(141,152,170,.15); color: var(--plan); }
+    table { width:100%; border-collapse: collapse; font-size: 15px; }
+    th, td { text-align:left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+    .roadmap { position: relative; padding-left: 26px; }
+    .roadmap::before { content:""; position:absolute; left: 7px; top: 6px; bottom: 6px; width: 2px; background: var(--border); }
+    .milestone { position: relative; margin-bottom: 22px; }
+    .milestone::before { content:""; position:absolute; left: -25px; top: 6px; width: 14px; height: 14px; border-radius: 50%;
+      background: var(--bg); border: 2px solid var(--plan); }
+    .milestone.done::before { background: var(--ok); border-color: var(--ok); }
+    .milestone.next::before { border-color: var(--wip); }
+    .milestone h3 { margin: 0 0 4px; font-size: 17px; }
+    .milestone ul { margin: 4px 0 0; padding-left: 18px; color: #c4ccd8; font-size: 15px; }
+    .refs li { margin-bottom: 8px; color: #c4ccd8; font-size: 14.5px; }
+    .note { border-left: 3px solid var(--wip); padding: 10px 16px; background: rgba(242,201,76,.06); border-radius: 0 10px 10px 0; color:#d8dde6; font-size: 15px; }
+    footer { padding: 32px 0 48px; color: var(--muted); font-size: 14px; }
+    @media (max-width: 860px) { .g2,.g3,.g4,.shots { grid-template-columns: 1fr; } h1 { font-size: 34px; } }
+  </style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">MVP · wersja 0.1</span>
+    <h1>Zobacz, jak pracują mięśnie <span>w czasie rzeczywistym</span></h1>
+    <p class="lead">
+      Human Exercise Simulation to interaktywny model 3D człowieka, który wykonuje ćwiczenia na polecenie
+      („zrób 5 pompek”) i na żywo pokazuje, które mięśnie są aktywowane, w jakiej fazie ruchu i jak mocno.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="../index.html">▶ Otwórz demo</a>
+      <a class="btn ghost" href="#funkcje">Funkcjonalności</a>
+      <a class="btn ghost" href="#roadmapa">Roadmapa</a>
+    </div>
+    <div class="meta">Ostatnia aktualizacja: 23 listopada 2026</div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>Jak to wygląda</h2>
+    <p class="sub">Zrzuty ekranu z aktualnej wersji demo.</p>
+    <div class="shots">
+      <figure><img src="img/pushup.png" alt="Pompka – dolna faza"><figcaption>Pompka, dolna pozycja: najmocniej pracują triceps, piersiowy większy i przedni akton mięśnia naramiennego.</figcaption></figure>
+      <div class="col">
+        <figure><img src="img/squat.png" alt="Przysiad"><figcaption>Przysiad: dominuje mięsień czworogłowy uda i pośladkowy wielki.</figcaption></figure>
+        <figure><img src="img/curl.png" alt="Uginanie przedramion"><figcaption>Uginanie z hantlami: biceps i zginacze przedramienia.</figcaption></figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Problem i rozwiązanie</h2>
+    <p class="sub">Dlaczego to ma sens.</p>
+    <div class="grid g2">
+      <div class="card">
+        <h3>Problem</h3>
+        <p>Atlasy anatomiczne i filmy treningowe pokazują <em>albo</em> ruch, <em>albo</em> mięśnie, i to statycznie.
+          Trudno zrozumieć, że ten sam mięsień pracuje inaczej przy opuszczaniu i wypychaniu ciała ani dlaczego
+          najtrudniejszy jest dół pompki.</p>
+      </div>
+      <div class="card">
+        <h3>Rozwiązanie</h3>
+        <p>Łączymy ruch i fizjologię w jednej, interaktywnej scenie. Każda klatka animacji ma przypisaną
+          aktywację każdego mięśnia. Można zatrzymać ruch, przewinąć do konkretnej fazy i obejrzeć model z dowolnej strony.</p>
+      </div>
+    </div>
+    <div class="grid g4" style="margin-top:18px">
+      <div class="card"><h3>🏋️ Trenerzy</h3><p>Tłumaczenie techniki i celu ćwiczenia podopiecznym.</p></div>
+      <div class="card"><h3>🩺 Fizjoterapia</h3><p>Pokazanie pacjentowi, co dokładnie wzmacnia dane ćwiczenie.</p></div>
+      <div class="card"><h3>🎓 Edukacja</h3><p>Anatomia funkcjonalna dla studentów AWF, fizjoterapii i medycyny.</p></div>
+      <div class="card"><h3>📱 Aplikacje fitness</h3><p>Silnik wizualizacji osadzany w istniejących aplikacjach treningowych.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Jak to działa</h2>
+    <p class="sub">Architektura: cztery niezależne warstwy, z których każdą można później wymienić na dokładniejszą.</p>
+    <div class="flow">
+      <div class="card step"><div class="num">1 · POLECENIE</div><h3>Rozumienie języka</h3>
+        <p>Parser zamienia „zrób 5 pompek” na ćwiczenie i liczbę powtórzeń. <br><small>Docelowo: LLM.</small></p></div>
+      <div class="arrow">→</div>
+      <div class="card step"><div class="num">2 · RUCH</div><h3>Model kinematyczny</h3>
+        <p>Ćwiczenie to fazy ruchu plus kinematyka odwrotna (IK): dłonie i stopy stoją w miejscu, reszta ciała się dopasowuje.</p></div>
+      <div class="arrow">→</div>
+      <div class="card step"><div class="num">3 · MIĘŚNIE</div><h3>Model aktywacji</h3>
+        <p>Aktywacja każdego mięśnia zależy od głębokości ruchu i typu skurczu (koncentryczny, ekscentryczny, izometryczny), skalibrowana na danych EMG. <br><small>Docelowo: symulacja biomechaniczna.</small></p></div>
+      <div class="arrow">→</div>
+      <div class="card step"><div class="num">4 · WIZUALIZACJA</div><h3>Scena 3D</h3>
+        <p>Three.js w przeglądarce: kolor mięśnia od niebieskiego do czerwonego, panel z wartościami i oś czasu faz.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="funkcje">
+  <div class="wrap">
+    <h2>Funkcjonalności</h2>
+    <p class="sub"><span class="status s-ok">GOTOWE</span> działa w demo · <span class="status s-wip">W TRAKCIE</span> następne w kolejce · <span class="status s-plan">PLANOWANE</span> na roadmapie</p>
+    <table>
+      <thead><tr><th style="width:150px">Status</th><th>Funkcja</th><th>Opis</th></tr></thead>
+      <tbody>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Model 3D człowieka</td><td>Stylizowany manekin ze szkieletem (14 stawów) i 17 grupami mięśni widocznymi na powierzchni ciała.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>3 ćwiczenia</td><td>Pompka, przysiad, uginanie przedramion z hantlami. Każde z opisem i wskazówkami technicznymi.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Aktywacja mięśni na żywo</td><td>Kolor mięśni i paski % MVC aktualizowane w każdej klatce, z uwzględnieniem opóźnienia reakcji mięśnia.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Fazy ruchu</td><td>Oś czasu z fazami ekscentryczną, koncentryczną i izometryczną. Przewijanie, pauza i tempo od 0,25× do 2×.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Polecenia tekstowe (PL)</td><td>„zrób 5 pompek”, „trzy przysiady”, „uginanie”, „stop”, „wolniej”, „odpocznij”.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Interakcja z modelem</td><td>Obracanie kamery, podpowiedź z nazwą mięśnia po najechaniu, podświetlanie mięśnia z listy.</td></tr>
+        <tr><td><span class="status s-wip">W TRAKCIE</span></td><td>Polecenia przez LLM</td><td>Dowolne sformułowania i parametry, np. „wolne pompki na szeroko, 3 sekundy w dół”.</td></tr>
+        <tr><td><span class="status s-wip">W TRAKCIE</span></td><td>Biblioteka ćwiczeń</td><td>Plank, wykroki, podciąganie, martwy ciąg, wiosłowanie. Warianty (szerokie i wąskie pompki).</td></tr>
+        <tr><td><span class="status s-plan">PLANOWANE</span></td><td>Realistyczny model anatomiczny</td><td>Siatka z dokładnymi kształtami mięśni (np. na bazie Z-Anatomy) zamiast manekina.</td></tr>
+        <tr><td><span class="status s-plan">PLANOWANE</span></td><td>Symulacja biomechaniczna</td><td>Aktywacje liczone z fizyki ruchu (OpenSim / MuJoCo MyoSuite) zamiast krzywych z literatury.</td></tr>
+        <tr><td><span class="status s-plan">PLANOWANE</span></td><td>Personalizacja</td><td>Masa ciała, obciążenie i tempo zmieniają aktywację. Porównanie dwóch wariantów obok siebie.</td></tr>
+        <tr><td><span class="status s-plan">PLANOWANE</span></td><td>Analiza techniki z kamery</td><td>Estymacja pozy z wideo użytkownika, nałożenie na model i wskazanie błędów techniki.</td></tr>
+        <tr><td><span class="status s-plan">PLANOWANE</span></td><td>Wersja angielska</td><td>Interfejs i polecenia w języku angielskim.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="roadmapa">
+  <div class="wrap">
+    <h2>Roadmapa</h2>
+    <p class="sub">Od demonstratora do narzędzia edukacyjnego opartego na nauce.</p>
+    <div class="roadmap">
+      <div class="milestone done"><h3>Etap 1 – MVP (zrealizowany)</h3>
+        <ul><li>Model 3D, 3 ćwiczenia, aktywacje z literatury EMG, polecenia tekstowe, oś faz.</li></ul></div>
+      <div class="milestone next"><h3>Etap 2 – Rozszerzenie treści</h3>
+        <ul><li>Polecenia przez LLM, 10+ ćwiczeń i warianty, realistyczny model anatomiczny.</li>
+          <li>Weryfikacja wartości aktywacji przez fizjoterapeutę lub biomechanika.</li></ul></div>
+      <div class="milestone"><h3>Etap 3 – Silnik biomechaniczny</h3>
+        <ul><li>Dynamika odwrotna i optymalizacja sił mięśni: aktywacje liczone, a nie zapisane na sztywno.</li>
+          <li>Wpływ obciążenia, tempa i budowy ciała.</li></ul></div>
+      <div class="milestone"><h3>Etap 4 – Produkt</h3>
+        <ul><li>Analiza wideo użytkownika, plany treningowe, wersja mobilna i VR, SDK dla aplikacji fitness.</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Podstawy naukowe i ograniczenia</h2>
+    <p class="sub">Uczciwie o tym, co model potrafi dziś.</p>
+    <p class="note">Wartości aktywacji w MVP to <b>uproszczony model</b>. Poziomy szczytowe są inspirowane zakresami
+      raportowanymi w badaniach EMG (wyrażonymi jako % MVC), a przebieg w czasie wynika z głębokości ruchu i typu skurczu.
+      Nie są to pomiary ani wynik symulacji fizycznej. Przed użyciem w celach klinicznych wymagają weryfikacji przez eksperta.</p>
+    <h3 style="margin-top:26px">Literatura</h3>
+    <ul class="refs">
+      <li>Cogley R.M. i in. (2005). <i>Comparison of muscle activation using various hand positions during the push-up exercise.</i> J Strength Cond Res 19(3): 628–633.</li>
+      <li>Calatayud J. i in. (2015). <i>Bench press and push-up at comparable levels of muscle activity results in similar strength gains.</i> J Strength Cond Res 29(1): 246–253.</li>
+      <li>Escamilla R.F. (2001). <i>Knee biomechanics of the dynamic squat exercise.</i> Med Sci Sports Exerc 33(1): 127–141.</li>
+      <li>Caterisano A. i in. (2002). <i>The effect of back squat depth on the EMG activity of 4 superficial hip and thigh muscles.</i> J Strength Cond Res 16(3): 428–432.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Dziennik zmian</h2>
+    <table>
+      <thead><tr><th style="width:150px">Data</th><th style="width:90px">Wersja</th><th>Zmiany</th></tr></thead>
+      <tbody>
+        <tr><td>23.11.2026</td><td>0.1</td><td>Pierwsze MVP: manekin 3D z 17 grupami mięśni, pompka, przysiad i uginanie przedramion, aktywacje na żywo, oś faz, polecenia tekstowe po polsku, strona projektu.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">Human Exercise Simulation · prototyp · <a href="../index.html">otwórz demo</a></div>
+</footer>
+</body>
+</html>

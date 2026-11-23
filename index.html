@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Human Exercise Simulation – demo</title>
+  <link rel="stylesheet" href="src/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <header class="panel top-left">
+    <div class="brand">
+      <h1>Human Exercise Simulation</h1>
+      <a href="docs/index.html" class="about">O projekcie →</a>
+    </div>
+    <form id="cmd-form" autocomplete="off">
+      <input id="cmd" type="text" placeholder="Wpisz polecenie, np. „zrób 5 pompek”" autofocus />
+      <button type="submit">Wykonaj</button>
+    </form>
+    <div id="chips" class="chips"></div>
+    <div id="feedback" class="feedback"></div>
+  </header>
+
+  <aside class="panel left">
+    <h2 id="ex-name">Pozycja stojąca</h2>
+    <p id="ex-desc" class="muted">Wydaj polecenie, aby rozpocząć ćwiczenie.</p>
+    <ul id="ex-cues" class="cues"></ul>
+    <div class="phase-box">
+      <div class="label">Aktualna faza</div>
+      <div id="phase-name" class="phase-name">—</div>
+      <div id="phase-kind" class="phase-kind"></div>
+      <div id="reps" class="reps"></div>
+    </div>
+  </aside>
+
+  <aside class="panel right">
+    <div class="right-head">
+      <h2>Aktywacja mięśni</h2>
+      <select id="sort-mode" title="Kolejność">
+        <option value="activation">wg aktywacji</option>
+        <option value="anatomy">wg anatomii</option>
+      </select>
+    </div>
+    <div class="legend">
+      <span>0%</span><div class="legend-bar"></div><span>100% MVC</span>
+    </div>
+    <div id="muscle-list" class="muscle-list"></div>
+    <p class="disclaimer">Wartości przybliżone (% maksymalnego dowolnego skurczu, MVC), modelowane na podstawie badań EMG. Służą celom edukacyjnym.</p>
+  </aside>
+
+  <footer class="panel bottom">
+    <button id="play" class="play" title="Odtwórz / pauza (spacja)">▶</button>
+    <div id="timeline" class="timeline" title="Kliknij lub przeciągnij, aby przewinąć">
+      <div id="playhead" class="playhead" hidden></div>
+    </div>
+    <select id="speed" title="Tempo">
+      <option value="0.25">0,25×</option>
+      <option value="0.5">0,5×</option>
+      <option value="1" selected>1×</option>
+      <option value="2">2×</option>
+    </select>
+  </footer>
+
+  <div id="tooltip" class="tooltip" hidden></div>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

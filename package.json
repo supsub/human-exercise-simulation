@@ -1,0 +1,11 @@
+{
+  "name": "human-exercise-simulation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Symulacja ćwiczeń na modelu 3D człowieka z wizualizacją aktywacji mięśni w czasie rzeczywistym",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "check": "node tools/check.mjs"
+  }
+}
