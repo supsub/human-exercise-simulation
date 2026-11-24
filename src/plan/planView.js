@@ -1,31 +1,46 @@
-import { paintMuscles, flyCamera, jumpCamera, controls, body, pickMuscle, showTooltip, cssColor, volumeColor, cssVolumeColor, updateBreathPuffs, WEEK_THRESHOLDS, DAY_THRESHOLDS } from '../scene.js';
+import { paintMuscles, flyCamera, jumpCamera, controls, body, pickMuscle, showTooltip, cssColor, volumeColor, cssVolumeColor,
+  updateBreathPuffs, updateStressMarkers, WEEK_THRESHOLDS, DAY_THRESHOLDS } from '../scene.js';
 import { MUSCLES, MUSCLE_BY_ID } from '../muscles.js';
-import { standingPose, sampleExercise, computeActivations, peakActivations, roleOf, ROLES } from '../exercises/common.js';
+import { roleOf, PHASE_KIND, BREATH } from '../exercises/common.js';
 import { EXERCISE_BY_ID } from '../exercises/index.js';
-import { blendPose, smoothstep } from '../kinematics.js';
+import { createPlayer } from '../player.js';
+import { createFigure } from '../figure.js';
 import { CATALOG, CATALOG_BY_ID, CATEGORIES } from './catalog.js';
 import { DAYS, DAY_BY_ID, analyzePlan, emptyPlan, examplePlan, volumeStatus, OPTIMAL_WEEKLY, newId } from './analysis.js';
 
-// Widok "Plan treningowy": tydzień Pn–Nd, ćwiczenia na każdy dzień,
-// mapa obciążenia mięśni na modelu 3D i rekomendacje liczone lokalnie (offline).
+// Jedyny widok aplikacji: plan treningowy (tydzień Pn–Nd) z modelem 3D.
+// - bez wybranego ćwiczenia model pokazuje mapę obciążenia tygodnia lub dnia,
+// - wybrane ćwiczenie (z planu, listy lub rekomendacji) otwiera szczegóły po prawej:
+//   animacja na modelu, typowe błędy, figura z pracującymi mięśniami, dodanie do wybranego dnia.
 
 const STORAGE_KEY = 'hes.plans.v1';
+const PLAN_CAMERA = [[0, 1.25, 3.4], [0, 0.95, 0]];
 const $ = (id) => document.getElementById(id);
 const ui = {
-  root: $('plan-view'), select: $('plan-select'), days: $('plan-days'),
+  select: $('plan-select'), days: $('plan-days'),
   newBtn: $('plan-new'), renameBtn: $('plan-rename'), deleteBtn: $('plan-delete'), exampleBtn: $('plan-example'),
-  focus: $('plan-focus'), score: $('plan-score'), groups: $('plan-groups'), warnings: $('plan-warnings'), recs: $('plan-recs'),
-  picker: $('picker'), pickerTitle: $('picker-title'), pickerSearch: $('picker-search'), pickerCats: $('picker-cats'),
-  pickerList: $('picker-list'), pickerClose: $('picker-close'), browse: $('picker-browse'), detail: $('picker-detail'),
+  focus: $('plan-focus'), legend: $('plan-legend'), score: $('plan-score'), groups: $('plan-groups'), warnings: $('plan-warnings'), recs: $('plan-recs'),
+  panel: $('picker'), panelTitle: $('picker-title'), panelClose: $('picker-close'),
+  browse: $('picker-browse'), search: $('picker-search'), cats: $('picker-cats'), list: $('picker-list'),
+  detail: $('picker-detail'), dTop: $('d-top'), dTech: $('d-technique'), dMuscles: $('d-muscles'),
+  bar: $('player-bar'), play: $('play'), timeline: $('timeline'), playhead: $('playhead'), speed: $('speed'),
+  breathLabel: $('breath-label'), phaseKind: $('phase-kind'),
 };
 
+const player = createPlayer();
+const figure = createFigure($('figure'));
+
 let store = load();
-let rendering = false;
-let focusDay = null;       // null = cały tydzień, inaczej id dnia
 let analysis = null;
-let display = Object.fromEntries(MUSCLES.map((m) => [m.id, 0])); // wygładzone wartości na modelu
-let hovered = null;
-let openInSimulation = () => {};
+let focusDay = null;        // wybrany dzień (mapa dnia na modelu, cel przycisku "Dodaj")
+let selected = null;        // { ex: pozycja katalogu, anim: definicja animacji | null, from: 'plan' | 'list' }
+let browseDay = null;       // dzień, dla którego otwarto listę ćwiczeń
+let browseCat = null;
+let listHover = null;       // ćwiczenie wskazane na liście (podgląd mięśni)
+let muscleHover = null;     // mięsień wskazany w panelu
+let showNotes = localStorage.getItem('hes.mistakeNotes') !== '0';
+let scrubbing = false;
+let display = Object.fromEntries(MUSCLES.map((m) => [m.id, 0]));
 
 function load() {
   try {
@@ -37,6 +52,11 @@ function load() {
 }
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }
 const plan = () => store.plans.find((p) => p.id === store.currentId) ?? store.plans[0];
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const clampInt = (v, a, b) => Math.min(b, Math.max(a, parseInt(v, 10) || a));
+const dayTotal = (p, id) => p.days[id].items.reduce((s, it) => s + (it.sets || 0), 0);
+// mięśnie, które ćwiczenie mocno angażuje, a w planie dostają za mało pracy
+const helpsOf = (ex) => Object.entries(ex.muscles).filter(([id, w]) => w >= 0.5 && analysis.weekly[id] < 3).map(([id]) => id);
 
 // ---------- Render ----------
 function render() {
@@ -45,12 +65,10 @@ function render() {
   analysis = analyzePlan(p);
   renderDays(p);
   renderAnalysis(p);
+  if (selected) renderDetailTop();
+  if (!ui.browse.hidden && !ui.panel.hidden) renderList();
   save();
-  if (typeof renderDetail === 'function' && preview && !ui.detail.hidden && !rendering) { rendering = true; renderDetail(); rendering = false; }
 }
-
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const dayTotal = (p, id) => p.days[id].items.reduce((s, it) => s + (it.sets || 0), 0);
 
 function renderDays(p) {
   ui.days.innerHTML = '';
@@ -62,55 +80,52 @@ function renderDays(p) {
     card.innerHTML = `
       <div class="day-head">
         <label class="switch" title="Dzień treningowy"><input type="checkbox" ${day.active ? 'checked' : ''}><span></span></label>
-        <button class="day-name" title="Pokaż mięśnie z tego dnia na modelu">${d.name}</button>
+        <button class="day-name" title="Wybierz dzień – pokaż jego mięśnie na modelu">${d.name}</button>
         <span class="day-meta">${day.active ? (total ? `${day.items.length} ćw. · ${total} serii` : 'trening') : 'odpoczynek'}</span>
       </div>
       <div class="day-items"></div>`;
-    card.querySelector('input').onchange = (e) => { day.active = e.target.checked; if (!day.active && focusDay === d.id) focusDay = null; render(); };
-    card.querySelector('.day-name').onclick = () => { if (preview) closePanel(); focusDay = focusDay === d.id ? null : d.id; render(); };
+    card.querySelector('input').onchange = (e) => { day.active = e.target.checked; render(); };
+    card.querySelector('.day-name').onclick = () => {
+      // przy wybranym ćwiczeniu klik w dzień tylko go zaznacza (cel "Dodaj"), bez odznaczania
+      focusDay = selected ? d.id : focusDay === d.id ? null : d.id;
+      render();
+    };
     const list = card.querySelector('.day-items');
     if (day.active) {
       day.items.forEach((it, idx) => {
         const ex = CATALOG_BY_ID[it.exId];
         const row = document.createElement('div');
-        row.className = 'item';
+        row.className = 'item' + (selected?.ex === ex ? ' selected' : '');
+        row.title = 'Kliknij, aby zobaczyć ćwiczenie';
         row.innerHTML = `
-          <span class="item-name" title="${esc(primaryText(ex))}">${esc(ex.name)}</span>
+          <span class="item-name">${esc(ex.name)}${ex.animated ? ' <i class="anim-dot" title="ma animację">▶</i>' : ''}</span>
           <input type="number" min="1" max="10" value="${it.sets}" title="Serie"> <span class="x">×</span>
           <input type="number" min="1" max="50" value="${it.reps}" title="Powtórzenia">
-          ${ex.animated ? '<button class="icon play-ex" title="Szczegóły: animacja i pracujące mięśnie">▶</button>' : '<button class="icon play-ex static" title="Szczegóły: zaangażowane mięśnie na modelu">◉</button>'}
-          <button class="icon del" title="Usuń">✕</button>`;
+          <button class="icon del" title="Usuń z planu">✕</button>`;
         const [setsIn, repsIn] = row.querySelectorAll('input');
         setsIn.onchange = () => { it.sets = clampInt(setsIn.value, 1, 10); render(); };
         repsIn.onchange = () => { it.reps = clampInt(repsIn.value, 1, 50); render(); };
-        row.querySelector('.del').onclick = () => { day.items.splice(idx, 1); render(); };
-        if (preview?.ex === ex) row.classList.add('previewing');
-        row.querySelector('.play-ex').onclick = () => (preview?.ex === ex ? closePanel() : openDetail(ex, 'plan', d.id));
+        row.querySelectorAll('input, .del').forEach((el) => el.addEventListener('click', (e) => e.stopPropagation()));
+        row.querySelector('.del').onclick = (e) => { e.stopPropagation(); day.items.splice(idx, 1); render(); };
+        row.onclick = () => (selected?.ex === ex ? closePanel() : selectExercise(ex, 'plan'));
         list.appendChild(row);
       });
       const add = document.createElement('button');
       add.className = 'add-ex';
       add.textContent = '+ Dodaj ćwiczenie';
-      add.onclick = () => openPicker(d.id);
+      add.onclick = () => openBrowse(d.id);
       list.appendChild(add);
     }
     ui.days.appendChild(card);
   }
 }
 
-const clampInt = (v, a, b) => Math.min(b, Math.max(a, parseInt(v, 10) || a));
-function primaryText(ex) {
-  return Object.entries(ex.muscles).filter(([, w]) => w >= 0.75).map(([id]) => MUSCLE_BY_ID[id].name).join(', ');
-}
-
 function renderAnalysis(p) {
   const a = analysis;
-  ui.focus.innerHTML = preview
-    ? `Podgląd: <b>${esc(preview.ex.name)}</b> <button id="focus-week" class="link">wróć do mapy planu</button>`
-    : focusDay
+  ui.focus.innerHTML = focusDay
     ? `Pokazuję: <b>${DAY_BY_ID[focusDay].name}</b> <button id="focus-week" class="link">pokaż cały tydzień</button>`
     : 'Pokazuję: <b>cały tydzień</b> <span class="muted">(kliknij nazwę dnia, aby zobaczyć jeden trening)</span>';
-  ui.focus.querySelector('#focus-week')?.addEventListener('click', () => { if (preview) closePanel(); else { focusDay = null; render(); } });
+  ui.focus.querySelector('#focus-week')?.addEventListener('click', () => { focusDay = null; render(); });
 
   const pct = Math.round((a.trained / MUSCLES.length) * 100);
   ui.score.innerHTML = `
@@ -120,7 +135,7 @@ function renderAnalysis(p) {
 
   ui.groups.innerHTML = a.groups.map((g) => {
     const w = Math.min(100, (g.sets / OPTIMAL_WEEKLY) * 100);
-    return `<div class="g-row" data-group="${esc(g.group)}">
+    return `<div class="g-row">
       <span class="g-name">${g.group}</span>
       <div class="g-bar"><div class="g-zone"></div><div class="g-fill" style="width:${w}%;background:${cssVolumeColor(g.sets)}"></div></div>
       <span class="g-val">${g.sets.toFixed(1)}</span>
@@ -134,183 +149,257 @@ function renderAnalysis(p) {
     ? a.recommendations.map((r, i) => {
         const ex = CATALOG_BY_ID[r.exId];
         return `<div class="rec">
-          <div><button class="link rec-name" data-i="${i}" title="Szczegóły ćwiczenia">${ex.name}</button> <span class="muted">· ${ex.equipment}</span><br>
+          <div><button class="link rec-name" data-i="${i}" title="Zobacz ćwiczenie">${ex.name}</button> <span class="muted">· ${ex.equipment}</span><br>
           <small>Uzupełnia: ${r.fixes.map((id) => MUSCLE_BY_ID[id].name).join(', ')}</small></div>
-          ${r.day ? `<button data-i="${i}">+ ${DAY_BY_ID[r.day].short}</button>` : ''}
+          ${r.day ? `<button class="rec-add" data-i="${i}">+ ${DAY_BY_ID[r.day].short}</button>` : ''}
         </div>`;
       }).join('')
     : '<div class="muted">Brak – wszystkie mięśnie dostają minimum bodźca.</div>';
   ui.recs.querySelectorAll('.rec-name').forEach((b) => (b.onclick = () => {
     const r = a.recommendations[+b.dataset.i];
-    openDetail(CATALOG_BY_ID[r.exId], 'plan', r.day);
+    if (r.day) focusDay = r.day;
+    selectExercise(CATALOG_BY_ID[r.exId], 'plan');
   }));
-  ui.recs.querySelectorAll('button[data-i]:not(.rec-name)').forEach((b) => (b.onclick = () => {
+  ui.recs.querySelectorAll('.rec-add').forEach((b) => (b.onclick = () => {
     const r = a.recommendations[+b.dataset.i];
     p.days[r.day].items.push({ exId: r.exId, sets: 3, reps: 10 });
     render();
   }));
 }
 
-// ---------- Panel ćwiczeń: lista wyboru i szczegóły ----------
-// Panel otwiera się po prawej stronie; plan po lewej i model na środku cały czas są widoczne.
-let pickerDay = null, pickerCat = null;
-let pickerPreview = null;  // podgląd mięśni po najechaniu na pozycję listy
-let detailFrom = null;     // 'list' | 'plan' – skąd otwarto szczegóły (decyduje o "wróć")
-let detailDay = null;      // dzień, do którego domyślnie dodajemy z widoku szczegółów
-let detailHover = null;    // mięsień wskazany na liście w szczegółach
-let detailNote = '';       // potwierdzenie po dodaniu
-
-function openPicker(dayId) {
-  pickerDay = dayId;
-  closePreview(false);
-  ui.pickerSearch.value = '';
-  ui.picker.hidden = false;
-  showBrowse();
-  ui.pickerSearch.focus();
-}
-function showBrowse() {
-  closePreview(false);
-  ui.pickerTitle.textContent = `Dodaj ćwiczenie – ${DAY_BY_ID[pickerDay].name}`;
+// ---------- Panel: lista ćwiczeń ----------
+function openBrowse(dayId) {
+  browseDay = dayId;
+  focusDay = dayId;
+  deselect();
+  ui.search.value = '';
+  ui.panel.hidden = false;
   ui.browse.hidden = false;
   ui.detail.hidden = true;
-  renderPicker();
+  ui.panelTitle.textContent = `Dodaj ćwiczenie – ${DAY_BY_ID[dayId].name}`;
+  flyCamera(...PLAN_CAMERA);
+  render();
+  ui.search.focus();
+}
+function backToList() {
+  deselect();
+  ui.browse.hidden = false;
+  ui.detail.hidden = true;
+  ui.panelTitle.textContent = `Dodaj ćwiczenie – ${DAY_BY_ID[browseDay].name}`;
+  flyCamera(...PLAN_CAMERA);
   render();
 }
 function closePanel() {
-  ui.picker.hidden = true;
-  pickerPreview = null;
-  closePreview();
-}
-function openDetail(ex, from, dayId = null, instantT = null) {
-  detailFrom = from;
-  detailDay = dayId ?? pickerDay ?? focusDay ?? DAYS.find((d) => plan().days[d.id].active)?.id ?? 'mon';
-  detailNote = '';
-  pickerPreview = null;
-  ui.picker.hidden = false;
-  ui.browse.hidden = true;
-  ui.detail.hidden = false;
-  ui.pickerTitle.textContent = from === 'list' ? `Dodaj ćwiczenie – ${DAY_BY_ID[pickerDay].name}` : 'Szczegóły ćwiczenia';
-  openPreview(ex, instantT);
-  ui.detail.scrollTop = 0;
+  ui.panel.hidden = true;
+  listHover = null;
+  deselect();
+  flyCamera(...PLAN_CAMERA);
+  render();
 }
 
-ui.pickerCats.innerHTML = ['Wszystkie', ...CATEGORIES].map((c) => `<button class="chip" data-c="${c}">${c}</button>`).join('');
-ui.pickerCats.querySelectorAll('button').forEach((b) => (b.onclick = () => { pickerCat = b.dataset.c === 'Wszystkie' ? null : b.dataset.c; renderPicker(); }));
-ui.pickerSearch.oninput = renderPicker;
-ui.pickerClose.onclick = closePanel;
-window.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape' || ui.root.hidden) return;
-  if (!ui.picker.hidden && !ui.detail.hidden && detailFrom === 'list') showBrowse();
-  else closePanel();
-});
+ui.cats.innerHTML = ['Wszystkie', ...CATEGORIES].map((c) => `<button class="chip" data-c="${c}">${c}</button>`).join('');
+ui.cats.querySelectorAll('button').forEach((b) => (b.onclick = () => { browseCat = b.dataset.c === 'Wszystkie' ? null : b.dataset.c; renderList(); }));
+ui.search.oninput = renderList;
+ui.panelClose.onclick = closePanel;
 
-const helpsOf = (ex) => Object.entries(ex.muscles).filter(([id, w]) => w >= 0.5 && analysis.weekly[id] < 3).map(([id]) => id);
-
-function renderPicker() {
-  const q = ui.pickerSearch.value.toLowerCase().trim();
-  ui.pickerCats.querySelectorAll('button').forEach((b) => b.classList.toggle('active', (b.dataset.c === 'Wszystkie' && !pickerCat) || b.dataset.c === pickerCat));
-  const items = CATALOG.filter((ex) => (!pickerCat || ex.category === pickerCat) &&
+function renderList() {
+  const q = ui.search.value.toLowerCase().trim();
+  ui.cats.querySelectorAll('button').forEach((b) => b.classList.toggle('active', (b.dataset.c === 'Wszystkie' && !browseCat) || b.dataset.c === browseCat));
+  const items = CATALOG.filter((ex) => (!browseCat || ex.category === browseCat) &&
     (!q || ex.name.toLowerCase().includes(q) || Object.keys(ex.muscles).some((id) => MUSCLE_BY_ID[id].name.toLowerCase().includes(q))));
-  // ćwiczenia uzupełniające braki w planie pokazujemy na górze
-  items.sort((a, b) => helpsOf(b).length - helpsOf(a).length);
-  ui.pickerList.innerHTML = items.map((ex) => {
+  items.sort((a, b) => helpsOf(b).length - helpsOf(a).length); // uzupełniające braki na górze
+  ui.list.innerHTML = items.map((ex) => {
     const helps = helpsOf(ex).length;
-    const tags = Object.entries(ex.muscles).sort((a, b) => b[1] - a[1]).slice(0, 4)
+    const tags = Object.entries(ex.muscles).sort((a, b) => b[1] - a[1]).slice(0, 3)
       .map(([id, w]) => `<span class="mtag" style="border-color:${cssColor(w * 0.9)}">${MUSCLE_BY_ID[id].name}</span>`).join('');
     return `<div class="pick" data-id="${ex.id}" tabindex="0">
       <div class="pick-body">
-        <div class="pick-head"><b>${ex.name}</b>${ex.animated ? '<span class="anim">▶ animacja 3D</span>' : ''}${helps ? `<span class="helps">uzupełnia ${helps} ${helps === 1 ? 'brak' : 'braki'}</span>` : ''}</div>
+        <div class="pick-head"><b>${ex.name}</b>${ex.animated ? '<span class="anim">▶ animacja</span>' : ''}${helps ? `<span class="helps">uzupełnia ${helps} ${helps === 1 ? 'brak' : 'braki'}</span>` : ''}</div>
         <div class="pick-meta">${ex.category} · ${ex.equipment}</div><div class="mtags">${tags}</div>
       </div>
-      <button class="quick-add" title="Dodaj od razu (3 × 10)">+</button>
+      <button class="quick-add" title="Dodaj od razu do: ${DAY_BY_ID[browseDay].name} (3 × 10)">+</button>
     </div>`;
   }).join('') || '<div class="muted">Brak ćwiczeń pasujących do wyszukiwania.</div>';
-  ui.pickerList.querySelectorAll('.pick').forEach((el) => {
+  ui.list.querySelectorAll('.pick').forEach((el) => {
     const ex = CATALOG_BY_ID[el.dataset.id];
-    el.onclick = () => openDetail(ex, 'list');
-    el.onkeydown = (e) => { if (e.key === 'Enter') openDetail(ex, 'list'); };
+    el.onclick = () => selectExercise(ex, 'list');
+    el.onkeydown = (e) => { if (e.key === 'Enter') selectExercise(ex, 'list'); };
     el.querySelector('.quick-add').onclick = (e) => {
       e.stopPropagation();
-      plan().days[pickerDay].active = true;
-      plan().days[pickerDay].items.push({ exId: ex.id, sets: 3, reps: 10 });
-      render();
-      renderPicker();
-      el.classList.add('added');
+      addToDay(ex, browseDay);
+      ui.list.querySelector(`.pick[data-id="${ex.id}"]`)?.classList.add('added');
     };
-    el.onmouseenter = () => (pickerPreview = ex);
-    el.onmouseleave = () => (pickerPreview = null);
+    el.onmouseenter = () => (listHover = ex);
+    el.onmouseleave = () => (listHover = null);
   });
 }
 
-// Szczegóły: jak wykonać, co trenuje (role mięśni), co zmieni w planie, dodanie do wybranego dnia
-function renderDetail() {
-  if (!preview || ui.detail.hidden) return;
-  const { ex, anim } = preview;
+function addToDay(ex, dayId) {
+  const day = plan().days[dayId];
+  day.active = true;
+  day.items.push({ exId: ex.id, sets: 3, reps: 10 });
+  render();
+}
+
+// ---------- Panel: szczegóły wybranego ćwiczenia ----------
+// Panele planu są szerokie – kamera trochę dalej od celu niż w definicji ćwiczenia
+function cameraFor(anim, pos = anim.cameraPosition) {
+  const tg = anim.cameraTarget ?? [0, 0.85, 0];
+  return [pos.map((v, i) => tg[i] + (v - tg[i]) * 1.3), tg];
+}
+
+function selectExercise(ex, from, { t = null, mistake = null } = {}) {
+  const anim = ex.animated ? EXERCISE_BY_ID[ex.animated] : null;
+  updateStressMarkers([], 0, 0);
+  selected = { ex, anim, from };
+  listHover = null;
+  muscleHover = null;
+  player.state.frozen = t !== null;
+  player.setExercise(anim, t);
+  ui.panel.hidden = false;
+  ui.browse.hidden = true;
+  ui.detail.hidden = false;
+  ui.detail.scrollTop = 0;
+  ui.panelTitle.textContent = from === 'list' ? `Dodaj ćwiczenie – ${DAY_BY_ID[browseDay].name}` : 'Ćwiczenie';
+  controls.autoRotate = !anim; // bez animacji model się obraca, żeby było widać też mięśnie z tyłu
+  if (anim) (t !== null ? jumpCamera : flyCamera)(...cameraFor(anim));
+  else flyCamera(...PLAN_CAMERA);
+  ui.bar.hidden = !anim;
+  if (anim) buildTimeline(anim);
+  renderTechnique();
+  if (mistake && anim) {
+    const m = anim.mistakes.find((x) => x.id === mistake);
+    if (m) setMistake(m, true);
+  }
+  render();
+}
+function deselect() {
+  if (!selected) return;
+  selected = null;
+  player.state.frozen = false;
+  player.setExercise(null);
+  ui.bar.hidden = true;
+  ui.detail.hidden = true;
+  updateStressMarkers([], 0, 0);
+}
+
+function renderDetailTop() {
+  const { ex, from } = selected;
   const p = plan();
-  const level = (id) => (anim ? preview.peak[id] : (ex.muscles[id] ?? 0) * 0.6);
-  const groups = ROLES.map((r) => ({ ...r, items: MUSCLES.filter((m) => roleOf(level(m.id))?.id === r.id) })).filter((g) => g.items.length);
   const inPlan = DAYS.flatMap((d) => p.days[d.id].active ? p.days[d.id].items.filter((it) => it.exId === ex.id).map((it) => `${d.short} ${it.sets}×${it.reps}`) : []);
-  const fixes = helpsOf(ex);
-  // jak zmieni się pokrycie po dodaniu 3 serii do wybranego dnia
-  const trial = JSON.parse(JSON.stringify(p));
-  trial.days[detailDay].active = true;
-  trial.days[detailDay].items.push({ exId: ex.id, sets: 3, reps: 10 });
-  const after = analyzePlan(trial);
-  const gain = after.trained - analysis.trained;
-
-  ui.detail.innerHTML = `
-    ${detailFrom === 'list' ? '<button class="link back">← wróć do listy</button>' : ''}
+  let impact = '';
+  if (focusDay) {
+    const trial = JSON.parse(JSON.stringify(p));
+    trial.days[focusDay].active = true;
+    trial.days[focusDay].items.push({ exId: ex.id, sets: 3, reps: 10 });
+    const after = analyzePlan(trial);
+    impact = after.trained > analysis.trained
+      ? `Po dodaniu: <b>${analysis.trained} → ${after.trained}</b> mięśni z wystarczającym bodźcem.`
+      : helpsOf(ex).length ? 'Wzmocni słabiej trenowane partie.' : 'Te mięśnie już są trenowane w planie.';
+  }
+  ui.dTop.innerHTML = `
+    ${from === 'list' ? '<button class="link back">← wróć do listy</button>' : ''}
     <div class="d-title"><h2>${esc(ex.name)}</h2>
-      <div class="muted small">${ex.category} · ${ex.equipment} · ${anim ? '▶ animacja na modelu' : '◉ mapa mięśni na modelu (obraca się)'}</div></div>
-
+      <div class="muted small">${ex.category} · ${ex.equipment}${selected.anim ? '' : ' · bez animacji – model pokazuje mapę mięśni'}</div></div>
     <div class="d-add">
-      <div class="d-add-row">
-        <select class="d-day" title="Dzień">${DAYS.map((d) => `<option value="${d.id}" ${d.id === detailDay ? 'selected' : ''}>${d.name}${p.days[d.id].active ? '' : ' (odpoczynek)'}</option>`).join('')}</select>
-        <input class="d-sets" type="number" min="1" max="10" value="3" title="Serie"><span class="x">×</span>
-        <input class="d-reps" type="number" min="1" max="50" value="10" title="Powtórzenia">
-        <button class="d-add-btn">+ Dodaj</button>
-      </div>
-      <div class="d-impact">${detailNote || (gain > 0
-        ? `Po dodaniu: <b>${analysis.trained} → ${after.trained}</b> mięśni z wystarczającym bodźcem.`
-        : fixes.length ? 'Wzmocni słabiej trenowane partie.' : 'Mięśnie z tego ćwiczenia już są trenowane w planie.')}
-        ${inPlan.length ? `<br><span class="muted">Już w planie: ${inPlan.join(', ')}</span>` : ''}</div>
+      ${focusDay
+        ? `<button class="d-add-btn">+ Dodaj do: ${DAY_BY_ID[focusDay].name}</button><div class="d-impact">${impact}</div>`
+        : '<div class="d-impact">Aby dodać, kliknij nazwę dnia w planie po lewej.</div>'}
+      ${inPlan.length ? `<div class="d-impact muted">Już w planie: ${inPlan.join(', ')}</div>` : ''}
     </div>
-
-    <h3>Jak wykonać</h3>
     <p class="d-text">${ex.how}</p>
-    <p class="d-tip">💡 ${ex.tip}</p>
-
-    <h3>Co trenuje</h3>
-    ${groups.map((g) => `<div class="role-group"><div class="label">${g.label}</div><div class="role-items">
-      ${g.items.sort((a, b) => level(b.id) - level(a.id)).map((m) => `<span class="role-item${fixes.includes(m.id) ? ' fix' : ''}" data-id="${m.id}"
-        title="${fixes.includes(m.id) ? 'W Twoim planie ten mięsień dostaje za mało pracy' : ''}"><i style="background:${cssColor(anim ? level(m.id) : (ex.muscles[m.id] ?? 0) * 0.9)}"></i>${m.name}${m.deep ? ' <em>(głęboki)</em>' : ''}${fixes.includes(m.id) ? ' <b class="up">+</b>' : ''}</span>`).join('')}
-    </div></div>`).join('')}
-    ${fixes.length ? '<div class="muted small" style="margin-top:6px"><b class="up">+</b> mięśnie, których brakuje w Twoim planie</div>' : ''}
-
-    ${anim ? `
-      <h3>Wskazówki techniczne</h3>
-      <ul class="cues">${anim.cues.map((c) => `<li>${c}</li>`).join('')}</ul>
-      ${anim.mistakes.length ? `<h3>Typowe błędy</h3><ul class="cues">${anim.mistakes.map((m) => `<li>${m.name}</li>`).join('')}</ul>` : ''}
-      <button class="d-sim">Pełna symulacja: fazy ruchu, oddech, błędy →</button>` : ''}
-  `;
-  ui.detail.querySelector('.back')?.addEventListener('click', showBrowse);
-  const daySel = ui.detail.querySelector('.d-day');
-  daySel.onchange = () => { detailDay = daySel.value; detailNote = ''; renderDetail(); };
-  ui.detail.querySelector('.d-add-btn').onclick = () => {
-    const sets = clampInt(ui.detail.querySelector('.d-sets').value, 1, 10);
-    const reps = clampInt(ui.detail.querySelector('.d-reps').value, 1, 50);
-    p.days[detailDay].active = true;
-    p.days[detailDay].items.push({ exId: ex.id, sets, reps });
-    render();
-    detailNote = `✓ Dodano: ${DAY_BY_ID[detailDay].name}, ${sets} × ${reps}. Pokrycie planu: ${analysis.trained} z ${MUSCLES.length} mięśni.`;
-    renderDetail();
-  };
-  ui.detail.querySelectorAll('.role-item').forEach((el) => {
-    el.onmouseenter = () => (detailHover = el.dataset.id);
-    el.onmouseleave = () => (detailHover = null);
-  });
-  ui.detail.querySelector('.d-sim')?.addEventListener('click', () => { const id = ex.animated; closePanel(); openInSimulation(id); });
+    <p class="d-tip">💡 ${ex.tip}</p>`;
+  ui.dTop.querySelector('.back')?.addEventListener('click', backToList);
+  ui.dTop.querySelector('.d-add-btn')?.addEventListener('click', () => addToDay(ex, focusDay));
+  renderMuscleSummary();
 }
+
+// Krótkie podsumowanie pod figurą zamiast długiej listy wszystkich mięśni
+function renderMuscleSummary() {
+  const { ex, anim } = selected;
+  const peak = anim ? (player.state.peakBad ?? player.state.peakGood) : null;
+  const level = (id) => (anim ? peak[id] : (ex.muscles[id] ?? 0) * 0.6);
+  const main = MUSCLES.filter((m) => roleOf(level(m.id))?.id === 'main').sort((a, b) => level(b.id) - level(a.id));
+  const fixes = helpsOf(ex);
+  const chip = (m, cls = '') => `<span class="role-item ${cls}" data-id="${m.id}"><i style="background:${cssColor(anim ? level(m.id) : (ex.muscles[m.id] ?? 0) * 0.9)}"></i>${m.name}</span>`;
+  ui.dMuscles.innerHTML = `
+    <div class="label">Pracują najmocniej</div><div class="role-items">${main.map((m) => chip(m)).join('')}</div>
+    ${fixes.length ? `<div class="label" style="margin-top:10px">Uzupełnia braki w Twoim planie</div>
+      <div class="role-items">${fixes.map((id) => chip(MUSCLE_BY_ID[id], 'fix')).join('')}</div>` : ''}
+    <div class="muted small" style="margin-top:8px">Najedź na figurę lub model, aby zobaczyć rolę każdego mięśnia.</div>`;
+  ui.dMuscles.querySelectorAll('.role-item').forEach((el) => {
+    el.onmouseenter = () => (muscleHover = el.dataset.id);
+    el.onmouseleave = () => (muscleHover = null);
+  });
+}
+
+// Typowe błędy techniki (tylko ćwiczenia z animacją): klik przełącza animację na błędną technikę
+function renderTechnique() {
+  const anim = selected.anim;
+  if (!anim) { ui.dTech.innerHTML = ''; return; }
+  const cur = player.state.pending;
+  ui.dTech.innerHTML = `
+    <div class="mistakes-head">
+      <h3>Technika – porównaj</h3>
+      <label class="mini-toggle" title="Pokazuj opis błędu i etykiety przeciążeń na modelu"><input type="checkbox" ${showNotes ? 'checked' : ''}> opisy</label>
+    </div>
+    <div class="mistakes">
+      <button class="mistake-btn good ${cur ? '' : 'active'}" data-id="">✓ Poprawna technika</button>
+      ${anim.mistakes.map((m) => `<button class="mistake-btn bad ${cur === m ? 'active' : ''}" data-id="${m.id}">✗ ${m.name}</button>`).join('')}
+    </div>
+    ${cur && showNotes ? `<div class="mistake-info"><p>${cur.what}</p><p><b>Dlaczego to problem:</b> ${cur.why}</p><p class="fix"><b>Jak poprawić:</b> ${cur.fix}</p></div>` : ''}
+    <details class="cues-box"><summary>Wskazówki techniczne i oddech</summary>
+      <ul class="cues">${anim.cues.map((c) => `<li>${c}</li>`).join('')}</ul>
+      ${anim.breathingTip ? `<p class="breath-tip">🫁 ${anim.breathingTip}</p>` : ''}</details>`;
+  ui.dTech.querySelectorAll('.mistake-btn').forEach((b) => (b.onclick = () => setMistake(anim.mistakes.find((m) => m.id === b.dataset.id) ?? null)));
+  ui.dTech.querySelector('.mini-toggle input').onchange = (e) => {
+    showNotes = e.target.checked;
+    localStorage.setItem('hes.mistakeNotes', showNotes ? '1' : '0');
+    renderTechnique();
+  };
+}
+function setMistake(m, instant = false) {
+  const anim = selected.anim;
+  player.setMistake(m, instant);
+  const pos = m?.camera ?? anim.cameraPosition;
+  (instant ? jumpCamera : flyCamera)(...cameraFor(anim, pos));
+  renderTechnique();
+  renderMuscleSummary();
+}
+
+// ---------- Pasek odtwarzania ----------
+function buildTimeline(ex) {
+  ui.timeline.querySelectorAll('.seg').forEach((s) => s.remove());
+  for (const p of ex.phases) {
+    const seg = document.createElement('div');
+    seg.className = 'seg ' + p.kind;
+    seg.style.left = p.start * 100 + '%';
+    seg.style.width = (p.end - p.start) * 100 + '%';
+    seg.title = `${p.name} – ${PHASE_KIND[p.kind].hint}, ${BREATH[p.breath].label.toLowerCase()}`;
+    seg.innerHTML = `<span>${p.name}</span><b class="seg-breath">${BREATH[p.breath].icon}</b>`;
+    ui.timeline.appendChild(seg);
+  }
+}
+ui.play.onclick = () => { player.state.frozen = false; player.state.playing = !player.state.playing; };
+ui.speed.onchange = () => (player.state.speed = parseFloat(ui.speed.value));
+function scrubAt(clientX) {
+  const r = ui.timeline.getBoundingClientRect();
+  player.seek((clientX - r.left) / r.width);
+}
+ui.timeline.addEventListener('pointerdown', (e) => { scrubbing = true; ui.timeline.setPointerCapture(e.pointerId); scrubAt(e.clientX); });
+ui.timeline.addEventListener('pointermove', (e) => scrubbing && scrubAt(e.clientX));
+ui.timeline.addEventListener('pointerup', () => (scrubbing = false));
+
+window.addEventListener('keydown', (e) => {
+  const typing = ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName);
+  if (e.key === 'Escape') {
+    if (selected?.from === 'list') backToList();
+    else if (!ui.panel.hidden) closePanel();
+  } else if (e.code === 'Space' && selected?.anim && !typing) {
+    e.preventDefault();
+    ui.play.click();
+  }
+});
 
 // ---------- Zarządzanie planami ----------
 ui.select.onchange = () => { store.currentId = ui.select.value; focusDay = null; render(); };
@@ -342,149 +431,106 @@ ui.exampleBtn.onclick = () => {
   render();
 };
 
-// ---------- Podgląd ćwiczenia w planie (bez wychodzenia z widoku) ----------
-// Ćwiczenia z animacją są odtwarzane na modelu z kolorami aktywacji, pozostałe pokazują mapę zaangażowania.
-const PLAN_CAMERA = [[0, 1.25, 3.4], [0, 0.95, 0]];
-let preview = null;         // { ex: pozycja katalogu, anim: definicja ćwiczenia | null, t, peak }
-let pose = standingPose();
-let poseBlend = null;       // { from, t }
-
-// W planie panele są szersze niż w symulacji – kamera trochę dalej od celu
-function previewCamera(anim) {
-  const tg = anim.cameraTarget ?? [0, 0.85, 0];
-  return [anim.cameraPosition.map((v, i) => tg[i] + (v - tg[i]) * 1.3), tg];
-}
-// instantT: (demo/testy) od razu ustaw pozę w danym punkcie cyklu, bez przejścia i animacji
-function openPreview(ex, instantT = null) {
-  const anim = ex.animated ? EXERCISE_BY_ID[ex.animated] : null;
-  preview = { ex, anim, t: instantT ?? 0, frozen: instantT !== null, peak: anim ? peakActivations(anim) : null };
-  poseBlend = instantT !== null ? null : { from: pose, t: 0 };
-  controls.autoRotate = !anim; // bez animacji: obracamy model, żeby było widać też mięśnie z tyłu
-  if (anim && instantT !== null) jumpCamera(...previewCamera(anim));
-  else if (anim) flyCamera(...previewCamera(anim));
-  else flyCamera(...PLAN_CAMERA);
-  render();
-}
-function closePreview(rerender = true) {
-  if (!preview) return;
-  preview = null;
-  detailHover = null;
-  poseBlend = { from: pose, t: 0 };
-  flyCamera(...PLAN_CAMERA);
-  if (rerender) render();
-}
-
-function previewFrame(dt) {
-  let target = standingPose();
-  let values;
-  if (preview?.anim) {
-    const a = preview.anim;
-    if (!preview.frozen && (!poseBlend || poseBlend.t > 0.6)) preview.t = (preview.t + dt / a.cycle) % 1;
-    const s = sampleExercise(a, preview.t);
-    target = a.pose(s.depth, {});
-    values = computeActivations(a, s);
-    body.setBreath(s.breath);
-    updateBreathPuffs(dt, s.phase.breath === 'out' ? 1 : 0);
-  } else {
-    body.setBreath(0.4);
-    updateBreathPuffs(dt, 0);
-  }
-  if (poseBlend) {
-    poseBlend.t = Math.min(1, poseBlend.t + dt / 0.8);
-    pose = blendPose(poseBlend.from, target, smoothstep(poseBlend.t));
-    if (poseBlend.t >= 1) poseBlend = null;
-  } else pose = target;
-  body.setPose(pose);
-  return values;
-}
-
 // ---------- Klatka animacji ----------
-export function frame(dt) {
+let mode = null, lastMode = null;
+export function frame(dt, time) {
   if (!analysis) return;
-  const animValues = previewFrame(dt);
-  // Trzy tryby: podgląd ćwiczenia z listy (udział mięśni), jeden dzień, cały tydzień
-  let target, colorFn, glowFn, tipEx = preview?.ex;
-  if (preview?.anim) {
-    target = animValues;
-    colorFn = undefined; glowFn = undefined;
+  const out = player.frame(dt, scrubbing);
+  body.setPose(out.pose);
+  body.setBreath(out.sample ? out.sample.breath : 0.4);
+  updateBreathPuffs(dt, out.sample?.phase.breath === 'out' && player.state.playing ? 1 : 0);
+  updateStressMarkers(out.mistake ? out.mistake.stress : [], out.mix, time, showNotes);
+
+  // Co pokazuje model: animację, udział mięśni w ćwiczeniu, jeden dzień albo cały tydzień
+  let target, colorFn, glowFn;
+  const staticEx = listHover ?? (selected && !selected.anim ? selected.ex : null);
+  if (selected?.anim && !listHover) {
+    target = out.activations ?? display;
     mode = 'anim';
-  } else if ((pickerPreview && !ui.picker.hidden) || preview) {
-    const src = pickerPreview && !ui.picker.hidden ? pickerPreview : preview.ex;
-    tipEx = src;
-    target = Object.fromEntries(MUSCLES.map((m) => [m.id, (src.muscles[m.id] ?? 0) * 0.9]));
-    colorFn = undefined; glowFn = undefined;
+  } else if (staticEx) {
+    target = Object.fromEntries(MUSCLES.map((m) => [m.id, (staticEx.muscles[m.id] ?? 0) * 0.9]));
     mode = 'preview';
   } else if (focusDay) {
-    target = { ...analysis.perDay[focusDay] };
+    target = analysis.perDay[focusDay];
     colorFn = (v, c) => volumeColor(v, DAY_THRESHOLDS, c); glowFn = (v) => v / 8;
     mode = 'day';
   } else {
-    target = { ...analysis.weekly };
+    target = analysis.weekly;
     colorFn = (v, c) => volumeColor(v, WEEK_THRESHOLDS, c); glowFn = (v) => v / 20;
     mode = 'week';
   }
   if (mode !== lastMode) { lastMode = mode; renderLegend(mode); }
-  const k = 1 - Math.exp(-dt / (mode === 'anim' ? 0.09 : 0.15));
+  const k = mode === 'anim' ? 1 : 1 - Math.exp(-dt / 0.15);
   for (const id in display) display[id] += (target[id] - display[id]) * k;
 
-  const hit = pickMuscle();
-  hovered = hit?.id ?? detailHover ?? null;
-  if (hit && (mode === 'anim' || mode === 'preview')) {
-    const r = mode === 'anim' ? roleOf(preview.peak[hit.id]) : roleOf((tipEx.muscles[hit.id] ?? 0) * 0.6);
-    showTooltip(hit, `${esc(tipEx.name)}: ${r ? r.one : 'prawie nie pracuje'}`);
+  // Najechanie: model, figura w panelu albo nazwa mięśnia w panelu
+  const hit = pickMuscle() ?? (selected ? figure.pick() : null);
+  const hovered = hit?.id ?? muscleHover ?? null;
+  if (hit && selected && !listHover) {
+    const lvl = selected.anim ? player.peakMap()[hit.id] : (selected.ex.muscles[hit.id] ?? 0) * 0.6;
+    const r = roleOf(lvl);
+    showTooltip(hit, `W tym ćwiczeniu ${r ? r.one : 'prawie nie pracuje'}`);
+  } else if (hit && listHover) {
+    const r = roleOf((listHover.muscles[hit.id] ?? 0) * 0.6);
+    showTooltip(hit, `${esc(listHover.name)}: ${r ? r.one : 'prawie nie pracuje'}`);
   } else if (hit) {
     const w = analysis.weekly[hit.id];
-    const st = volumeStatus(w);
     const dayTxt = focusDay ? `<br>${DAY_BY_ID[focusDay].name}: ${analysis.perDay[focusDay][hit.id].toFixed(1)} serii` : '';
-    showTooltip(hit, `Tydzień: <b>${w.toFixed(1)}</b> efektywnych serii – ${st.label}${dayTxt}`);
+    showTooltip(hit, `Tydzień: <b>${w.toFixed(1)}</b> efektywnych serii – ${volumeStatus(w).label}${dayTxt}`);
   } else showTooltip(null);
   paintMuscles(display, hovered, colorFn, glowFn);
+
+  // Figura w panelu szczegółów i pasek odtwarzania
+  if (selected) {
+    const map = selected.anim ? player.peakMap()
+      : Object.fromEntries(MUSCLES.map((m) => [m.id, (selected.ex.muscles[m.id] ?? 0) * 0.7]));
+    figure.set(map, hovered);
+    figure.render();
+    ui.dMuscles.querySelectorAll('.role-item').forEach((el) => el.classList.toggle('hover', el.dataset.id === hovered));
+  }
+  if (out.sample) {
+    const ph = out.sample.phase;
+    ui.playhead.style.left = player.state.t * 100 + '%';
+    ui.timeline.querySelectorAll('.seg').forEach((s, i) => s.classList.toggle('current', selected.anim.phases[i] === ph));
+    ui.breathLabel.textContent = `${BREATH[ph.breath].icon} ${BREATH[ph.breath].label}`;
+    ui.breathLabel.className = 'breath-label ' + ph.breath;
+    ui.phaseKind.innerHTML = `<b>${ph.name}</b> – ${PHASE_KIND[ph.kind].hint}`;
+    ui.play.textContent = player.state.playing ? '❚❚' : '▶';
+  }
 }
 
-let mode = null, lastMode = null;
 function renderLegend(m) {
-  const el = document.getElementById('plan-legend');
   if (m === 'anim') {
-    el.innerHTML = `<span>aktywacja mięśni:</span><div class="legend-bar"></div><span>mocno</span>`;
+    ui.legend.innerHTML = `<span>praca mięśni teraz:</span><div class="legend-bar"></div><span>mocno</span>`;
     return;
   }
   if (m === 'preview') {
-    el.innerHTML = `<span>udział mięśnia:</span><div class="legend-bar"></div><span>główny</span>`;
+    ui.legend.innerHTML = `<span>udział mięśnia:</span><div class="legend-bar"></div><span>główny</span>`;
     return;
   }
   const th = m === 'day' ? DAY_THRESHOLDS : WEEK_THRESHOLDS;
   const box = (v, t) => `<span class="lg"><i style="background:${cssVolumeColor(v, th)}"></i>${t}</span>`;
-  el.innerHTML = (m === 'day' ? '<b>Serie w tym dniu:</b> ' : '<b>Serie tygodniowo:</b> ') +
+  ui.legend.innerHTML = (m === 'day' ? '<b>Serie w tym dniu:</b> ' : '<b>Serie tygodniowo:</b> ') +
     box(0, '0') + box(th[0] * 0.8, `&lt; ${th[0]}`) + box((th[0] + th[1]) / 2, `${th[0]}–${th[1]}`) + box(th[2] * 0.75, `${th[1]}–${th[2]}`) + box(th[3] + 2, `&gt; ${th[2]}`);
 }
 
-export function enter() {
-  pose = standingPose();
-  poseBlend = null;
-  preview = null;
-  ui.picker.hidden = true;
-  body.setPose(pose);
-  body.setBreath(0.4);
+// Start. Parametry do demo/testów:
+//   ?focus=tue – wybrany dzień, ?picker=wed – lista ćwiczeń dla dnia, &preview=row – podgląd z listy,
+//   ?ex=squat – szczegóły ćwiczenia, &t=0.5 – zatrzymanie animacji, &mistake=valgus – typowy błąd
+export function start() {
   flyCamera(...PLAN_CAMERA);
   controls.autoRotate = true;
-  // parametry do demo/testów: ?focus=mon&picker=wed&preview=row
   const q = new URLSearchParams(location.search);
   if (DAY_BY_ID[q.get('focus')]) focusDay = q.get('focus');
   render();
-  const instantT = q.has('t') ? parseFloat(q.get('t')) : null;
-  if (CATALOG_BY_ID[q.get('show')]) openDetail(CATALOG_BY_ID[q.get('show')], 'plan', null, instantT);
   if (DAY_BY_ID[q.get('picker')]) {
-    openPicker(q.get('picker'));
-    if (CATALOG_BY_ID[q.get('preview')]) pickerPreview = CATALOG_BY_ID[q.get('preview')];
-    if (CATALOG_BY_ID[q.get('detail')]) openDetail(CATALOG_BY_ID[q.get('detail')], 'list', null, instantT);
+    openBrowse(q.get('picker'));
+    if (CATALOG_BY_ID[q.get('preview')]) listHover = CATALOG_BY_ID[q.get('preview')];
+  }
+  const ex = CATALOG_BY_ID[q.get('ex')];
+  if (ex) {
+    if (DAY_BY_ID[q.get('focus')]) focusDay = q.get('focus');
+    selectExercise(ex, q.get('picker') ? 'list' : 'plan', { t: q.has('t') ? parseFloat(q.get('t')) : null, mistake: q.get('mistake') });
   }
 }
-export function leave() {
-  controls.autoRotate = false;
-  ui.picker.hidden = true;
-  preview = null;
-  updateBreathPuffs(0, 0);
-  showTooltip(null);
-}
-export function setOpenInSimulation(fn) { openInSimulation = fn; }
 controls.addEventListener('start', () => (controls.autoRotate = false));

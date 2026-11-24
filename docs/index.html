@@ -67,7 +67,7 @@
 
 <header class="hero">
   <div class="wrap">
-    <span class="tag">MVP · wersja 0.3.1</span>
+    <span class="tag">MVP · wersja 0.4</span>
     <h1>Ułóż plan treningowy i <span>zobacz, które mięśnie pracują</span></h1>
     <p class="lead">
       Human Exercise Simulation to aplikacja dla osób, które chcą ułożyć sensowny plan treningowy i zrozumieć,
@@ -89,16 +89,16 @@
     <h2>Jak to wygląda</h2>
     <p class="sub">Zrzuty ekranu z aktualnej wersji demo.</p>
     <div class="shots">
-      <figure><img src="img/pushup.png" alt="Pompka – dolna faza"><figcaption>Symulacja: pompka w animacji, a obok statyczna figura (przód i tył) z mięśniami, które pracują najmocniej, pomagają lub trzymają pozycję.</figcaption></figure>
+      <figure><img src="img/pushup.png" alt="Pompka wybrana w planie"><figcaption>Ćwiczenie wybrane z planu: animacja na modelu, pasek faz ruchu i oddechu, a w panelu opis, typowe błędy i figura (przód i tył) z pracującymi mięśniami.</figcaption></figure>
       <div class="col">
         <figure><img src="img/mistake.png" alt="Błąd techniki – kolana do środka"><figcaption>Typowy błąd: kolana uciekają do środka w przysiadzie. Przeciążone więzadła kolana są zaznaczone na czerwono.</figcaption></figure>
         <figure><img src="img/curl.png" alt="Uginanie przedramion"><figcaption>Uginanie z hantlami: biceps, ramienny i ramienno-promieniowy.</figcaption></figure>
       </div>
     </div>
     <div class="shots" style="margin-top:14px">
-      <figure><img src="img/plan.png" alt="Plan treningowy"><figcaption>Plan treningowy: tydzień Pn–Nd, ocena planu i ostrzeżenia. Ćwiczenie z planu można obejrzeć w animacji bez wychodzenia z planu.</figcaption></figure>
+      <figure><img src="img/plan.png" alt="Plan treningowy"><figcaption>Plan treningowy: tydzień Pn–Nd, mapa obciążenia mięśni na modelu, ocena planu, ostrzeżenia i rekomendacje.</figcaption></figure>
       <div class="col">
-        <figure><img src="img/picker.png" alt="Szczegóły ćwiczenia w planie"><figcaption>Szczegóły ćwiczenia w panelu obok planu: animacja, opis, mięśnie wg roli i wpływ na plan.</figcaption></figure>
+        <figure><img src="img/picker.png" alt="Wybór ćwiczeń"><figcaption>Dodawanie ćwiczeń: na górze listy są te, które uzupełniają braki w planie; najechanie pokazuje mięśnie na modelu.</figcaption></figure>
       </div>
     </div>
   </div>
@@ -163,12 +163,12 @@
       <thead><tr><th style="width:150px">Status</th><th>Funkcja</th><th>Opis</th></tr></thead>
       <tbody>
         <tr><td><span class="status s-ok">GOTOWE</span></td><td>Model 3D człowieka</td><td>Stylizowany manekin ze szkieletem (14 stawów) i <b>34 mięśniami z podziałem na głowy i części</b>: 4 głowy czworogłowego, 3 aktony naramiennego, 3 części czworobocznego, 2 głowy tricepsa i inne. Mięśnie mają kształt wrzecion i łez, a mięsień prosty brzucha pokazany jest jako „kaloryfer”.</td></tr>
-        <tr><td><span class="status s-ok">GOTOWE</span></td><td>3 ćwiczenia z animacją</td><td>Pompka, przysiad, uginanie przedramion z hantlami. Każde ma opis, wskazówki techniczne i wskazówki oddechowe.</td></tr>
-        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Pracujące mięśnie – prosto</td><td>W animacji kolor mięśni zmienia się z fazą ruchu. Obok statyczna figura (przód i tył) i podział na mięśnie, które <b>pracują najmocniej</b>, <b>pomagają</b> i <b>trzymają pozycję</b> – bez procentów, które dla laika są nieczytelne. Przy błędzie techniki strzałki pokazują, co pracuje mocniej, a co słabiej.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>3 ćwiczenia z animacją</td><td>Pompka, przysiad, uginanie przedramion z hantlami. Animacja odtwarza się na modelu w planie, z paskiem faz (pauza, przewijanie, tempo), wskazówkami technicznymi i oddechowymi.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Pracujące mięśnie – prosto</td><td>W animacji kolor mięśni zmienia się z fazą ruchu. W panelu statyczna figura (przód i tył) i krótka lista: które mięśnie <b>pracują najmocniej</b> i które <b>uzupełniają braki w Twoim planie</b> – bez procentów i bez długich list. Rolę każdego mięśnia widać po najechaniu.</td></tr>
         <tr><td><span class="status s-ok">GOTOWE</span></td><td>Łatwe wskazywanie mięśni</td><td>Najechanie kursorem na mięsień (na modelu lub na figurze) pokazuje jego nazwę i rolę w ćwiczeniu. Mięśnie nachodzące na siebie (np. głowy czworogłowego) są rozróżniane po tym, który jest najbliżej kursora.</td></tr>
-        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Oddech</td><td>Klatka piersiowa i brzuch rozszerzają się przy wdechu, przy wydechu widać obłoczki. Oddech jest zsynchronizowany z fazami ruchu (np. wydech przy wypychaniu), a obok jest wskaźnik płuc.</td></tr>
-        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Typowe błędy techniki</td><td>Dla każdego ćwiczenia 2–3 błędy (np. opadające biodra, łokcie na boki, kolana do środka, zaokrąglone plecy, bujanie). Płynne przejście między techniką poprawną i błędną, zmiana aktywacji mięśni, czerwone znaczniki przeciążonych struktur oraz opis: co się dzieje, dlaczego to problem i jak poprawić. Opis jest w panelu bocznym (nie zasłania animacji) i można go wyłączyć.</td></tr>
-        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Plan treningowy</td><td>Wiele planów, tydzień Pn–Nd, dni treningowe i odpoczynku, ćwiczenia z serii × powtórzeniami. Zapis lokalny w przeglądarce. Szczegóły ćwiczenia otwierają się w panelu obok planu: animacja lub mapa mięśni na modelu, opis „jak wykonać” i „na co uważać”, mięśnie wg roli z zaznaczeniem tych, których brakuje w planie, wpływ na pokrycie planu („13 → 15 mięśni”) i dodanie do wybranego dnia. Plan cały czas jest widoczny.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Oddech</td><td>Klatka piersiowa i brzuch rozszerzają się przy wdechu, przy wydechu widać obłoczki. Oddech jest zsynchronizowany z fazami ruchu (np. wydech przy wypychaniu), a pasek odtwarzania pokazuje bieżący wdech / wydech.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Typowe błędy techniki</td><td>Dla każdego ćwiczenia 2–3 błędy (np. opadające biodra, łokcie na boki, kolana do środka, zaokrąglone plecy, bujanie). Płynne przejście między techniką poprawną i błędną, zmiana aktywacji mięśni, czerwone znaczniki przeciążonych struktur oraz opis: co się dzieje, dlaczego to problem i jak poprawić. Błąd wybiera się jednym kliknięciem w panelu ćwiczenia, a opis można wyłączyć.</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Plan treningowy</td><td><b>Jeden ekran</b>: plan, model i szczegóły ćwiczenia. Wiele planów, tydzień Pn–Nd, ćwiczenia z serii × powtórzeniami, zapis lokalny. Kliknięcie ćwiczenia w planie, na liście lub w rekomendacjach otwiera jego szczegóły obok planu. Dodawanie jest naturalne: wybierasz ćwiczenie, klikasz dzień w planie, potem „Dodaj do: Wtorek” – z podglądem wpływu na plan („13 → 15 mięśni”).</td></tr>
         <tr><td><span class="status s-ok">GOTOWE</span></td><td>Katalog 38 ćwiczeń</td><td>Ćwiczenia z wagą zaangażowania każdego mięśnia i krótkim opisem dla laika. Wyszukiwanie po nazwie i mięśniu, filtr kategorii, podgląd mięśni na modelu, szybkie dodawanie przyciskiem +.</td></tr>
         <tr><td><span class="status s-ok">GOTOWE</span></td><td>Analiza planu offline</td><td>Tygodniowa objętość (efektywne serie) na mięsień i partię, mapa na modelu 3D (tydzień lub pojedynczy dzień) i ocena pokrycia. Ostrzeżenia: proporcje pchanie/przyciąganie i przód/tył uda, regeneracja dzień po dniu, brak dnia wolnego, za długi trening.</td></tr>
         <tr><td><span class="status s-ok">GOTOWE</span></td><td>Rekomendacje ćwiczeń</td><td>Algorytm dobiera ćwiczenia pokrywające zaniedbane mięśnie i proponuje dzień, który najmniej koliduje z regeneracją. Dodanie jednym kliknięciem.</td></tr>
@@ -193,7 +193,7 @@
       <div class="milestone done"><h3>Etap 1.5 – Edukacja i planowanie (zrealizowany)</h3>
         <ul><li>34 mięśnie z podziałem na głowy, oddech, typowe błędy techniki ze znacznikami przeciążeń.</li>
           <li>Planer tygodniowy z katalogiem 38 ćwiczeń, analizą offline i rekomendacjami.</li>
-          <li>v0.3: uproszczenie pod laika – figura z rolami mięśni zamiast procentów, podgląd ćwiczeń w planie, rezygnacja z poleceń tekstowych.</li></ul></div>
+          <li>v0.3–0.4: uproszczenie pod laika – figura z rolami mięśni zamiast procentów, rezygnacja z poleceń tekstowych, jeden ekran: plan z animacjami i błędami techniki.</li></ul></div>
       <div class="milestone next"><h3>Etap 2 – Rozszerzenie treści</h3>
         <ul><li>Animacje dla całego katalogu, realistyczny model anatomiczny.</li>
           <li>Weryfikacja wartości aktywacji i opisów błędów przez fizjoterapeutę lub biomechanika.</li></ul></div>
@@ -229,6 +229,7 @@
     <table>
       <thead><tr><th style="width:150px">Data</th><th style="width:90px">Wersja</th><th>Zmiany</th></tr></thead>
       <tbody>
+        <tr><td>24.11.2026</td><td>0.4</td><td>Jeden interfejs: osobny widok symulacji usunięty, wszystko dzieje się w planie. Kliknięcie ćwiczenia w planie wybiera je i pokazuje szczegóły; dodawanie przez zaznaczenie dnia w planie i „Dodaj do: …”. Typowe błędy klikalne w panelu ćwiczenia (animacja, znaczniki przeciążeń). Długą listę mięśni zastąpiła figura przód/tył i krótkie podsumowanie. Pasek odtwarzania z fazami i oddechem pod modelem.</td></tr>
         <tr><td>24.11.2026</td><td>0.3.1</td><td>Szczegóły ćwiczenia w panelu wyboru, bez wychodzenia z planu: animacja na modelu, opis i wskazówka, mięśnie wg roli, wpływ na plan, dodanie do dowolnego dnia z seriami × powtórzeniami. Panel nie przyciemnia już modelu – można go obracać. Opisy dla wszystkich 38 ćwiczeń katalogu.</td></tr>
         <tr><td>24.11.2026</td><td>0.3</td><td>Kierunek: aplikacja dla osób układających plan i poznających mięśnie. Usunięte polecenia tekstowe (wybór ćwiczenia przyciskiem). Zamiast skaczących procentów: statyczna figura przód/tył i podział mięśni na pracujące najmocniej / pomagające / trzymające pozycję. Podgląd ćwiczenia bezpośrednio w planie. Opis błędu techniki przeniesiony do panelu, z opcją wyłączenia. Naprawione odwrócone bryły mięśni kończyn (były prawie niewidoczne) i dokładniejsze wskazywanie nachodzących na siebie mięśni.</td></tr>
         <tr><td>23.11.2026</td><td>0.2</td><td>Model z 34 mięśniami (podział na głowy i części, kształty wrzecionowate), animacja oddechu zsynchronizowana z fazami, typowe błędy techniki (8 błędów w 3 ćwiczeniach) ze znacznikami przeciążeń, planer treningowy z katalogiem 38 ćwiczeń, mapą obciążenia na modelu, analizą i rekomendacjami offline. Nawigacja Symulacja / Plan.</td></tr>

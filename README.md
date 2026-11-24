@@ -13,10 +13,10 @@ python3 -m http.server 8000     # albo: npm start
 Następnie otwórz <http://localhost:8000>. Three.js ładuje się z CDN, więc potrzebny jest internet. Projekt nie ma kroku budowania.
 
 Parametry URL przydatne do demo i testów:
-- `?ex=pushup` otwiera wybrane ćwiczenie (id z `src/exercises/`),
+- `?ex=squat` otwiera szczegóły ćwiczenia z katalogu (id z `src/plan/catalog.js`),
 - `&t=0.6` zatrzymuje animację w danym punkcie cyklu (0–1),
-- `&mistake=sag` pokazuje typowy błąd (id z `mistakes` w pliku ćwiczenia),
-- `index.html?focus=mon#plan` pokazuje plan z wybranym dniem, a `?picker=wed#plan` otwiera okno wyboru ćwiczeń, a `?show=squat#plan` lub `?picker=wed&detail=row#plan` otwiera szczegóły ćwiczenia z katalogu (`&t=0.5` zatrzymuje animację).
+- `&mistake=valgus` pokazuje typowy błąd (id z `mistakes` w pliku ćwiczenia),
+- `?focus=tue` zaznacza dzień, `?picker=wed` otwiera listę ćwiczeń dla dnia, `&preview=row` podświetla mięśnie ćwiczenia z listy.
 
 `node tools/check.mjs` wypisuje kąty stawów i aktywacje bez przeglądarki (szybki test sanity).
 
@@ -32,11 +32,11 @@ Parametry URL przydatne do demo i testów:
 | `src/exercises/common.js` | oś czasu faz i model aktywacji |
 | `src/figure.js` | statyczna figura przód/tył z pracującymi mięśniami |
 | `src/scene.js` | wspólna scena 3D: kamera, światła, kolorowanie mięśni, znaczniki przeciążeń, oddech |
-| `src/simView.js` | widok Symulacja: ćwiczenia, oś czasu, błędy techniki |
+| `src/player.js` | odtwarzanie ćwiczenia: oś czasu, przejścia, błędy techniki, wygładzone aktywacje |
 | `src/plan/catalog.js` | katalog ćwiczeń do planu (waga zaangażowania mięśni) |
 | `src/plan/analysis.js` | analiza planu: objętość, ostrzeżenia, rekomendacje (bez UI) |
-| `src/plan/planView.js` | widok Plan treningowy |
-| `src/main.js` | przełączanie widoków (#sim / #plan) |
+| `src/plan/planView.js` | jedyny widok: plan, panel ćwiczeń (lista i szczegóły), pasek odtwarzania |
+| `src/main.js` | start aplikacji |
 
 ## Dodanie ćwiczenia
 
