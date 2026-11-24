@@ -76,6 +76,18 @@ export function checkScenery(body, scenery = [], pose = null, soft = 0.03) {
       if (depth > soft + (c.part === 'pelvis' ? 0.015 : 0)) hit(`${partName(c.part)} wchodzi w sprzęt`, c.part, depth);
     }
   }
+  // walce sprzętu (drążek do podciągania, poręcze, wałki, słupki, uchwyty): punkty co 2 cm wzdłuż osi
+  // nie mogą wchodzić w ciało; trzymające je przedramiona są wyłączone (dłoń obejmuje drążek)
+  for (const d of scenery.filter((x) => x.cyl)) {
+    const a = new THREE.Vector3(...d.cyl[0]), b = new THREE.Vector3(...d.cyl[1]);
+    const n = Math.max(2, Math.ceil(a.distanceTo(b) / 0.02));
+    const pts = Array.from({ length: n + 1 }, (_, k) => a.clone().lerp(b, k / n));
+    // zapas na mięśnie wystające ponad bryły kolizyjne (wygląd organiczny): tułów 1,5 cm, kończyny 1 cm;
+    // d.contact – element, który ma dociskać ciało (np. wałek na kostki) – dopuszczamy kontakt do 4 cm
+    const w = deepest(body, pts, (p) => holding(p), (d.r ?? 0.02) + 0.01);
+    const wt = deepest(body, pts, (p) => holding(p) || !['chest', 'belly', 'pelvis'].includes(p), (d.r ?? 0.02) + 0.015);
+    for (const x of [w, wt]) if (x && x.depth > (d.contact ? 0.04 : 0.005)) hit(`${partName(x.part)} wchodzi w drążek/poręcz/wałek`, x.part, x.depth);
+  }
   for (const S of ['L', 'R']) {
     const toe = body.points['toe' + S].getWorldPosition(new THREE.Vector3()), heel = body.points['heel' + S].getWorldPosition(new THREE.Vector3());
     const ankle = body.joints['ankle' + S].getWorldPosition(new THREE.Vector3());
@@ -125,7 +137,7 @@ export function checkPose(body, pose, tol = 0.012) {
     const pts = [];
     for (let s = -len / 2; s <= len / 2; s += 0.02) pts.push(mid.clone().addScaledVector(u, s));
     // sztanga z przodu na barkach leży na mięśniach barków – dopuszczamy kontakt z ramionami
-    const w = deepest(body, pts, (p) => holding(p) || (front && /^upperArm/.test(p)), 0.014);
+    const w = deepest(body, pts, (p) => holding(p) || (front && /^upperArm/.test(p)), 0.014 + 0.01);   // + zapas na mięśnie
     if (w && w.depth > tol) issues.push({ what: `drążek wchodzi w ${partName(w.part)}`, ...w });
     if (props.bar.plates !== false && mid.y < 0.2 - 0.01) issues.push({ what: 'talerze sztangi w podłodze', part: 'floor', depth: 0.2 - mid.y });
   }

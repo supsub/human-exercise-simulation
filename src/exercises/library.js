@@ -22,10 +22,10 @@ const pullBar = (y = 2.12) => [
   { cyl: [[-0.75, 0, 0], [-0.75, y + 0.05, 0]], r: 0.035, color: 'frame' },
 ];
 const seat = (y = 0.45, z = 0, d = 0.42) => ({ box: [0, y / 2, z], size: [0.4, y, d] });
-// uchwyt maszyny przy siedzisku: pręt w dłoni (oś z, środek w punkcie chwytu) i łącznik do ramy (do x = ±xIn)
-const handles = (x, y, z, xIn) => [1, -1].flatMap((s) => [
+// uchwyt maszyny przy siedzisku: pręt w dłoni (oś z, środek w punkcie chwytu) na pionowym słupku
+const handles = (x, y, z) => [1, -1].flatMap((s) => [
   { cyl: [[s * x, y, z - 0.08], [s * x, y, z + 0.08]], r: 0.016, color: 'frame' },
-  { cyl: [[s * xIn, y - 0.03, z], [s * x, y, z]], r: 0.014, color: 'frame' },
+  { cyl: [[s * x, 0, z - 0.06], [s * x, y, z - 0.06]], r: 0.014, color: 'frame' },   // słupek z przodu uchwytu, z dala od ud
 ]);
 const column = (z, h = 2.4) => ({ box: [0, h / 2, z], size: [0.16, h, 0.16], color: 'frame' });
 
@@ -88,7 +88,7 @@ const pullup = animated({
   id: 'pullup', type: 'lift', camera: 'hang', scenery: pullBar(),
   steps: ['Zwis na drążku', 'Podciąganie', 'Broda nad drążkiem', 'Opuszczanie'],
   pose: keyframes({ anchor: { pt: 'handL', at: { y: 2.12, z: 0 } }, thigh: -10, shin: 30, grip: 1 },
-    { arm: 180, fore: 180, rx: 0, trunk: 0 }, { arm: 348, fore: 176, rx: -8, trunk: -14, head: -5 }),
+    { arm: 180, fore: 180, rx: 0, trunk: 0 }, { arm: 350, fore: 200, rx: -8, trunk: -14, head: -5 }),   // łokcie za drążkiem, klatka tuż za nim, broda nad nim
 });
 // Wyciąg górny: siedzisko, wałek na uda, kolumna z obciążeniem PRZED ćwiczącym, bloczek nad drążkiem
 const pulldownMachine = [{ box: [0, 0.245, -0.2], size: [0.34, 0.49, 0.8] }, { cyl: [[-0.25, 0.68, 0.32], [0.25, 0.68, 0.32]], r: 0.05, color: 'pad' },
@@ -157,7 +157,7 @@ const shrug = animated({
 // podkładka pod udami, poniżej zgięcia bioder – tułów zgina się nad jej górną krawędzią
 const back_ext = animated({
   id: 'back_ext', type: 'lift',
-  scenery: [{ box: [0.0, 0.646, 0.065], size: [0.42, 0.24, 0.1], rx: Math.PI / 4 }, { cyl: [[-0.2, 0.3, -0.58], [0.2, 0.3, -0.58]], r: 0.045, color: 'pad' },
+  scenery: [{ box: [0.0, 0.646, 0.065], size: [0.42, 0.24, 0.1], rx: Math.PI / 4 }, { cyl: [[-0.2, 0.3, -0.58], [0.2, 0.3, -0.58]], r: 0.045, color: 'pad', contact: true },
     { box: [0, 0.32, -0.15], size: [0.08, 0.64, 0.9], color: 'frame' }],
   steps: ['Tułów opuszczony', 'Prostowanie tułowia', 'Ciało w linii', 'Opuszczanie tułowia'],
   pose: keyframes({ anchor: { pt: 'ankleL', at: { y: 0.27, z: -0.52 } }, thigh: 45, shin: 45, foot: 120, shX: -40, abd: 12, el: -130 },
@@ -307,7 +307,7 @@ const leg_press = animated({
   id: 'leg_press', camera: 'seat',
   scenery: [{ box: [0, 0.45, 0.02], size: [0.45, 0.08, 0.4], rx: -0.3 }, { box: [0, 0.66, -0.33], size: [0.45, 0.8, 0.08], rx: -50 * Math.PI / 180 },
     { cyl: [[0.28, 0.25, 0.3], [0.28, 1.45, 1.5]], r: 0.03 }, { cyl: [[-0.28, 0.25, 0.3], [-0.28, 1.45, 1.5]], r: 0.03 },
-    { box: [0, 0.2, 0], size: [0.3, 0.4, 0.3], color: 'frame' }, ...handles(0.388, 0.482, 0.082, 0.22)],
+    { box: [0, 0.2, 0], size: [0.3, 0.4, 0.3], color: 'frame' }, ...handles(0.388, 0.482, 0.082)],
   steps: ['Nogi wyprostowane, platforma w górze', 'Opuszczanie platformy', 'Kolana przy klatce', 'Wypychanie'],
   pose: keyframes({ root: { y: 0.55, z: 0 }, rx: -50, head: -40, foot: -135, abd: 16, props: { plate: true } },
     { thigh: -128, shin: -138 }, { thigh: -172, shin: -78 }),
@@ -315,7 +315,7 @@ const leg_press = animated({
 });
 const machineSeat = [seat(0.48, 0.02, 0.5), { box: [0, 0.85, -0.27], size: [0.45, 0.7, 0.08], rx: -0.2 }];
 const leg_ext = animated({
-  id: 'leg_ext', type: 'lift', camera: 'seat', scenery: [...machineSeat, { box: [0.32, 0.28, 0.42], size: [0.06, 0.56, 0.06], color: 'frame' }, ...handles(0.215, 0.462, 0, 0.2)],
+  id: 'leg_ext', type: 'lift', camera: 'seat', scenery: [...machineSeat, { box: [0.32, 0.28, 0.42], size: [0.06, 0.56, 0.06], color: 'frame' }, ...handles(0.215, 0.462, 0)],
   steps: ['Kolana zgięte', 'Prostowanie nóg', 'Pełny wyprost', 'Opuszczanie'],
   pose: keyframes({ root: { y: 0.55, z: 0 }, rx: -10, trunk: -12, thigh: -88, arm: 12, fore: -30, props: { rollers: ['shin'] } },
     { shin: -8 }, { shin: -84 }),
@@ -323,7 +323,7 @@ const leg_ext = animated({
 const leg_curl = animated({
   id: 'leg_curl', type: 'lift', camera: 'lie',
   scenery: [{ box: [0, 0.24, 0.25], size: [0.4, 0.48, 1.3] }, { box: [0, 0.2, -0.7], size: [0.08, 0.4, 0.08], color: 'frame' },
-    ...handles(0.26, 0.4, 0.8, 0.2)],   // uchwyty z przodu ławki
+    ...handles(0.26, 0.4, 0.8)],   // uchwyty z przodu ławki
   steps: ['Nogi wyprostowane', 'Uginanie nóg', 'Pięty przy pośladkach', 'Opuszczanie'],
   pose: keyframes({ root: { y: 0.57, z: 0 }, rx: 90, head: 75, thigh: 92, arm: -40, fore: 8, props: { rollers: ['calf'] },
     handL: { at: [0.26, 0.4, 0.8], pole: [1, 0.3, -0.5] }, handR: { at: [-0.26, 0.4, 0.8], pole: [-1, 0.3, -0.5] } },
@@ -331,10 +331,10 @@ const leg_curl = animated({
   cameraPosition: [2.2, 1.4, 1.2], cameraTarget: [0, 0.6, -0.1],
 });
 const adductor = animated({
-  id: 'adductor', type: 'lift', camera: 'seat', scenery: [...machineSeat, ...handles(0.472, 0.559, 0.088, 0.2)],
+  id: 'adductor', type: 'lift', camera: 'seat', scenery: [...machineSeat, ...handles(0.53, 0.559, 0.088)],
   steps: ['Nogi rozchylone', 'Ściąganie kolan do środka', 'Kolana razem', 'Rozchylanie'],
   pose: keyframes({ root: { y: 0.55, z: 0 }, rx: -6, trunk: -10, thigh: -86, shin: 0, foot: 0, arm: 10, fore: -40, abd: 30,
-    handL: { at: [0.472, 0.559, 0.088], pole: [1, -0.5, -0.5] }, handR: { at: [-0.472, 0.559, 0.088], pole: [-1, -0.5, -0.5] } },   // dłonie na uchwytach
+    handL: { at: [0.53, 0.559, 0.088], pole: [1, -0.5, -0.5] }, handR: { at: [-0.53, 0.559, 0.088], pole: [-1, -0.5, -0.5] } },   // dłonie na uchwytach
     { hipAbd: 38 }, { hipAbd: 4 }),
   cameraPosition: [0.6, 1.5, 2.6], cameraTarget: [0, 0.6, 0.2],
 });

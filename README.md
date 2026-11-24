@@ -55,6 +55,7 @@ Automatycznie – `tools/sheet.html?check` musi zwrócić „OK – brak narusze
 - [ ] sprzęt (sztanga, hantle, hantel oburącz) nie wchodzi w ciało, dłonie nie wchodzą w tułów, głowę ani uda
 - [ ] nogi nie nachodzą na siebie, nic nie przechodzi przez podłogę
 - [ ] ciało, dłonie i stopy (cała podeszwa i śródstopie) nie wchodzą w sprzęt: ławki, siedziska, podnóżki, oparcia
+- [ ] ciało nie wchodzi w drążki, poręcze, wałki i słupki sprzętu (z zapasem na mięśnie wyglądu organicznego); elementy, które mają dociskać ciało (wałek na kostki), oznaczamy `contact: true`
 - [ ] chwyt zgodny ze specyfikacją z `grips.js` (wnętrze dłoni i kciuk we właściwą stronę)
 - [ ] chwyt nie zmienia się w trakcie ruchu (nachwyt ↔ podchwyt), dłonie nie przesuwają się po drążku
 - [ ] zaciśnięta dłoń zawsze coś trzyma (drążek, poręcz, uchwyt maszyny) – nie zaciska się w powietrzu
