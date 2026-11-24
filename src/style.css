@@ -287,6 +287,18 @@ input:focus { border-color: var(--accent); }
   .picker-detail.from-plan .d-title, .picker-detail.from-plan .d-add { display: none; }
   .picker-detail .d-sec h3:first-child, .picker-detail .mistakes-head h3 { margin-top: 4px; }
   .figure-box { max-height: 34vh; }
+  /* lista ćwiczeń: jak najwięcej miejsca na samą listę */
+  .side-panel { padding: 0; border: none; }
+  .side-panel .modal-box { padding: 10px 10px 0; gap: 8px; border: none; box-shadow: none; }
+  .modal-head h2 { font-size: 16px; margin: 0; }
+  #picker-cats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex: none; }
+  #picker-cats .chip { flex: none; }
+  .picker-list { flex: 1; min-height: 0; padding-bottom: 10px; }
+  .pick { padding: 7px 9px; }
+  .pick-meta { margin: 1px 0 3px; }
+  .mtags { flex-wrap: nowrap; overflow: hidden; }
+  .mtag { white-space: nowrap; }
+  .disclaimer { display: none; }
   .mobile-tabs { display: flex; position: fixed; left: 0; right: 0; bottom: 0; height: var(--tabs); z-index: 30;
     background: var(--panel); border-top: 1px solid var(--border); }
   .mobile-tabs button { flex: 1; background: none; border: none; border-radius: 0; color: var(--muted); font-size: 15px; font-weight: 600; }

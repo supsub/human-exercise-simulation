@@ -307,8 +307,8 @@ function renderList() {
     const here = inWorkout(ex.id, browseId);
     return `<div class="pick${here ? ' present' : ''}" data-id="${ex.id}" tabindex="0">
       <div class="pick-body">
-        <div class="pick-head"><b>${ex.name}</b>${helps ? `<span class="helps">uzupełnia ${helps} ${helps === 1 ? 'brak' : 'braki'}</span>` : ''}</div>
-        <div class="pick-meta">${ex.category} · ${ex.equipment}</div><div class="mtags">${tags}</div>
+        <div class="pick-head"><b>${ex.name}</b></div>
+        <div class="pick-meta">${ex.category} · ${ex.equipment}${helps ? ` <span class="helps">uzupełnia ${helps} ${helps === 1 ? 'brak' : 'braki'}</span>` : ''}</div><div class="mtags">${tags}</div>
       </div>
       ${here ? `<span class="present-tag">już w tym treningu<br>${here.sets} × ${here.reps}</span>`
         : `<button class="quick-add" title="Dodaj od razu do: ${esc(workout(browseId).name)} (3 × 10)">+</button>`}
@@ -427,8 +427,7 @@ function renderMuscleSummary() {
   ui.dMuscles.innerHTML = `
     <div class="label">Pracują najmocniej</div><div class="role-items">${main.map((m) => chip(m)).join('')}</div>
     ${fixes.length ? `<div class="label" style="margin-top:10px">Uzupełnia braki w Twoim planie</div>
-      <div class="role-items">${fixes.map((id) => chip(MUSCLE_BY_ID[id], 'fix')).join('')}</div>` : ''}
-    <div class="muted small" style="margin-top:8px">Najedź na figurę lub model, aby zobaczyć rolę każdego mięśnia.</div>`;
+      <div class="role-items">${fixes.map((id) => chip(MUSCLE_BY_ID[id], 'fix')).join('')}</div>` : ''}`;
   ui.dMuscles.querySelectorAll('.role-item').forEach((el) => {
     el.onmouseenter = () => (muscleHover = el.dataset.id);
     el.onmouseleave = () => (muscleHover = null);
