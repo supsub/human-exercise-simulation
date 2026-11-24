@@ -21,6 +21,7 @@
   <nav class="topnav">
     <span class="logo">Human Exercise Simulation</span>
     <span class="nav-sub">Plan treningowy</span>
+    <button id="face-open" class="face-open" title="Twoja twarz na modelu">🙂<span class="lbl"> Twarz</span></button>
     <a class="tab about" href="docs/index.html">O projekcie →</a>
   </nav>
 
@@ -101,6 +102,21 @@
         <button data-sec="info">Opis</button><button data-sec="tech">Błędy</button><button data-sec="muscles">Mięśnie</button>
       </div>
       <button id="pb-close" class="icon" title="Zakończ podgląd ćwiczenia">✕</button>
+    </div>
+  </div>
+
+  <!-- Twoja twarz: zdjęcie przetwarzane i zapisywane tylko w tej przeglądarce (src/faceUI.js) -->
+  <div id="face-dialog" class="side-panel" hidden>
+    <div class="modal-box">
+      <div class="modal-head"><h2>Twoja twarz</h2><button id="face-close" class="icon" title="Zamknij">✕</button></div>
+      <div class="face-actions">
+        <label class="face-pick">📷 Wybierz zdjęcie<input id="face-file" type="file" accept="image/*" hidden></label>
+        <button id="face-undo" disabled>↶ Cofnij</button>
+        <button id="face-zoom-in" disabled title="Przybliż">＋</button><button id="face-zoom-out" disabled title="Oddal">−</button>
+        <button id="face-remove">Usuń twarz</button>
+      </div>
+      <div id="face-step" class="face-step">Zdjęcie twarzy na wprost. Zostaje tylko na tym urządzeniu.</div>
+      <div class="face-photo"><canvas id="face-photo"></canvas></div>
     </div>
   </div>
 

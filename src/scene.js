@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createBody } from './body.js';
+import { applyFace } from './face.js';
 import { MUSCLES, MUSCLE_BY_ID } from './muscles.js';
 import { smoothstep } from './kinematics.js';
 
@@ -51,6 +52,15 @@ scene.add(grid);
 
 export const body = createBody();
 scene.add(body.root);
+// podgląd twarzy (narzędzie): ?faceimg=local/x.jpg&lm=px,py,lx,ly,mx,my (oko prawe, lewe, usta w px zdjęcia)&facetone=photo|model
+{
+  const q = new URLSearchParams(location.search);
+  if (q.get('faceimg')) {
+    const img = new Image();
+    img.onload = () => { const v = q.get('lm').split(',').map(Number); applyFace(body, img, [v.slice(0, 2), v.slice(2, 4), v.slice(4, 6), ...(v.length > 6 ? [v.slice(6, 8)] : [])], q.get('facetone') ?? 'photo'); };
+    img.src = q.get('faceimg');
+  }
+}
 
 // ---------- Kolory aktywacji ----------
 // Wygląd organiczny (domyślny; ?look=classic – dawny ludzik): mięśnie w spoczynku w jasnym, stonowanym kolorze bliskim skórze

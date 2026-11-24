@@ -33,6 +33,7 @@
     import { EXERCISE_BY_ID } from '../src/exercises/index.js';
     import { sampleExercise, computeActivations } from '../src/exercises/common.js';
     import { MUSCLES } from '../src/muscles.js';
+    import { applyFace } from '../src/face.js';
 
     const q = new URLSearchParams(location.search);
     const DEMO = ['squat', 'goblet_squat', 'bench', 'curl', 'lat_pulldown', 'deadlift', 'lunge', 'pushup', 'ohp', 'row'];
@@ -62,6 +63,12 @@
       scene.add(body.root);
       const scenery = new THREE.Group(); scene.add(scenery);
       if (q.has('nomuscles')) body.muscleMeshes.forEach((m) => (m.visible = false));
+      // &faceimg=../local/x.jpg&lm=…&facetone=photo|model – twarz ze zdjęcia (jak w aplikacji)
+      if (q.get('faceimg') && look === 'organic') {
+        const img = new Image(), v = q.get('lm').split(',').map(Number);
+        img.onload = () => applyFace(body, img, [v.slice(0, 2), v.slice(2, 4), v.slice(4, 6), ...(v.length > 6 ? [v.slice(6, 8)] : [])], q.get('facetone') ?? 'photo');
+        img.src = q.get('faceimg');
+      }
       return { scene, body, scenery, look };
     }
     const worlds = q.has('solo') ? [makeWorld(q.get('solo'))] : [makeWorld('classic'), makeWorld('organic')];

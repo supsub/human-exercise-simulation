@@ -652,15 +652,41 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
   // b: 0 = pełny wydech, 1 = pełny wdech
   // usta przy wydechu: 0 = zamknięte (kreska), 1 = lekko otwarte w „o” (wydmuchiwanie powietrza)
   const MOUTH_SHUT = new THREE.Color(0x8a93a3), MOUTH_OPEN = new THREE.Color(0x2a2f38);
+  let mouthHome = null, onFace = null;   // onFace: usta na twarzy ze zdjęcia (src/face.js) – { pos, color }
   function setMouth(v) {
     if (!mouth) return;
+    if (onFace) {
+      // na zdjęciu widać prawdziwe wargi – rysujemy tylko otwór między nimi, który pojawia się przy wydechu
+      mouth.visible = v > 0.03;
+      mouth.material.opacity = Math.min(1, v * 1.3);
+      mouth.scale.set(0.006 + 0.008 * v, 0.0015 + 0.0055 * v, 0.003);
+      return;
+    }
     mouth.scale.set(0.022 - 0.008 * v, 0.004 + 0.0055 * v, 0.004 + 0.002 * v);
     mouth.material.color.lerpColors(MOUTH_SHUT, MOUTH_OPEN, v);
+  }
+  function setMouthOnFace(pos, color) {
+    if (!mouth) return;
+    mouthHome ??= mouth.position.clone();
+    onFace = pos ? { pos, color } : null;
+    if (onFace) {
+      mouth.position.set(pos[0], pos[1], pos[2] + 0.0015);
+      mouth.material.color.set(color);
+      Object.assign(mouth.material, { transparent: true, depthWrite: false });
+      mouth.renderOrder = 3;   // nad płatem twarzy
+      mouth.castShadow = false;
+    } else {
+      mouth.position.copy(mouthHome);
+      Object.assign(mouth.material, { transparent: false, depthWrite: true, opacity: 1 });
+      mouth.renderOrder = 0; mouth.visible = true;
+    }
+    mouth.material.needsUpdate = true;
+    setMouth(0);
   }
   function setBreath(b) {
     ribcage.scale.set(1 + 0.03 * b, 1 + 0.015 * b, 1 + 0.07 * b);
     belly.scale.set(1 + 0.015 * b, 1, 1 + 0.1 * b);
   }
 
-  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, plateShape, materials, muscleMeshes, nose, faceParts, setPose, setBreath, setMouth, resolvePose };
+  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, plateShape, materials, muscleMeshes, nose, faceParts, setPose, setBreath, setMouth, setMouthOnFace, resolvePose };
 }
