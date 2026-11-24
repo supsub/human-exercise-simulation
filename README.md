@@ -42,7 +42,7 @@ Parametry URL przydatne do demo i testów:
 ## Dodanie ćwiczenia
 
 1. Dopisz ćwiczenie do `src/plan/catalog.js` (wagi mięśni) i jego opis do `INFO` w tym samym pliku.
-2. Dodaj animację w `src/exercises/library.js`: zwykle wystarczą dwie pozy kluczowe (`keyframes(base, A, B)`), kotwica (np. stopy na podłodze) i rekwizyty. Konwencje kątów są opisane w `src/exercises/build.js`. Aktywacje mięśni liczą się automatycznie z wag w katalogu.
+2. Dodaj animację w `src/exercises/library.js`: zwykle wystarczą dwie pozy kluczowe (`keyframes(base, A, B)`), kotwica (np. stopy na podłodze) i rekwizyty. Gdy dłonie trzymają drążek, podaj tor drążka i szerokość chwytu (`hands: { w, y, z, pole }`) – ramiona policzy kinematyka odwrotna, a chwyt się nie przesuwa. Konwencje kątów są opisane w `src/exercises/build.js`. Aktywacje mięśni liczą się automatycznie z wag w katalogu.
 3. Sprawdź wszystkie animacje naraz: <http://localhost:8000/tools/sheet.html> (pozycja A i B każdego ćwiczenia; `?only=bench,row` zawęża listę, `?mistakes` pokazuje wszystkie typowe błędy, `?check` uruchamia test fizyki z `src/physics.js` – musi zwrócić „OK” przed każdym commitem zmieniającym animacje, `&cam=x,y,z&target=x,y,z` ustawia kamerę).
 4. Typowe błędy dopisz w `src/exercises/mistakes.js` (zmiana pozy, mięśni, przeciążenia i opis).
 5. Zaktualizuj `docs/index.html` (tabela funkcjonalności i dziennik zmian).

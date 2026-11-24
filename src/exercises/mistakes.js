@@ -12,7 +12,7 @@ const ROM = (what, why, fix, shift = {}) => ({ id: 'partial', name: 'Niepełny z
 export const MISTAKES = {
   // ---------- Klatka ----------
   bench: [
-    { id: 'flare', name: 'Łokcie szeroko na boki', B: { abd: 88, shX: -4 },
+    { id: 'flare', name: 'Łokcie szeroko na boki', B: { hands: { w: 0.82, y: 0.73, z: -0.21, pole: [1, -0.1, -0.15] } },
       what: 'Przy opuszczaniu łokcie rozchodzą się na boki pod kątem prostym do tułowia.',
       why: 'Staw barkowy pracuje w niekorzystnym ustawieniu – ścięgna stożka rotatorów są ściskane, a przedni akton barku przejmuje część pracy klatki.',
       fix: 'Prowadź łokcie pod kątem ok. 45–60° do tułowia, sztangę opuszczaj do dolnej części klatki.',
@@ -94,7 +94,8 @@ export const MISTAKES = {
     ROM('Drążek zatrzymuje się nad głową.', 'Plecy pracują tylko w części zakresu.', 'Ściągaj drążek do górnej części klatki.', { latissimus: -0.3 }),
   ],
   lat_pulldown_wide: [
-    { id: 'behind', name: 'Ściąganie za kark', B: { rx: 18, trunk: 28, head: 58, shX: -22, abd: 52 }, M: { shX: -6, abd: 125, el: -40, trunk: 15, head: 40 },
+    { id: 'behind', name: 'Ściąganie za kark', B: { rx: 18, trunk: 28, head: 58, hands: { w: 1.1, y: 1.24, z: -0.22, pole: [1, -0.7, 0.1] } },
+      M: { trunk: 15, head: 40, hands: { w: 1.1, y: 1.6, z: -0.16, pole: [1, -0.7, 0] } },
       what: 'Tułów pochyla się do przodu, a drążek trafia za głowę.',
       why: 'Barki pracują w skrajnej rotacji zewnętrznej, a szyja jest zgięta – to obciąża barki i kręgi szyjne.',
       fix: 'Zawsze ściągaj drążek przed twarz, do górnej części klatki.',
@@ -150,7 +151,7 @@ export const MISTAKES = {
     ROM('Łokcie nie dochodzą za linię tułowia.', 'Łopatki nie ściągają się, więc środkowa część pleców prawie nie pracuje.', 'Przyciągaj hantle do boków tułowia i na końcu ściśnij łopatki.', { trap_mid: -0.35 }),
   ],
   face_pull: [
-    { id: 'low', name: 'Ciągnięcie do brzucha', B: { abd: 12, shX: 30, rot: 0, el: -95 },
+    { id: 'low', name: 'Ciągnięcie do brzucha', B: { hands: { w: 0.34, y: 1.02, z: 0.2, pole: [0.3, -1, -0.6] } },
       what: 'Lina trafia na wysokość brzucha, a łokcie idą w dół zamiast na boki.',
       why: 'Pracuje głównie najszerszy grzbietu, a tylne barki i rotatory – cel ćwiczenia – prawie wcale.',
       fix: 'Ciągnij linę do twarzy, łokcie wysoko i na boki.',
@@ -308,6 +309,15 @@ export const MISTAKES = {
       fix: 'Schodź tylko tak nisko, jak pozwalają proste plecy – zwykle do połowy goleni.', shift: { biceps_femoris: -0.2, erector_spinae: 0.2 },
       stress: [{ joint: 'lumbar', label: 'Krążki międzykręgowe' }] },
     { id: 'squat', name: 'Za mocno ugięte kolana', B: { rx: 50, trunk: 48, thigh: -62, shin: 26, arm: -22, fore: -22 },
+      what: 'Kolana mocno się uginają, a ruch zamienia się w przysiad.', why: 'Tył uda – cel ćwiczenia – prawie się nie rozciąga i pracuje słabiej.',
+      fix: 'Kolana lekko ugięte i nieruchome, cofaj biodra jak przy zamykaniu drzwi pośladkami.', shift: { biceps_femoris: -0.35, semitendinosus: -0.35, vastus_lateralis: 0.4 }, stress: [] },
+  ],
+  db_rdl: [
+    { id: 'round', name: 'Okrągłe plecy', B: { trunk: 108, head: 95 },
+      what: 'Przy pochylaniu plecy się zaokrąglają, żeby zejść niżej.', why: 'Ruch odbywa się w kręgosłupie zamiast w biodrach, a dyski są ściskane.',
+      fix: 'Schodź tylko tak nisko, jak pozwalają proste plecy – zwykle do połowy goleni.', shift: { biceps_femoris: -0.2, erector_spinae: 0.2 },
+      stress: [{ joint: 'lumbar', label: 'Krążki międzykręgowe' }] },
+    { id: 'squat', name: 'Za mocno ugięte kolana', B: { rx: 50, trunk: 48, thigh: -62, shin: 26, arm: -16, fore: -16 },
       what: 'Kolana mocno się uginają, a ruch zamienia się w przysiad.', why: 'Tył uda – cel ćwiczenia – prawie się nie rozciąga i pracuje słabiej.',
       fix: 'Kolana lekko ugięte i nieruchome, cofaj biodra jak przy zamykaniu drzwi pośladkami.', shift: { biceps_femoris: -0.35, semitendinosus: -0.35, vastus_lateralis: 0.4 }, stress: [] },
   ],

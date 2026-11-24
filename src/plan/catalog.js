@@ -81,6 +81,8 @@ export const CATALOG = [
     muscles: { glute_max: 1, erector_spinae: 1, biceps_femoris: 0.75, semitendinosus: 0.75, vastus_lateralis: 0.5, vastus_medialis: 0.5, vastus_intermedius: 0.5, adductors: 0.5, trap_upper: 0.5, forearm_flex: 0.75, latissimus: 0.25, trap_mid: 0.25, rectus_femoris: 0.25 } },
   { id: 'rdl', name: 'Rumuński martwy ciąg', category: 'Nogi', equipment: 'sztanga',
     muscles: { biceps_femoris: 1, semitendinosus: 1, glute_max: 0.75, erector_spinae: 0.75, adductors: 0.5, forearm_flex: 0.5 } },
+  { id: 'db_rdl', name: 'Rumuński martwy ciąg z hantlami', category: 'Nogi', equipment: 'hantle',
+    muscles: { biceps_femoris: 1, semitendinosus: 1, glute_max: 0.75, erector_spinae: 0.75, adductors: 0.5, forearm_flex: 0.5, trap_upper: 0.25 } },
   { id: 'lunge', name: 'Wykroki', category: 'Nogi', equipment: 'hantle',
     muscles: { vastus_lateralis: 1, vastus_medialis: 1, vastus_intermedius: 1, glute_max: 1, rectus_femoris: 0.5, glute_med: 0.5, adductors: 0.5, biceps_femoris: 0.25, semitendinosus: 0.25 } },
   { id: 'leg_ext', name: 'Prostowanie nóg na maszynie', category: 'Nogi', equipment: 'maszyna',
@@ -119,6 +121,7 @@ export const CATALOG_BY_ID = Object.fromEntries(CATALOG.map((e) => [e.id, e]));
 
 // Krótkie opisy dla laika: jak wykonać i na co uważać (pokazywane w szczegółach ćwiczenia).
 const INFO = {
+  db_rdl: ['Z hantlami przed udami cofasz biodra i pochylasz się z prostymi plecami, hantle suną wzdłuż nóg, potem wracasz do wyprostu.', 'Hantle blisko nóg przez cały ruch, kolana lekko ugięte i nieruchome.'],
   db_bench: ['Leżąc na płaskiej ławce wypychasz hantle znad klatki w górę i opuszczasz je do boków klatki.', 'Hantle pozwalają na większy zakres ruchu niż sztanga – nie opuszczaj ich jednak niżej niż linia barków.'],
   cable_fly: ['Stojąc między wyciągami prowadzisz lekko ugięte ręce łukiem od boków do przodu, przed klatkę.', 'Łokcie cały czas lekko ugięte, ruch w barkach, nie w łokciach.'],
   lat_pulldown_wide: ['Siedząc przy wyciągu ściągasz szeroko chwycony drążek do górnej części klatki, łokcie idą w dół i na boki.', 'Nie ściągaj drążka za głowę – to obciąża barki.'],

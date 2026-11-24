@@ -57,7 +57,7 @@ export function checkPose(body, pose, tol = 0.012) {
     const front = props.bar.on === 'front';
     const L = pt(front ? 'rackL' : 'handL'), Rr = pt(front ? 'rackR' : 'handR');
     const mid = L.clone().add(Rr).multiplyScalar(0.5), u = L.clone().sub(Rr).normalize();
-    const len = props.bar.len ?? 1.6;
+    const len = props.bar.len === 'fit' ? L.distanceTo(Rr) : props.bar.len ?? 1.6;
     const pts = [];
     for (let s = -len / 2; s <= len / 2; s += 0.02) pts.push(mid.clone().addScaledVector(u, s));
     // sztanga z przodu na barkach leży na mięśniach barków – dopuszczamy kontakt z ramionami

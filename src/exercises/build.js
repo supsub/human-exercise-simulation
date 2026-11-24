@@ -51,6 +51,11 @@ export function makePose(s) {
     grip: s.grip,
     props: s.props ?? {},
   };
+  // hands: { w, y, z, pole } – stały chwyt o szerokości w na drążku w punkcie (y, z) świata; ramiona liczy IK (body.js)
+  if (s.hands) {
+    const { w, y, z, pole = [1, -1, 0] } = s.hands;
+    pose.ik = { L: { target: [w / 2, y, z], pole }, R: { target: [-w / 2, y, z], pole: [-pole[0], pole[1], pole[2]] } };
+  }
   if (s.anchor) pose.anchor = s.anchor;
   if (s.anchor2) pose.anchor2 = s.anchor2;
   return pose;
@@ -75,6 +80,7 @@ function blendPoses(a, b, t) {
   const out = blendPose(a, b, t);
   if (a.anchor) out.anchor = mix(a.anchor, b.anchor ?? a.anchor, t);
   if (a.anchor2) out.anchor2 = mix(a.anchor2, b.anchor2 ?? a.anchor2, t);
+  if (a.ik || b.ik) out.ik = mix(a.ik ?? b.ik, b.ik ?? a.ik, t);
   return out;
 }
 function track(A, B, M, d) {

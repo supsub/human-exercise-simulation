@@ -30,7 +30,9 @@ const lying = { rx: -90, head: -90, root: { y: 0.55, z: 0.25 }, thigh: -75, shin
 const bench = animated({
   id: 'bench', camera: 'lie', scenery: flatBench,
   steps: ['Sztanga nad klatką', 'Opuszczanie sztangi', 'Sztanga przy klatce', 'Wyciskanie'],
-  pose: keyframes({ ...lying, props: { bar: { len: 1.6 } } }, { shX: -88, abd: 14, el: -6 }, { shX: -14, abd: 66, el: -100 }),
+  // stały chwyt (82 cm), sztanga pionowo nad dolną częścią klatki; łokcie liczy IK (w dół i lekko na boki)
+  pose: keyframes({ ...lying, props: { bar: { len: 1.6 } } },
+    { hands: { w: 0.82, y: 1.12, z: -0.17, pole: [1, -0.9, 0.3] } }, { hands: { w: 0.82, y: 0.71, z: -0.08, pole: [1, -0.9, 0.3] } }),
 });
 const db_bench = animated({
   id: 'db_bench', camera: 'lie', scenery: flatBench,
@@ -92,18 +94,18 @@ const lat_pulldown = animated({
   id: 'lat_pulldown', type: 'lift', camera: 'seat', scenery: pulldownMachine,
   cameraPosition: [1.7, 1.75, -2.2], cameraTarget: [0, 1.15, 0.1],   // z tyłu i z boku – widać pracę pleców
   steps: ['Ręce wyprostowane w górze', 'Ściąganie drążka do klatki', 'Drążek przy klatce', 'Powrót w górę'],
-  // chwyt nieco szerszy niż barki, łokcie schodzą w dół i na boki, drążek przed twarzą do górnej części klatki
+  // stały chwyt (85 cm), łokcie schodzą w dół i na boki; drążek przed twarzą do górnej części klatki (ramiona liczy IK)
   pose: keyframes({ ...seated, rx: -8, trunk: -14, grip: 1, props: { bar: { len: 1.25, plates: false }, cable: { from: [[0, 2.47, 0.12]] } } },
-    { shX: 24, abd: 148, rot: 90, el: -12 }, { shX: 50, abd: 36, rot: 90, el: -118 },
-    { shX: 66, abd: 92, el: -56 }),   // w połowie drogi drążek mija twarz z przodu
+    { hands: { w: 0.85, y: 1.6, z: -0.04, pole: [1, -0.9, -0.2] } }, { hands: { w: 0.85, y: 1.13, z: 0.14, pole: [1, -0.9, -0.2] } },
+    { hands: { w: 0.85, y: 1.42, z: 0.2, pole: [1, -0.9, -0.2] } }),   // w połowie drogi drążek mija twarz z przodu
 });
 const lat_pulldown_wide = animated({
   id: 'lat_pulldown_wide', type: 'lift', camera: 'seat', scenery: pulldownMachine,
   cameraPosition: [1.7, 1.75, -2.2], cameraTarget: [0, 1.15, 0.1],   // z tyłu i z boku – widać pracę pleców
   steps: ['Szeroki chwyt, ręce w górze', 'Ściąganie łokciami w dół i na boki', 'Drążek przy klatce', 'Powrót w górę'],
   pose: keyframes({ ...seated, rx: -8, trunk: -14, grip: 1, props: { bar: { len: 1.55, plates: false }, cable: { from: [[0, 2.47, 0.12]] } } },
-    { shX: 18, abd: 162, rot: 90, el: -6 }, { shX: 50, abd: 40, rot: 90, el: -112 },
-    { shX: 64, abd: 104, el: -50 }),
+    { hands: { w: 1.1, y: 1.56, z: -0.04, pole: [1, -0.7, -0.25] } }, { hands: { w: 1.1, y: 1.15, z: 0.14, pole: [1, -0.7, -0.25] } },
+    { hands: { w: 1.1, y: 1.4, z: 0.2, pole: [1, -0.7, -0.25] } }),
 });
 const hinge = { ...FEET, rx: 65, head: 40, thigh: -22, shin: 16 };
 const row = animated({
@@ -137,9 +139,9 @@ const incline_row = animated({
 const face_pull = animated({
   id: 'face_pull', type: 'lift', scenery: [column(1.4, 2.0)],
   steps: ['Ręce wyciągnięte do wyciągu', 'Przyciąganie liny do twarzy', 'Łokcie wysoko i na boki', 'Powrót'],
-  pose: keyframes({ ...FEET, rx: -4, props: { bar: { len: 0.32, plates: false }, cable: { from: [[0, 1.58, 1.32]] } } },
-    { shX: -86, abd: 8, el: -4 }, { shX: -40, abd: 82, rot: 90, el: -100 },
-    { shX: -85, abd: 45, el: -45 }),
+  // tor dłoni: z przodu na wysokości barków → do uszu, łokcie wysoko na boki (ramiona liczy IK)
+  pose: keyframes({ ...FEET, rx: -4, grip: 1, props: { bar: { len: 'fit', plates: false }, cable: { from: [[0, 1.58, 1.32]] } } },
+    { hands: { w: 0.3, y: 1.42, z: 0.56, pole: [1, 0.2, -0.3] } }, { hands: { w: 0.52, y: 1.52, z: 0.1, pole: [1, 0.45, -0.6] } }),
 });
 const shrug = animated({
   id: 'shrug', type: 'lift',
@@ -266,6 +268,14 @@ const rdl = animated({
   pose: keyframes({ ...FEET, props: { bar: { len: 1.6 } } },
     { rx: 0, head: 0, thigh: 0, shin: 0, arm: -12, fore: -12, abd: 6 },
     { rx: 78, trunk: 76, head: 45, thigh: -18, shin: 8, arm: -8, fore: -8 }),
+  cameraTarget: [0, 0.75, 0],
+});
+const db_rdl = animated({
+  id: 'db_rdl',
+  steps: ['Wyprost, hantle przy udach', 'Cofanie bioder, pochylenie', 'Rozciągnięcie tyłu uda', 'Powrót do wyprostu'],
+  pose: keyframes({ ...FEET, grip: 1, props: { dumbbells: true } },
+    { rx: 0, head: 0, thigh: 0, shin: 0, arm: -12, fore: -12, abd: 4 },
+    { rx: 78, trunk: 76, head: 45, thigh: -18, shin: 8, arm: -6, fore: -6, abd: 4 }),
   cameraTarget: [0, 0.75, 0],
 });
 // Wykrok w miejscu (split squat): przednia stopa płasko, tylna na palcach
@@ -421,7 +431,7 @@ export const LIBRARY = [
   pullup, lat_pulldown, lat_pulldown_wide, row, db_row, cable_row, incline_row, face_pull, shrug, back_ext,
   ohp, db_ohp, lateral_raise, reverse_fly,
   hammer, triceps_oh, pushdown, wrist_curl, reverse_curl,
-  front_squat, goblet_squat, deadlift, rdl, lunge, leg_press, leg_ext, leg_curl, adductor, calf_raise, seated_calf, tib_raise,
+  front_squat, goblet_squat, deadlift, rdl, db_rdl, lunge, leg_press, leg_ext, leg_curl, adductor, calf_raise, seated_calf, tib_raise,
   hip_thrust, band_walk,
   plank, side_plank, crunch, leg_raise, farmer,
 ];

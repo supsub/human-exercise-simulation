@@ -295,7 +295,7 @@ export function createBody() {
   // Odsuwa drążek od ciała: w każdym kroku próbuje małych zmian (zgięcie w barkach, ugięcie łokci,
   // odchylenie tułowia w tył – jak robi to ćwiczący) i wybiera tę, która najbardziej zmniejsza wniknięcie.
   function avoidBar(out) {
-    const len = out.props.bar.len ?? 1.6;
+    const len = out.props.bar.len === 'fit' ? 0.3 : out.props.bar.len ?? 1.6;
     const add = (k, dx) => {
       const v = out.joints[k];
       out.joints[k] = Array.isArray(v) ? [v[0] + dx, v[1], v[2]] : (v ?? 0) + dx;
@@ -330,12 +330,60 @@ export function createBody() {
     applyAngles(out);
   }
 
+  // ---------- IK ramion: dłonie w zadanych punktach (stały chwyt na drążku) ----------
+  // ik: { L: { target: [x,y,z], pole: [x,y,z] }, R: {...} } – punkt chwytu dłoni w świecie, pole = kierunek łokcia.
+  // Wynik zapisujemy z powrotem jako kąty stawów (bark [x,y,z] w kolejności XZY, łokieć), więc pozy dalej płynnie się mieszają.
+  const _S = new THREE.Vector3(), _T = new THREE.Vector3(), _P = new THREE.Vector3(), _E = new THREE.Vector3(), _kd = new THREE.Vector3();
+  const _ua = new THREE.Vector3(), _fv = new THREE.Vector3(), _xa = new THREE.Vector3(), _ya = new THREE.Vector3(), _za = new THREE.Vector3();
+  const _mb = new THREE.Matrix4(), _qw = new THREE.Quaternion(), _qp = new THREE.Quaternion(), _eu = new THREE.Euler();
+  const GRIP = 0.058; // nadgarstek → punkt chwytu
+  function solveArm(S, ik, out) {
+    const sh = joints['shoulder' + S], el = joints['elbow' + S], wr = joints['wrist' + S];
+    sh.getWorldPosition(_S);
+    _T.set(...ik.target);
+    const a = DIMS.upperArm, b = DIMS.forearm + GRIP;
+    _kd.subVectors(_T, _S);
+    const dist = Math.min(a + b - 1e-3, Math.max(Math.abs(a - b) + 1e-3, _kd.length()));
+    _kd.normalize();
+    _P.set(...ik.pole).addScaledVector(_kd, -_P.dot(_kd)).normalize();
+    const cosA = (a * a + dist * dist - b * b) / (2 * a * dist), sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
+    _E.copy(_S).addScaledVector(_kd, a * cosA).addScaledVector(_P, a * sinA);
+    _T.copy(_S).addScaledVector(_kd, dist);
+    _ua.subVectors(_E, _S).normalize();
+    _fv.subVectors(_T, _E).normalize();
+    const theta = Math.acos(Math.max(-1, Math.min(1, _ua.dot(_fv))));
+    // układ ramienia: −Y wzdłuż kości, +Z w stronę, w którą zgina się przedramię
+    _za.copy(_fv).addScaledVector(_ua, -_fv.dot(_ua));
+    if (_za.lengthSq() < 1e-6) _za.copy(_P); else _za.normalize();
+    _ya.copy(_ua).negate();
+    _xa.crossVectors(_ya, _za);
+    _mb.makeBasis(_xa, _ya, _za);
+    _qw.setFromRotationMatrix(_mb);
+    sh.parent.getWorldQuaternion(_qp);
+    sh.quaternion.copy(_qp.invert().multiply(_qw));
+    _eu.setFromQuaternion(sh.quaternion, 'XZY');
+    out.joints['shoulder' + S] = [_eu.x, _eu.y, _eu.z];
+    out.joints['elbow' + S] = -theta;
+    out.joints['wrist' + S] = 0;
+    el.rotation.set(-theta, 0, 0);
+    wr.rotation.set(0, 0, 0);
+    root.updateWorldMatrix(true, true);
+  }
+
   function resolvePose(pose) {
-    const needsAvoid = pose.props?.bar && pose.props.bar.on !== 'front';
-    if (!pose.anchor && !needsAvoid) return pose;
-    const out = { ...pose, root: { ...pose.root } };
+    const needsAvoid = pose.props?.bar && pose.props.bar.on !== 'front' && !pose.ik;
+    if (!pose.anchor && !needsAvoid && !pose.ik) return pose;
+    const out = { ...pose, root: { ...pose.root }, joints: { ...pose.joints } };
+    const finishIK = () => {
+      if (!out.ik) return;
+      applyAngles(out);
+      solveArm('L', out.ik.L, out);
+      solveArm('R', out.ik.R, out);
+      delete out.ik;
+    };
     if (!pose.anchor) {
-      avoidBar(out);
+      finishIK();
+      if (needsAvoid) avoidBar(out);
       return out;
     }
     const place = () => {
@@ -358,6 +406,7 @@ export function createBody() {
       out.root.rx = (lo + hi) / 2;
     }
     place();
+    finishIK();
     if (needsAvoid) { avoidBar(out); place(); }
     delete out.anchor; delete out.anchor2;
     return out;
@@ -404,8 +453,10 @@ export function createBody() {
       mid.addVectors(hL, hR).multiplyScalar(0.5);
     }
     if (props.bar) {
-      const { len = 1.6, plates = true } = props.bar;
-      centeredBar(hL, hR, len, 0.014, metal);
+      const { plates = true } = props.bar;
+      // lina (fit) rozkłada się razem z dłońmi; drążek/sztanga ma stałą długość
+      const len = props.bar.len === 'fit' ? hL.distanceTo(hR) + 0.04 : props.bar.len ?? 1.6;
+      centeredBar(hL, hR, len, props.bar.len === 'fit' ? 0.01 : 0.014, props.bar.len === 'fit' ? cableMat : metal);
       if (plates) {
         _u.subVectors(hL, hR).normalize();
         if (_u.lengthSq() < 0.5) _u.set(1, 0, 0);
