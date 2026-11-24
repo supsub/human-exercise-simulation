@@ -130,6 +130,8 @@ input:focus { border-color: var(--accent); }
 .plan-head button { padding: 7px 10px; }
 .plan-days { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
 .day-card { border: 1px solid var(--border); border-radius: 11px; padding: 8px 10px; background: rgba(11,16,23,.5); }
+.day-card { cursor: pointer; transition: border-color .15s; }
+.day-card:hover { border-color: rgba(79,179,255,.45); }
 .day-card.active { background: rgba(35,48,71,.35); border-color: rgba(79,179,255,.18); }
 .day-card.focused { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 .day-head { display: flex; align-items: center; gap: 10px; }

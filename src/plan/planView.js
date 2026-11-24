@@ -85,7 +85,9 @@ function renderDays(p) {
       </div>
       <div class="day-items"></div>`;
     card.querySelector('input').onchange = (e) => { day.active = e.target.checked; render(); };
-    card.querySelector('.day-name').onclick = () => {
+    card.querySelector('.switch').addEventListener('click', (e) => e.stopPropagation());
+    // cała karta dnia jest klikalna (wiersze ćwiczeń, pola i przyciski mają własne akcje)
+    card.onclick = () => {
       // przy wybranym ćwiczeniu klik w dzień tylko go zaznacza (cel "Dodaj"), bez odznaczania
       focusDay = selected ? d.id : focusDay === d.id ? null : d.id;
       render();
@@ -107,13 +109,13 @@ function renderDays(p) {
         repsIn.onchange = () => { it.reps = clampInt(repsIn.value, 1, 50); render(); };
         row.querySelectorAll('input, .del').forEach((el) => el.addEventListener('click', (e) => e.stopPropagation()));
         row.querySelector('.del').onclick = (e) => { e.stopPropagation(); day.items.splice(idx, 1); render(); };
-        row.onclick = () => (selected?.ex === ex ? closePanel() : selectExercise(ex, 'plan'));
+        row.onclick = (e) => { e.stopPropagation(); selected?.ex === ex ? closePanel() : selectExercise(ex, 'plan'); };
         list.appendChild(row);
       });
       const add = document.createElement('button');
       add.className = 'add-ex';
       add.textContent = '+ Dodaj ćwiczenie';
-      add.onclick = () => openBrowse(d.id);
+      add.onclick = (e) => { e.stopPropagation(); openBrowse(d.id); };
       list.appendChild(add);
     }
     ui.days.appendChild(card);
