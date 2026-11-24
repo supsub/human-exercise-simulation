@@ -53,8 +53,8 @@ export const body = createBody();
 scene.add(body.root);
 
 // ---------- Kolory aktywacji ----------
-// Wygląd organiczny (DEMO, ?look=organic): mięśnie w spoczynku w jasnym, stonowanym kolorze bliskim skórze
-const ORGANIC = new URLSearchParams(location.search).get('look') === 'organic';
+// Wygląd organiczny (domyślny; ?look=classic – dawny ludzik): mięśnie w spoczynku w jasnym, stonowanym kolorze bliskim skórze
+const ORGANIC = new URLSearchParams(location.search).get('look') !== 'classic';
 const STOPS = [
   [0.0, new THREE.Color(ORGANIC ? 0xa9b3c4 : 0x4a5a78)],
   [0.2, new THREE.Color(0x3fa7d6)],

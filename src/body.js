@@ -102,8 +102,8 @@ function twistChain(rootG, midG, endG, angle, lateralSign) {
   }
 }
 
-// look: 'classic' (domyślny) albo 'organic' (DEMO nowego wyglądu; w przeglądarce także ?look=organic)
-export function createBody({ look = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('look')) || 'classic' } = {}) {
+// look: 'organic' (domyślny – realistyczna sylwetka) albo 'classic' (dawny ludzik z brył; w przeglądarce ?look=classic)
+export function createBody({ look = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('look')) || 'organic' } = {}) {
   const organic = look === 'organic';
   const joints = {};
   const points = {};

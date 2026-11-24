@@ -67,4 +67,4 @@ Wzrokowo – arkusze zbliżeń (`tools/sheet.html?ts=0.01,0.5&focus=handL&dist=0
 - [ ] stopy stoją płasko tam, gdzie powinny (podłoga, platforma, podnóżek), sprzęt ma sensowne wymiary
 - [ ] przy przełączeniu na błąd technika różni się tylko tym błędem (kamera zostaje w miejscu – porównanie 1:1)
 
-Narzędzia: `tools/points.html?ex=db_row&t=0,0.5&pts=handR,toeL` – pozycje punktów ciała (do ustawiania sprzętu i podparć), `tools/sheet.html?grips` – tabela chwytu wszystkich ćwiczeń, `tools/look.html` – porównanie wyglądów.
+Narzędzia: `tools/points.html?ex=db_row&t=0,0.5&pts=handR,toeL` – pozycje punktów ciała (do ustawiania sprzętu i podparć), `tools/sheet.html?grips` – tabela chwytu wszystkich ćwiczeń, `tools/look.html` – porównanie wyglądów (domyślny: realistyczny, `?look=classic` – dawny ludzik z brył).
