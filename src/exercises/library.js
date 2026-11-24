@@ -94,14 +94,16 @@ const lat_pulldown = animated({
   steps: ['Ręce wyprostowane w górze', 'Ściąganie drążka do klatki', 'Drążek przy klatce', 'Powrót w górę'],
   // chwyt nieco szerszy niż barki, łokcie schodzą w dół i na boki, drążek przed twarzą do górnej części klatki
   pose: keyframes({ ...seated, rx: -8, trunk: -14, grip: 1, props: { bar: { len: 1.25, plates: false }, cable: { from: [[0, 2.47, 0.12]] } } },
-    { shX: 24, abd: 148, rot: 90, el: -12 }, { shX: 26, abd: 44, rot: 90, el: -116 }),
+    { shX: 24, abd: 148, rot: 90, el: -12 }, { shX: 34, abd: 36, rot: 90, el: -122 },
+    { shX: 66, abd: 92, el: -56 }),   // w połowie drogi drążek mija twarz z przodu
 });
 const lat_pulldown_wide = animated({
   id: 'lat_pulldown_wide', type: 'lift', camera: 'seat', scenery: pulldownMachine,
   cameraPosition: [1.7, 1.75, -2.2], cameraTarget: [0, 1.15, 0.1],   // z tyłu i z boku – widać pracę pleców
   steps: ['Szeroki chwyt, ręce w górze', 'Ściąganie łokciami w dół i na boki', 'Drążek przy klatce', 'Powrót w górę'],
   pose: keyframes({ ...seated, rx: -8, trunk: -14, grip: 1, props: { bar: { len: 1.55, plates: false }, cable: { from: [[0, 2.47, 0.12]] } } },
-    { shX: 18, abd: 162, rot: 90, el: -6 }, { shX: 22, abd: 56, rot: 90, el: -104 }),
+    { shX: 18, abd: 162, rot: 90, el: -6 }, { shX: 38, abd: 38, rot: 90, el: -118 },
+    { shX: 64, abd: 104, el: -50 }),
 });
 const hinge = { ...FEET, rx: 65, head: 40, thigh: -22, shin: 16 };
 const row = animated({
@@ -235,7 +237,7 @@ function squatVariant(armGlobal, foreGlobal, uprightness, props, adduct = 0) {
 const front_squat = animated({
   id: 'front_squat', camera: 'stand',
   steps: ['Sztanga z przodu na barkach', 'Zejście w dół', 'Dolna pozycja', 'Wstawanie'],
-  pose: squatVariant(-80, 138, 0.55, { bar: { len: 1.6 } }),
+  pose: squatVariant(-90, 102, 0.55, { bar: { len: 1.6, on: 'front' } }),
   cameraTarget: [0, 0.8, 0],
 });
 const goblet_squat = animated({

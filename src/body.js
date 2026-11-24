@@ -72,7 +72,7 @@ function dumbbell() {
     plate.position.x = x;
     g.add(plate);
   }
-  g.position.set(0, -0.06, 0);
+  g.position.set(0, -0.058, 0.01);   // w punkcie chwytu dłoni
   g.visible = false;
   return g;
 }
@@ -151,10 +151,10 @@ export function createBody() {
     // Dłoń: śródręcze + dwuczłonowe palce + kciuk. Palce zaciskają się na trzymanym przedmiocie
     // (uchwyt jest w punkcie 'hand', ok. 7 cm pod nadgarstkiem, tuż przed wnętrzem dłoni).
     const palm = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.07, 0.026), jointMat));
-    palm.position.set(0, -0.038, -0.02);
+    palm.position.set(0, -0.038, -0.013);
     wr.add(palm);
     const f1 = new THREE.Group();
-    f1.position.set(0, -0.073, -0.02);
+    f1.position.set(0, -0.073, -0.013);
     wr.add(f1);
     const seg1 = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.032, 0.022), jointMat));
     seg1.position.y = -0.016;
@@ -191,7 +191,7 @@ export function createBody() {
     sh.rotation.order = 'XZY';
     hip.rotation.order = 'XZY';
     // punkty pomocnicze: chwyt dłoni, palce i pięta stopy, przód/tył goleni (wałki maszyn)
-    marker('hand' + side, wr, [0, -0.07, 0]);
+    marker('hand' + side, wr, [0, -0.058, 0.01]);   // punkt chwytu: między śródręczem a zgiętymi palcami
     marker('toe' + side, an, [0, -DIMS.ankleHeight, DIMS.footFront]);
     marker('heel' + side, an, [0, -DIMS.ankleHeight, DIMS.footBack]);
     marker('shinFront' + side, kn, [0, -DIMS.shin + 0.08, 0.075]);
@@ -199,6 +199,9 @@ export function createBody() {
     marker('kneeOut' + side, kn, [0, -0.04, 0]);
   }
   marker('chest', torso, [0, 0.3, 0.13]);
+  // pozycja sztangi w przysiadzie frontowym: na przednich aktonach barków, przed szyją
+  marker('rackL', torso, [0.2, 0.455, 0.115]);
+  marker('rackR', torso, [-0.2, 0.455, 0.115]);
   marker('backTop', torso, [0, 0.38, -0.12]);
   marker('headTop', neck, [0, 0.29, 0.01]);
 
@@ -317,6 +320,11 @@ export function createBody() {
     used = 0;
     const hL = pointWorld('handL', new THREE.Vector3()), hR = pointWorld('handR', new THREE.Vector3());
     const mid = new THREE.Vector3().addVectors(hL, hR).multiplyScalar(0.5);
+    if (props.bar?.on === 'front') {
+      // sztanga oparta na barkach – rekwizyt liczony od barków, nie od dłoni
+      pointWorld('rackL', hL); pointWorld('rackR', hR);
+      mid.addVectors(hL, hR).multiplyScalar(0.5);
+    }
     if (props.bar) {
       const { len = 1.6, plates = true } = props.bar;
       centeredBar(hL, hR, len, 0.014, metal);
@@ -374,8 +382,33 @@ export function createBody() {
     }
   }
 
+  // Dłonie na drążku: obracamy nadgarstek wzdłuż osi przedramienia tak, żeby drążek leżał w zgiętych palcach
+  // (oś "chwytu" dłoni = lokalna oś X nadgarstka ustawiona równolegle do drążka).
+  const _f = new THREE.Vector3(), _x = new THREE.Vector3(), _z = new THREE.Vector3(), _bar = new THREE.Vector3();
+  function alignHandsToBar() {
+    pointWorld('handL', _a); pointWorld('handR', _b);
+    for (const S of ['L', 'R']) {
+      const wr = joints['wrist' + S];
+      wr.rotation.y = 0;
+      wr.updateWorldMatrix(true, false);
+      const e = wr.matrixWorld.elements;
+      _x.set(e[0], e[1], e[2]).normalize();
+      _f.set(e[4], e[5], e[6]).normalize();       // oś przedramienia/dłoni
+      _z.set(e[8], e[9], e[10]).normalize();
+      _bar.subVectors(_a, _b);
+      _bar.addScaledVector(_f, -_bar.dot(_f));
+      if (_bar.lengthSq() < 1e-8) continue;
+      _bar.normalize();
+      let th = Math.atan2(-_bar.dot(_z), _bar.dot(_x));
+      if (th > Math.PI / 2) th -= Math.PI; else if (th < -Math.PI / 2) th += Math.PI;
+      wr.rotation.y = th;
+    }
+    root.updateWorldMatrix(true, true);
+  }
+
   function setPose(pose) {
     applyAngles(pose);
+    if (pose.props?.bar && pose.props.bar.on !== 'front') alignHandsToBar();
     setGrip(pose);
     const db = pose.props?.dumbbells;
     props.dumbbells.forEach((d, i) => {

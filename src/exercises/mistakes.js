@@ -94,7 +94,7 @@ export const MISTAKES = {
     ROM('Drążek zatrzymuje się nad głową.', 'Plecy pracują tylko w części zakresu.', 'Ściągaj drążek do górnej części klatki.', { latissimus: -0.3 }),
   ],
   lat_pulldown_wide: [
-    { id: 'behind', name: 'Ściąganie za kark', B: { rx: 18, trunk: 25, head: 45, shX: -10 },
+    { id: 'behind', name: 'Ściąganie za kark', B: { rx: 18, trunk: 28, head: 58, shX: -22, abd: 52 }, M: { shX: -6, abd: 125, el: -40, trunk: 15, head: 40 },
       what: 'Tułów pochyla się do przodu, a drążek trafia za głowę.',
       why: 'Barki pracują w skrajnej rotacji zewnętrznej, a szyja jest zgięta – to obciąża barki i kręgi szyjne.',
       fix: 'Zawsze ściągaj drążek przed twarz, do górnej części klatki.',

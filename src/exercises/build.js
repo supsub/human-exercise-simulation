@@ -66,13 +66,19 @@ function mix(a, b, t) {
   }
   return a ?? b;
 }
-// Typowy błąd w pozach kluczowych: { A, B, both } – nadpisania specyfikacji; params[id] = 0..1 (płynne przejście)
-export const keyframes = (base, A, B) => (d, params = {}, mistakes = []) => {
-  let spec = mix({ ...base, ...A }, { ...base, ...B }, d);
+// Typowy błąd w pozach kluczowych: { A, B, both, M } – nadpisania specyfikacji; params[id] = 0..1 (płynne przejście).
+// M (opcjonalnie) – poza pośrednia w połowie ruchu (np. drążek musi minąć twarz z przodu).
+function spec3(A, B, M, d) {
+  if (!M) return mix(A, B, d);
+  const mid = { ...mix(A, B, 0.5), ...M };
+  return d < 0.5 ? mix(A, mid, d * 2) : mix(mid, B, (d - 0.5) * 2);
+}
+export const keyframes = (base, A, B, M = null) => (d, params = {}, mistakes = []) => {
+  let spec = spec3({ ...base, ...A }, { ...base, ...B }, M, d);
   for (const m of mistakes) {
     const w = params[m.id] ?? 0;
     if (w <= 0 || !(m.A || m.B || m.both)) continue;
-    const bad = mix({ ...base, ...A, ...m.both, ...m.A }, { ...base, ...B, ...m.both, ...m.B }, d);
+    const bad = spec3({ ...base, ...A, ...m.both, ...m.A }, { ...base, ...B, ...m.both, ...m.B }, (M || m.M) && { ...M, ...m.both, ...m.M }, d);
     spec = mix(spec, bad, w);
   }
   return makePose(spec);

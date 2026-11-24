@@ -24,7 +24,7 @@ const ui = {
   browse: $('picker-browse'), search: $('picker-search'), cats: $('picker-cats'), list: $('picker-list'),
   detail: $('picker-detail'), dTop: $('d-top'), dTech: $('d-technique'), dMuscles: $('d-muscles'),
   bar: $('player-bar'), play: $('play'), timeline: $('timeline'), playhead: $('playhead'), speed: $('speed'),
-  breathLabel: $('breath-label'), phaseKind: $('phase-kind'),
+  breathLabel: $('breath-label'), phaseKind: $('phase-kind'), phaseHint: $('phase-hint'),
 };
 
 const player = createPlayer(body.resolvePose);
@@ -100,7 +100,7 @@ function renderDays(p) {
         row.className = 'item' + (selected?.ex === ex ? ' selected' : '');
         row.title = 'Kliknij, aby zobaczyć ćwiczenie';
         row.innerHTML = `
-          <span class="item-name">${esc(ex.name)}${ex.animated ? ' <i class="anim-dot" title="ma animację">▶</i>' : ''}</span>
+          <span class="item-name">${esc(ex.name)}</span>
           <input type="number" min="1" max="10" value="${it.sets}" title="Serie"> <span class="x">×</span>
           <input type="number" min="1" max="50" value="${it.reps}" title="Powtórzenia">
           <button class="icon del" title="Usuń z planu">✕</button>`;
@@ -209,35 +209,40 @@ function renderList() {
   ui.cats.querySelectorAll('button').forEach((b) => b.classList.toggle('active', (b.dataset.c === 'Wszystkie' && !browseCat) || b.dataset.c === browseCat));
   const items = CATALOG.filter((ex) => (!browseCat || ex.category === browseCat) &&
     (!q || ex.name.toLowerCase().includes(q) || Object.keys(ex.muscles).some((id) => MUSCLE_BY_ID[id].name.toLowerCase().includes(q))));
-  items.sort((a, b) => helpsOf(b).length - helpsOf(a).length); // uzupełniające braki na górze
+  // uzupełniające braki na górze, ćwiczenia już obecne w tym dniu na końcu (bez możliwości dodania)
+  items.sort((a, b) => !!inDay(a.id, browseDay) - !!inDay(b.id, browseDay) || helpsOf(b).length - helpsOf(a).length);
   ui.list.innerHTML = items.map((ex) => {
     const helps = helpsOf(ex).length;
     const tags = Object.entries(ex.muscles).sort((a, b) => b[1] - a[1]).slice(0, 3)
       .map(([id, w]) => `<span class="mtag" style="border-color:${cssColor(w * 0.9)}">${MUSCLE_BY_ID[id].name}</span>`).join('');
-    return `<div class="pick" data-id="${ex.id}" tabindex="0">
+    const here = inDay(ex.id, browseDay);
+    return `<div class="pick${here ? ' present' : ''}" data-id="${ex.id}" tabindex="0">
       <div class="pick-body">
-        <div class="pick-head"><b>${ex.name}</b>${ex.animated ? '<span class="anim">▶ animacja</span>' : ''}${helps ? `<span class="helps">uzupełnia ${helps} ${helps === 1 ? 'brak' : 'braki'}</span>` : ''}</div>
+        <div class="pick-head"><b>${ex.name}</b>${helps ? `<span class="helps">uzupełnia ${helps} ${helps === 1 ? 'brak' : 'braki'}</span>` : ''}</div>
         <div class="pick-meta">${ex.category} · ${ex.equipment}</div><div class="mtags">${tags}</div>
       </div>
-      <button class="quick-add" title="Dodaj od razu do: ${DAY_BY_ID[browseDay].name} (3 × 10)">+</button>
+      ${here ? `<span class="present-tag">już w tym dniu<br>${here.sets} × ${here.reps}</span>`
+        : `<button class="quick-add" title="Dodaj od razu do: ${DAY_BY_ID[browseDay].name} (3 × 10)">+</button>`}
     </div>`;
   }).join('') || '<div class="muted">Brak ćwiczeń pasujących do wyszukiwania.</div>';
   ui.list.querySelectorAll('.pick').forEach((el) => {
     const ex = CATALOG_BY_ID[el.dataset.id];
     el.onclick = () => selectExercise(ex, 'list');
     el.onkeydown = (e) => { if (e.key === 'Enter') selectExercise(ex, 'list'); };
-    el.querySelector('.quick-add').onclick = (e) => {
+    el.querySelector('.quick-add')?.addEventListener('click', (e) => {
       e.stopPropagation();
       addToDay(ex, browseDay);
-      ui.list.querySelector(`.pick[data-id="${ex.id}"]`)?.classList.add('added');
-    };
+    });
     el.onmouseenter = () => (listHover = ex);
     el.onmouseleave = () => (listHover = null);
   });
 }
 
+// Jedno ćwiczenie raz w danym dniu – więcej pracy = więcej serii, nie drugi wpis
+const inDay = (exId, dayId) => plan().days[dayId].items.find((it) => it.exId === exId);
 function addToDay(ex, dayId) {
   const day = plan().days[dayId];
+  if (inDay(ex.id, dayId)) return;
   day.active = true;
   day.items.push({ exId: ex.id, sets: 3, reps: 10 });
   render();
@@ -307,7 +312,9 @@ function renderDetailTop() {
       <div class="muted small">${ex.category} · ${ex.equipment}${selected.anim ? '' : ' · bez animacji – model pokazuje mapę mięśni'}</div></div>
     <div class="d-add">
       ${focusDay
-        ? `<button class="d-add-btn">+ Dodaj do: ${DAY_BY_ID[focusDay].name}</button><div class="d-impact">${impact}</div>`
+        ? inDay(ex.id, focusDay)
+          ? `<div class="d-impact">✓ Już jest w: <b>${DAY_BY_ID[focusDay].name}</b> (${inDay(ex.id, focusDay).sets} × ${inDay(ex.id, focusDay).reps}). Chcesz więcej pracy? Zwiększ liczbę serii w planie.</div>`
+          : `<button class="d-add-btn">+ Dodaj do: ${DAY_BY_ID[focusDay].name}</button><div class="d-impact">${impact}</div>`
         : '<div class="d-impact">Aby dodać, kliknij nazwę dnia w planie po lewej.</div>'}
       ${inPlan.length ? `<div class="d-impact muted">Już w planie: ${inPlan.join(', ')}</div>` : ''}
     </div>
@@ -502,7 +509,8 @@ export function frame(dt, time) {
     ui.timeline.querySelectorAll('.seg').forEach((s, i) => s.classList.toggle('current', selected.anim.phases[i] === ph));
     ui.breathLabel.textContent = `${BREATH[ph.breath].icon} ${BREATH[ph.breath].label}`;
     ui.breathLabel.className = 'breath-label ' + ph.breath;
-    ui.phaseKind.innerHTML = `<b>${ph.name}</b> · ${PHASE_KIND[ph.kind].hint}`;
+    ui.phaseKind.textContent = ph.name;
+    ui.phaseHint.textContent = PHASE_KIND[ph.kind].hint;
     ui.play.textContent = player.state.playing ? '❚❚' : '▶';
   }
 }

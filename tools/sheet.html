@@ -46,6 +46,38 @@
     scene.add(new THREE.GridHelper(6, 24, 0x2c3648, 0x222a38));
     const body = createBody();
     scene.add(body.root);
+    // ?check – test kolizji: czy drążek (sztanga, uchwyt wyciągu) przechodzi przez głowę w którymkolwiek momencie ruchu
+    if (q.has('check')) {
+      const out = [];
+      const head = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), seg = new THREE.Vector3(), tmp = new THREE.Vector3();
+      for (const ex of list) {
+        const variants = [{ id: 'ok', params: {} }, ...ex.mistakes.map((m) => ({ id: m.id, params: m.params }))];
+        for (const v of variants) {
+          let worst = null;
+          for (let i = 0; i < 60; i++) {
+            const t = i / 60;
+            const pose = body.resolvePose(ex.pose(sampleExercise(ex, t, v.params.rom ?? 0).depth, v.params));
+            if (!pose.props?.bar && !pose.props?.goblet) break;
+            body.setPose(pose);
+            body.joints.neck.localToWorld(head.set(0, 0.17, 0.01));
+            const front = pose.props.bar?.on === 'front';
+            body.points[front ? 'rackL' : 'handL'].getWorldPosition(a); body.points[front ? 'rackR' : 'handR'].getWorldPosition(b);
+            // odcinek drążka (długość z rekwizytu) wycentrowany między dłońmi
+            const len = pose.props.bar?.len ?? 0.2;
+            const c = a.clone().add(b).multiplyScalar(0.5), u = a.clone().sub(b).normalize();
+            const p0 = c.clone().addScaledVector(u, -len / 2);
+            seg.copy(u).multiplyScalar(len);
+            const k = Math.max(0, Math.min(1, tmp.subVectors(head, p0).dot(seg) / seg.lengthSq()));
+            const dist = head.distanceTo(p0.clone().addScaledVector(seg, k));
+            if (dist < 0.125 && (!worst || dist < worst.dist)) worst = { t, dist };
+          }
+          if (worst) out.push(`KOLIZJA ${ex.id} [${v.id}] t=${worst.t.toFixed(2)} odl=${worst.dist.toFixed(3)}`);
+        }
+      }
+      const pre = document.createElement('pre'); pre.id = 'check';
+      pre.textContent = out.length ? out.join('\n') : 'OK – brak kolizji drążka z głową';
+      document.body.prepend(pre);
+    }
     const scenery = new THREE.Group(); scene.add(scenery);
     const COLORS = { pad: 0x343b48, frame: 0x5d6572, metal: 0x9aa1ab, wall: 0x232a36 };
     function setScenery(defs = []) {
