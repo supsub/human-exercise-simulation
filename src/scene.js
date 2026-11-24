@@ -154,9 +154,18 @@ export function updateStressMarkers(list, strength, time, showLabels = true) {
 }
 
 // ---------- Oddech: obłoczki przy wydechu ----------
-const puffGeo = new THREE.SphereGeometry(1, 12, 8);
-const puffs = Array.from({ length: 24 }, () => {
-  const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0, depthWrite: false }));
+// obłoczek wydechu: miękka biała plamka z lekko ciemniejszym brzegiem – widoczna i na jasnym, i na ciemnym tle
+const puffTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.55, 'rgba(235,244,255,0.6)');
+  gr.addColorStop(0.8, 'rgba(120,140,170,0.25)'); gr.addColorStop(1, 'rgba(120,140,170,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+const puffs = Array.from({ length: 30 }, () => {
+  const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, opacity: 0, depthWrite: false }));
   m.visible = false;
   m.userData = { life: 0, vel: new THREE.Vector3() };
   scene.add(m);
@@ -168,25 +177,26 @@ const _dir = new THREE.Vector3(), _q = new THREE.Quaternion();
 export function updateBreathPuffs(dt, exhaling) {
   puffTimer -= dt;
   if (exhaling > 0.05 && puffTimer <= 0) {
-    puffTimer = 0.07;
+    puffTimer = 0.06;
     const p = puffs.find((x) => !x.visible);
     if (p) {
       body.nose.getWorldPosition(p.position);
       body.nose.parent.getWorldQuaternion(_q);
       _dir.set((Math.random() - 0.5) * 0.25, -0.15 + (Math.random() - 0.5) * 0.2, 1).normalize().applyQuaternion(_q);
-      p.userData.vel.copy(_dir).multiplyScalar(0.35 * exhaling);
+      p.userData.vel.copy(_dir).multiplyScalar(0.5 * exhaling);
       p.userData.life = 1;
       p.visible = true;
     }
   }
   for (const p of puffs) {
     if (!p.visible) continue;
-    p.userData.life -= dt / 0.9;
+    p.userData.life -= dt / 1.1;
     if (p.userData.life <= 0) { p.visible = false; continue; }
     p.position.addScaledVector(p.userData.vel, dt);
+    p.userData.vel.multiplyScalar(1 - 1.2 * dt);            // powietrze hamuje, obłoczek rozpływa się
     const l = p.userData.life;
-    p.scale.setScalar(0.012 + 0.03 * (1 - l));
-    p.material.opacity = 0.35 * l;
+    p.scale.setScalar(0.03 + 0.09 * (1 - l));
+    p.material.opacity = 0.8 * Math.min(1, l * 1.6) * (0.4 + 0.6 * l);
   }
 }
 
