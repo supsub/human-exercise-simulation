@@ -382,9 +382,9 @@ function buildTimeline(ex) {
     const seg = document.createElement('div');
     seg.className = 'seg ' + p.kind;
     seg.style.left = p.start * 100 + '%';
-    seg.style.width = (p.end - p.start) * 100 + '%';
     seg.title = `${p.name} – ${PHASE_KIND[p.kind].hint}, ${BREATH[p.breath].label.toLowerCase()}`;
-    seg.innerHTML = `<span>${p.name}</span><b class="seg-breath">${BREATH[p.breath].icon}</b>`;
+    // segment bez tekstu (żeby nic nie było ucinane), pełny opis w podpowiedzi
+    seg.style.width = `calc(${(p.end - p.start) * 100}% - 3px)`;
     ui.timeline.appendChild(seg);
   }
 }
@@ -502,7 +502,7 @@ export function frame(dt, time) {
     ui.timeline.querySelectorAll('.seg').forEach((s, i) => s.classList.toggle('current', selected.anim.phases[i] === ph));
     ui.breathLabel.textContent = `${BREATH[ph.breath].icon} ${BREATH[ph.breath].label}`;
     ui.breathLabel.className = 'breath-label ' + ph.breath;
-    ui.phaseKind.innerHTML = `<b>${ph.name}</b> – ${PHASE_KIND[ph.kind].hint}`;
+    ui.phaseKind.innerHTML = `<b>${ph.name}</b> · ${PHASE_KIND[ph.kind].hint}`;
     ui.play.textContent = player.state.playing ? '❚❚' : '▶';
   }
 }

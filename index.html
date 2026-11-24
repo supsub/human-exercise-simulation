@@ -75,18 +75,21 @@
 
     <!-- Sterowanie animacją wybranego ćwiczenia -->
     <div id="player-bar" class="panel player-bar" hidden>
-      <div class="pb-row">
-        <button id="play" class="play" title="Odtwórz / pauza (spacja)">❚❚</button>
+      <button id="play" class="play" title="Odtwórz / pauza (spacja)">❚❚</button>
+      <div class="pb-main">
+        <div class="pb-info">
+          <span id="phase-kind" class="pb-kind"></span>
+          <span id="breath-label" class="breath-label"></span>
+        </div>
         <div id="timeline" class="timeline" title="Kliknij lub przeciągnij, aby przewinąć">
           <div id="playhead" class="playhead"></div>
         </div>
-        <select id="speed" title="Tempo">
-          <option value="0.25">0,25×</option>
-          <option value="0.5">0,5×</option>
-          <option value="1" selected>1×</option>
-        </select>
       </div>
-      <div class="pb-info"><span id="phase-kind" class="pb-kind"></span><span id="breath-label" class="breath-label"></span></div>
+      <select id="speed" title="Tempo">
+        <option value="0.25">0,25×</option>
+        <option value="0.5">0,5×</option>
+        <option value="1" selected>1×</option>
+      </select>
     </div>
   </div>
 
