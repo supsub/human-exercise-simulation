@@ -16,7 +16,7 @@ Parametry URL przydatne do demo i testów:
 - `?ex=pushup` otwiera wybrane ćwiczenie (id z `src/exercises/`),
 - `&t=0.6` zatrzymuje animację w danym punkcie cyklu (0–1),
 - `&mistake=sag` pokazuje typowy błąd (id z `mistakes` w pliku ćwiczenia),
-- `index.html?focus=mon#plan` pokazuje plan z wybranym dniem, a `?picker=wed#plan` otwiera okno wyboru ćwiczeń, a `?show=squat#plan` otwiera podgląd ćwiczenia z katalogu.
+- `index.html?focus=mon#plan` pokazuje plan z wybranym dniem, a `?picker=wed#plan` otwiera okno wyboru ćwiczeń, a `?show=squat#plan` lub `?picker=wed&detail=row#plan` otwiera szczegóły ćwiczenia z katalogu (`&t=0.5` zatrzymuje animację).
 
 `node tools/check.mjs` wypisuje kąty stawów i aktywacje bez przeglądarki (szybki test sanity).
 

@@ -98,3 +98,46 @@ export const CATALOG = [
 ];
 
 export const CATALOG_BY_ID = Object.fromEntries(CATALOG.map((e) => [e.id, e]));
+
+// Krótkie opisy dla laika: jak wykonać i na co uważać (pokazywane w szczegółach ćwiczenia).
+const INFO = {
+  pushup: ['Podpór na dłoniach, ciało proste jak deska. Opuszczasz klatkę prawie do podłogi i wypychasz się w górę.', 'Nie pozwól biodrom opadać, łokcie prowadź blisko tułowia.'],
+  bench: ['Leżąc na ławce opuszczasz sztangę do dolnej części klatki i wypychasz ją w górę.', 'Łopatki ściągnięte i wciśnięte w ławkę, stopy stabilnie na podłodze.'],
+  incline_db: ['Na ławce ustawionej skośnie (ok. 30°) wypychasz hantle znad klatki w górę.', 'Zbyt stromy skos przerzuca pracę na barki.'],
+  dips: ['W podporze na poręczach opuszczasz ciało, zginając łokcie, i wypychasz się w górę.', 'Nie schodź za nisko, jeśli czujesz ból z przodu barku.'],
+  fly: ['Leżąc na ławce rozkładasz lekko ugięte ręce z hantlami na boki i łączysz je nad klatką.', 'Ruch kontrolowany, łokcie cały czas lekko ugięte.'],
+  pullup: ['Wisząc na drążku podciągasz się, aż broda znajdzie się nad drążkiem.', 'Zacznij od ściągnięcia łopatek w dół, bez bujania.'],
+  lat_pulldown: ['Siedząc przy wyciągu ściągasz drążek do górnej części klatki.', 'Nie odchylaj się mocno do tyłu i nie szarp.'],
+  row: ['W pochyleniu z prostymi plecami przyciągasz sztangę do brzucha.', 'Plecy proste przez cały ruch – to najczęstszy błąd.'],
+  db_row: ['Opierając się jedną ręką o ławkę przyciągasz hantel do biodra.', 'Ciągnij łokciem, nie przekręcaj tułowia.'],
+  face_pull: ['Przyciągasz linę wyciągu do twarzy, rozchylając ręce na boki.', 'Lekki ciężar, nacisk na ściąganie łopatek – świetne dla zdrowia barków.'],
+  shrug: ['Trzymając ciężar w dłoniach unosisz barki prosto w górę, do uszu.', 'Nie kręć barkami w kółko.'],
+  back_ext: ['Na ławce rzymskiej opuszczasz tułów i prostujesz go do linii ciała.', 'Nie przeprostowuj pleców w górnej pozycji.'],
+  ohp: ['Stojąc wypychasz sztangę lub hantle znad barków nad głowę.', 'Napnij brzuch i pośladki, żeby nie wyginać lędźwi.'],
+  lateral_raise: ['Unosisz hantle bokiem do wysokości barków.', 'Lekki ciężar, bez bujania tułowiem.'],
+  reverse_fly: ['W opadzie tułowia rozkładasz ręce z hantlami na boki.', 'Prowadź ruch tylną częścią barków, nie plecami.'],
+  curl: ['Stojąc uginasz ręce w łokciach, unosząc hantle do barków.', 'Łokcie przy tułowiu, bez bujania.'],
+  hammer: ['Uginasz ręce z hantlami trzymanymi jak młotek (kciuki w górę).', 'Mocno angażuje przedramię i mięsień ramienny.'],
+  triceps_oh: ['Trzymając ciężar za głową prostujesz ręce w łokciach nad głowę.', 'Łokcie skierowane do przodu, nie na boki.'],
+  pushdown: ['Przy wyciągu prostujesz ręce w łokciach, ściągając linkę lub drążek w dół.', 'Łokcie przyklejone do boków.'],
+  wrist_curl: ['Z przedramieniem opartym o udo uginasz nadgarstek z ciężarem w górę.', 'Mały zakres i lekki ciężar wystarczą.'],
+  reverse_curl: ['Uginasz ręce w łokciach, trzymając sztangę nachwytem (dłonie w dół).', 'Wzmacnia przedramiona i mięsień ramienno-promieniowy.'],
+  squat: ['Stojąc schodzisz w dół, zginając biodra i kolana, i wstajesz.', 'Kolana w linii stóp, pięty na podłodze, plecy proste.'],
+  deadlift: ['Podnosisz sztangę z podłogi do pełnego wyprostu, pchając nogami i prostując biodra.', 'Plecy proste, sztanga blisko nóg – technika ważniejsza niż ciężar.'],
+  rdl: ['Z lekko ugiętymi kolanami pochylasz się, cofając biodra, i wracasz do wyprostu.', 'Czujesz rozciąganie tyłu uda – plecy cały czas proste.'],
+  lunge: ['Robisz duży krok i opuszczasz tylne kolano w stronę podłogi, potem wracasz.', 'Przednie kolano nad stopą, tułów wyprostowany.'],
+  leg_ext: ['Siedząc na maszynie prostujesz nogi w kolanach.', 'Izoluje przód uda, nie szarp ciężarem.'],
+  leg_curl: ['Leżąc na maszynie uginasz nogi w kolanach, przyciągając wałek do pośladków.', 'Biodra przyciśnięte do ławki.'],
+  adductor: ['Siedząc na maszynie zsuwasz rozchylone nogi do środka.', 'Ruch powolny, bez odbijania.'],
+  calf_raise: ['Stojąc wspinasz się na palce i powoli opuszczasz pięty.', 'Pełny zakres: od rozciągnięcia do pełnego wspięcia.'],
+  seated_calf: ['Siedząc z ciężarem na kolanach unosisz pięty.', 'Przy ugiętych kolanach pracuje głównie mięsień płaszczkowaty.'],
+  tib_raise: ['Opierając plecy o ścianę unosisz palce stóp, stojąc na piętach.', 'Wzmacnia przód podudzia, pomaga kolanom i kostkom.'],
+  hip_thrust: ['Oparty plecami o ławkę unosisz biodra z ciężarem do linii prostej.', 'Na górze mocno ściśnij pośladki, broda lekko w dół.'],
+  band_walk: ['Z gumą nad kolanami idziesz w półprzysiadzie krokami w bok.', 'Kolana wypychaj na zewnątrz, nie pozwól im się schodzić.'],
+  plank: ['Podpór na przedramionach, ciało proste od głowy do pięt – trzymasz pozycję.', 'Nie unoś bioder i nie pozwól im opadać.'],
+  side_plank: ['Podpór bokiem na jednym przedramieniu, ciało w linii prostej.', 'Biodra wysoko, nie opadają do podłogi.'],
+  crunch: ['Leżąc z ugiętymi nogami unosisz łopatki nad podłogę, spinając brzuch.', 'Nie ciągnij głowy rękami.'],
+  leg_raise: ['Wisząc na drążku unosisz nogi przed siebie.', 'Bez bujania – trudniejsza wersja to proste nogi.'],
+  farmer: ['Idziesz z ciężkimi hantlami w dłoniach, trzymając prostą sylwetkę.', 'Barki w dół, tułów nie przechyla się na boki.'],
+};
+for (const ex of CATALOG) [ex.how, ex.tip] = INFO[ex.id] ?? ['', ''];
