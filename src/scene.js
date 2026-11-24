@@ -35,6 +35,7 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -2.5, right: 2.5, top: 2.5, bottom: -2.5, near: 0.5, far: 12 });
 sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.008;
 scene.add(sun);
 const rim = new THREE.DirectionalLight(0x7fa8ff, 0.8);
 rim.position.set(-3, 2, -3);

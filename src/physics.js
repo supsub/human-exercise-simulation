@@ -65,6 +65,17 @@ export function checkPose(body, pose, tol = 0.012) {
     if (w && w.depth > tol) issues.push({ what: `drążek wchodzi w ${partName(w.part)}`, ...w });
     if (props.bar.plates !== false && mid.y < 0.2 - 0.01) issues.push({ what: 'talerze sztangi w podłodze', part: 'floor', depth: 0.2 - mid.y });
   }
+  // hantel oburącz (goblet): górny talerz między dłońmi, rączka i dolny talerz pod nim – jak w body.js
+  if (props.goblet) {
+    const mid = pt('handL').add(pt('handR')).multiplyScalar(0.5);
+    const pts = [];
+    for (const [dy, r] of [[0.01, 0.062], [-0.045, 0.062], [-0.1, 0.016], [-0.16, 0.062], [-0.215, 0.062]]) {
+      pts.push(mid.clone().add(_a.set(0, dy, 0)));
+      for (let k = 0; k < 8; k++) pts.push(mid.clone().add(_a.set(Math.cos(k * Math.PI / 4) * (r - 0.01), dy, Math.sin(k * Math.PI / 4) * (r - 0.01))));
+    }
+    const w = deepest(body, pts, (p) => holding(p) || /^upperArm/.test(p), 0.01);
+    if (w && w.depth > tol + 0.01) issues.push({ what: `hantel wchodzi w ${partName(w.part)}`, ...w });
+  }
   // hantle: uchwyt i oba talerze
   for (const [i, d] of body.dumbbells.entries()) {
     if (!d.visible) continue;

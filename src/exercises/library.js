@@ -238,6 +238,8 @@ function squatVariant(armGlobal, foreGlobal, uprightness, props, adduct = 0) {
     j.shoulderR = [arm / D - trunk, adduct / D, 0];
     j.elbowL = j.elbowR = (fore - arm) / D;
     j.neck = -trunk * 0.6;
+    // hantel oburącz: wnętrza dłoni zwrócone do siebie, obejmują górny talerz
+    if (props.goblet) { j.wristL = [0, -126 / D, 0]; j.wristR = [0, 126 / D, 0]; }
     return { ...p, root: { ...p.root, rx }, joints: j, props };
   };
 }

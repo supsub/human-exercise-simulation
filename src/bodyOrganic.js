@@ -7,15 +7,16 @@ import { Loft, loftZ, musclePatch, softEdges } from './anatomy.js';
 
 // ---------- Kształty (metry, lokalne układy stawów; dla lewej strony, x > 0 = na zewnątrz) ----------
 const TORSO = [
-  { y: -0.04, w: 0.15, d: 0.095, db: 0.105 }, { y: 0.03, w: 0.145, d: 0.095, db: 0.098 },
-  { y: 0.10, w: 0.137, d: 0.092, db: 0.092 }, { y: 0.17, w: 0.148, d: 0.098, db: 0.095 },
-  { y: 0.24, w: 0.163, d: 0.106, db: 0.1 }, { y: 0.31, w: 0.176, d: 0.113, db: 0.104 },
-  { y: 0.37, w: 0.183, d: 0.11, db: 0.104 }, { y: 0.42, w: 0.18, d: 0.094, db: 0.1 },
+  { y: -0.04, w: 0.118, d: 0.072, db: 0.08 }, { y: 0.03, w: 0.128, d: 0.082, db: 0.086 },
+  { y: 0.10, w: 0.132, d: 0.09, db: 0.09 }, { y: 0.17, w: 0.146, d: 0.097, db: 0.095 },
+  { y: 0.24, w: 0.166, d: 0.106, db: 0.102 }, { y: 0.31, w: 0.182, d: 0.113, db: 0.106 },
+  { y: 0.37, w: 0.189, d: 0.11, db: 0.106 }, { y: 0.42, w: 0.184, d: 0.094, db: 0.102 },
   { y: 0.465, w: 0.14, d: 0.07, db: 0.08 }, { y: 0.5, w: 0.07, d: 0.05, db: 0.06 }, { y: 0.53, w: 0.055, d: 0.045, db: 0.05 },
 ];
 const PELVIS = [
-  { y: -0.125, w: 0.03, d: 0.03 }, { y: -0.11, w: 0.1, d: 0.07, db: 0.08 }, { y: -0.06, w: 0.15, d: 0.09, db: 0.112 },
-  { y: 0.0, w: 0.164, d: 0.095, db: 0.113 }, { y: 0.06, w: 0.157, d: 0.095, db: 0.104 }, { y: 0.12, w: 0.15, d: 0.095, db: 0.1 },
+  { y: -0.148, w: 0.03, d: 0.025, db: 0.04 }, { y: -0.128, w: 0.095, d: 0.06, db: 0.088 }, { y: -0.09, w: 0.138, d: 0.08, db: 0.115 },
+  { y: -0.04, w: 0.156, d: 0.09, db: 0.122 }, { y: 0.01, w: 0.16, d: 0.092, db: 0.114 }, { y: 0.06, w: 0.148, d: 0.088, db: 0.098 },
+  { y: 0.12, w: 0.124, d: 0.08, db: 0.082 },
 ];
 const NECK = [{ y: -0.02, w: 0.06, d: 0.055 }, { y: 0.05, w: 0.052, d: 0.05 }, { y: 0.11, w: 0.05, d: 0.048 }];
 const HEAD = [
@@ -24,16 +25,23 @@ const HEAD = [
   { y: 0.272, w: 0.07, d: 0.078 }, { y: 0.288, w: 0.053, d: 0.059 }, { y: 0.298, w: 0.031, d: 0.035 }, { y: 0.3035, w: 0.008, d: 0.009 },
 ];
 const UPPER_ARM = [
-  { y: 0.045, w: 0.04, d: 0.04 }, { y: 0.0, w: 0.058, d: 0.055 }, { y: -0.05, w: 0.056, d: 0.052 }, { y: -0.12, w: 0.05, d: 0.048 },
+  { y: 0.078, w: 0.006, d: 0.006 }, { y: 0.07, w: 0.03, d: 0.03 }, { y: 0.05, w: 0.05, d: 0.048 }, { y: 0.0, w: 0.06, d: 0.057 }, { y: -0.05, w: 0.056, d: 0.052 }, { y: -0.12, w: 0.05, d: 0.048 },
   { y: -0.2, w: 0.045, d: 0.044 }, { y: -0.27, w: 0.042, d: 0.04 }, { y: -0.31, w: 0.036, d: 0.034 }, { y: -0.33, w: 0.008, d: 0.008 },
 ];
 const FOREARM = [
   { y: 0.03, w: 0.03, d: 0.03 }, { y: 0.0, w: 0.042, d: 0.04 }, { y: -0.06, w: 0.045, d: 0.042 }, { y: -0.14, w: 0.037, d: 0.033 },
   { y: -0.22, w: 0.029, d: 0.022 }, { y: -0.27, w: 0.027, d: 0.019 }, { y: -0.285, w: 0.012, d: 0.01 },
 ];
-const PALM = [{ y: 0.0, w: 0.03, d: 0.016, z0: -0.013 }, { y: -0.03, w: 0.038, d: 0.015, z0: -0.013 }, { y: -0.07, w: 0.041, d: 0.013, z0: -0.013 }, { y: -0.08, w: 0.03, d: 0.01, z0: -0.013 }];
+// palce: x – położenie knykcia (+ = strona małego palca), długości i promienie 3 członów (wskazujący, środkowy, serdeczny, mały)
+const HAND_FINGERS = [
+  { x: -0.027, y: -0.073, len: [0.027, 0.018, 0.015], r: [0.0088, 0.0081, 0.0074] },
+  { x: -0.009, y: -0.076, len: [0.03, 0.02, 0.016], r: [0.009, 0.0083, 0.0075] },
+  { x: 0.009, y: -0.074, len: [0.028, 0.019, 0.015], r: [0.0086, 0.0079, 0.0072] },
+  { x: 0.026, y: -0.069, len: [0.022, 0.015, 0.013], r: [0.0076, 0.007, 0.0064] },
+];
+const PALM = [{ y: 0.005, w: 0.026, d: 0.015, z0: -0.012 }, { y: -0.02, w: 0.036, d: 0.016, z0: -0.012 }, { y: -0.055, w: 0.04, d: 0.014, z0: -0.012 }, { y: -0.074, w: 0.039, d: 0.011, z0: -0.012 }, { y: -0.08, w: 0.028, d: 0.008, z0: -0.012 }];
 const THIGH = [
-  { y: 0.06, w: 0.07, d: 0.07 }, { y: 0.0, w: 0.088, d: 0.086, db: 0.09 }, { y: -0.08, w: 0.085, d: 0.082 }, { y: -0.2, w: 0.074, d: 0.07 },
+  { y: 0.06, w: 0.008, d: 0.008 }, { y: 0.05, w: 0.036, d: 0.036 }, { y: 0.028, w: 0.064, d: 0.064 }, { y: -0.01, w: 0.084, d: 0.082, db: 0.086 }, { y: -0.08, w: 0.085, d: 0.082 }, { y: -0.2, w: 0.074, d: 0.07 },
   { y: -0.32, w: 0.062, d: 0.058 }, { y: -0.41, w: 0.053, d: 0.05 }, { y: -0.47, w: 0.045, d: 0.045 }, { y: -0.49, w: 0.01, d: 0.01 },
 ];
 const SHIN = [
@@ -48,14 +56,17 @@ const FOOT = [
 ];
 
 const SHAPES = {
-  torso: new Loft(TORSO, { exp: 2.4 }), pelvis: new Loft(PELVIS, { exp: 2.2 }),
+  torso: new Loft(TORSO, { exp: 2.4 }), pelvis: new Loft(PELVIS, { exp: 2.2, caps: false }),
   upperArm: new Loft(UPPER_ARM), forearm: new Loft(FOREARM), thigh: new Loft(THIGH), shin: new Loft(SHIN),
 };
+
+// Jak mocno mięśnie odcinają się od skóry (1 = gładko, ~1.6 = wysportowana sylwetka z wyraźnym zarysem)
+const DEFINITION = 1.6;
 
 // ---------- Mięśnie: płaty na powierzchni (a = kąty, y = zakres wzdłuż segmentu, T = grubość, peak = najgrubsze miejsce) ----------
 export const ORGANIC_MUSCLES = {
   pec_clav: [{ seg: 'torso', a: { top: [42, 87], bottom: [36, 87] }, y: [0.44, 0.385], T: 0.012, peak: 0.5 }],
-  pec_stern: [{ seg: 'torso', a: { top: [34, 87], bottom: [52, 87] }, y: [0.385, 0.27], T: 0.022, peak: 0.55 }],
+  pec_stern: [{ seg: 'torso', a: { top: [30, 87.5], bottom: [50, 87.5] }, y: [0.39, 0.265], T: 0.024, peak: 0.7, round: 0.4, spindle: 0.35 }],
   serratus: [
     { seg: 'torso', a: [6, 28], y: [0.315, 0.285], T: 0.008 }, { seg: 'torso', a: [4, 30], y: [0.275, 0.245], T: 0.008 },
     { seg: 'torso', a: [4, 32], y: [0.235, 0.205], T: 0.008 },
@@ -75,13 +86,13 @@ export const ORGANIC_MUSCLES = {
   forearm_flex: [{ seg: 'forearm', a: [92, 168], y: [-0.01, -0.19], T: 0.011, peak: 0.3 }],
   forearm_ext: [{ seg: 'forearm', a: [-112, -8], y: [-0.01, -0.19], T: 0.01, peak: 0.3 }],
   rectus_abdominis: [
-    { seg: 'torso', a: [74, 88], y: [0.275, 0.21], T: 0.012, spindle: 0.15 }, { seg: 'torso', a: [74, 88.5], y: [0.205, 0.145], T: 0.013, spindle: 0.15 },
-    { seg: 'torso', a: [74, 89], y: [0.14, 0.08], T: 0.013, spindle: 0.15 }, { seg: 'torso', a: [75, 89], y: [0.075, -0.01], T: 0.011, spindle: 0.2 },
+    { seg: 'torso', a: [73, 88.5], y: [0.272, 0.212], T: 0.011, spindle: 0.1, round: 0.35 }, { seg: 'torso', a: [73, 88.5], y: [0.204, 0.146], T: 0.012, spindle: 0.1, round: 0.35 },
+    { seg: 'torso', a: [73.5, 88.5], y: [0.138, 0.08], T: 0.012, spindle: 0.1, round: 0.35 }, { seg: 'torso', a: [75, 88.5], y: [0.072, -0.01], T: 0.01, spindle: 0.2, round: 0.4 },
   ],
   obliques: [{ seg: 'torso', a: { top: [8, 52], bottom: [14, 72] }, y: [0.23, 0.0], T: 0.012, peak: 0.45 }],
   erector_spinae: [{ seg: 'torso', a: [-87, -70], y: [0.3, -0.03], T: 0.016, peak: 0.72 }],
-  glute_max: [{ seg: 'pelvis', a: { top: [-86, -30], bottom: [-86, -22] }, y: [0.06, -0.115], T: 0.03, peak: 0.55 }],
-  glute_med: [{ seg: 'pelvis', a: [-32, 4], y: [0.075, -0.03], T: 0.015, peak: 0.45 }],
+  glute_max: [{ seg: 'pelvis', a: { top: [-88, -28], bottom: [-89, -18] }, y: [0.075, -0.12], T: 0.017, peak: 0.6, round: 0.45, spindle: 0.25 }],
+  glute_med: [{ seg: 'pelvis', a: [-40, 8], y: [0.1, -0.02], T: 0.009, peak: 0.4, spindle: 0.3 }],
   rectus_femoris: [{ seg: 'thigh', a: [74, 108], y: [-0.05, -0.41], T: 0.016, peak: 0.5 }],
   vastus_lateralis: [{ seg: 'thigh', a: [4, 74], y: [-0.06, -0.43], T: 0.019, peak: 0.55 }],
   vastus_medialis: [{ seg: 'thigh', a: [106, 162], y: [-0.25, -0.44], T: 0.021, peak: 0.68 }],
@@ -101,8 +112,10 @@ export function buildOrganic(ctx) {
   const ell = (r, pos, mat = jointMat) => { const m = mesh(new THREE.SphereGeometry(1, 20, 14), mat); m.scale.set(...r); m.position.set(...pos); return m; };
 
   // Tułów: dolna część oddycha z brzuchem, górna z klatką
-  const lower = new Loft(TORSO.filter((r) => r.y <= 0.24), { exp: 2.4 });
-  const upper = new Loft(TORSO.filter((r) => r.y >= 0.17), { exp: 2.4 });
+  // zakładka 0.17–0.24: końce obu części chowają się pod drugą (bez migotania nakładających się powierzchni)
+  const tuck = (r, k) => ({ ...r, w: r.w * k, d: r.d * k, db: (r.db ?? r.d) * k });
+  const lower = new Loft(TORSO.filter((r) => r.y <= 0.24).map((r) => (r.y === 0.24 ? tuck(r, 0.95) : r)), { exp: 2.4, caps: false });
+  const upper = new Loft(TORSO.filter((r) => r.y >= 0.17).map((r) => (r.y === 0.17 ? tuck(r, 0.95) : r)), { exp: 2.4, caps: false });
   const lg = lower.geometry(); lg.translate(0, -BELLY_PIVOT, 0); belly.add(mesh(lg, skinMat));
   const ug = upper.geometry(); ug.translate(0, -RIB_PIVOT, 0); ribcage.add(mesh(ug, skinMat));
   root.add(mesh(SHAPES.pelvis.geometry(), skinMat));
@@ -130,18 +143,31 @@ export function buildOrganic(ctx) {
     sh.add(mesh(SHAPES.upperArm.geometry(sx), skinMat));
     el.add(mesh(SHAPES.forearm.geometry(sx), skinMat));
     el.add(ell([0.016, 0.02, 0.014], [0, 0.0, -0.036], skinMat));                         // wyrostek łokciowy – kierunek łokcia
-    // dłoń: śródręcze + 4 palce (2 człony) + kciuk; palce zginają się razem (setGrip w body.js)
+    // dłoń: śródręcze z kłębem kciuka + 4 palce (3 człony, różne długości) + kciuk (2 człony); zginanie: setGrip w body.js
     wr.add(mesh(new Loft(PALM).geometry(sx), skinMat));
-    const f1 = new THREE.Group(); f1.position.set(0, -0.073, -0.013); wr.add(f1);
-    const f2 = new THREE.Group(); f2.position.y = -0.03; f1.add(f2);
-    for (const fx of [-0.027, -0.009, 0.009, 0.027]) {
-      const len = fx === -0.027 * sx ? 0.022 : 0.028;
-      const p1 = mesh(new THREE.CapsuleGeometry(0.0088, len, 4, 8), skinMat); p1.position.set(fx, -len / 2, 0); f1.add(p1);
-      const p2 = mesh(new THREE.CapsuleGeometry(0.008, 0.02, 4, 8), skinMat); p2.position.set(fx, -0.012, 0); f2.add(p2);
+    wr.add(ell([0.014, 0.024, 0.011], [-sx * 0.024, -0.032, -0.006], skinMat));            // kłąb kciuka
+    wr.add(ell([0.011, 0.022, 0.009], [sx * 0.027, -0.04, -0.008], skinMat));              // kłąb palca małego
+    const chains = [];
+    for (const F of HAND_FINGERS) {
+      let parent = wr;
+      const chain = [];
+      F.len.forEach((len, k) => {
+        const g = new THREE.Group();
+        if (k === 0) g.position.set(F.x * sx, F.y, -0.012); else g.position.y = -F.len[k - 1];
+        parent.add(g);
+        const r = F.r[k], seg = mesh(new THREE.CapsuleGeometry(r, Math.max(0.001, len - r * 0.6), 4, 10), skinMat);
+        seg.position.y = -len / 2; seg.scale.set(1.08, 1, 0.92);
+        g.add(seg);
+        chain.push(g); parent = g;
+      });
+      chains.push(chain);
     }
-    const thumb = new THREE.Group(); thumb.position.set(-sx * 0.036, -0.03, -0.012); wr.add(thumb);
-    const tm = mesh(new THREE.CapsuleGeometry(0.0105, 0.032, 4, 8), skinMat); tm.position.y = -0.022; thumb.add(tm);
-    fingers.push({ f1, f2, thumb, sx });
+    const thumb = new THREE.Group(); thumb.position.set(-sx * 0.03, -0.02, -0.004); wr.add(thumb);
+    const t1 = mesh(new THREE.CapsuleGeometry(0.0105, 0.022, 4, 10), skinMat); t1.position.y = -0.016; thumb.add(t1);
+    const tj = new THREE.Group(); tj.position.y = -0.03; thumb.add(tj);
+    const t2 = mesh(new THREE.CapsuleGeometry(0.0092, 0.012, 4, 10), skinMat); t2.position.y = -0.011; tj.add(t2);
+    const f1 = chains[1][0], f2 = chains[1][1];   // zgodność z klasycznym wyglądem
+    fingers.push({ f1, f2, thumb, tj, chains, sx });
 
     hip.add(mesh(SHAPES.thigh.geometry(sx), skinMat));
     hip.add(ell([0.021, 0.025, 0.01], [0, -0.448, 0.043], skinMat));                       // rzepka – kierunek kolana
@@ -161,7 +187,7 @@ export function buildOrganic(ctx) {
     for (const S of ['L', 'R']) {
       const sx = S === 'L' ? 1 : -1;
       for (const p of patches) {
-        const geo = musclePatch(SHAPES[p.seg], p, sx);
+        const geo = musclePatch(SHAPES[p.seg], { ...p, T: (p.T ?? 0.015) * DEFINITION }, sx);
         let parent;
         if (p.seg === 'torso') {
           const yc = (p.y[0] + p.y[1]) / 2;

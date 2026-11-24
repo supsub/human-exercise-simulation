@@ -31,7 +31,7 @@ function muscleGeometry(shape) {
 const skinMat = new THREE.MeshStandardMaterial({ color: 0xc3c9d4, roughness: 0.6, metalness: 0.05 });
 const jointMat = new THREE.MeshStandardMaterial({ color: 0xaab1be, roughness: 0.6, metalness: 0.05 });
 const faceMat = new THREE.MeshStandardMaterial({ color: 0x8a93a3, roughness: 0.5 });
-const organicSkin = new THREE.MeshStandardMaterial({ color: 0xc9ced6, roughness: 0.72, metalness: 0.0 });
+const organicSkin = new THREE.MeshStandardMaterial({ color: 0xc9ced6, roughness: 0.55, metalness: 0.0 });
 const metalMat = new THREE.MeshStandardMaterial({ color: 0x3a3f48, roughness: 0.35, metalness: 0.8 });
 
 function shadowed(mesh) {
@@ -504,10 +504,11 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     }
     if (props.goblet) {
       // jeden hantel trzymany pionowo oburącz
-      const top = mid.clone().add(new THREE.Vector3(0, 0.1, 0)), bot = mid.clone().add(new THREE.Vector3(0, -0.08, 0));
-      cyl(top, bot, 0.016, metal);
-      cyl(top.clone().add(new THREE.Vector3(0, 0.02, 0)), top.clone().add(new THREE.Vector3(0, -0.03, 0)), 0.065, plateMat);
-      cyl(bot.clone().add(new THREE.Vector3(0, 0.03, 0)), bot.clone().add(new THREE.Vector3(0, -0.02, 0)), 0.065, plateMat);
+      // górny talerz ściśnięty między dłońmi, palce obejmują jego górną krawędź; rączka i dolny talerz pod nim
+      const at = (dy) => mid.clone().add(new THREE.Vector3(0, dy, 0));
+      cyl(at(-0.02), at(-0.19), 0.016, metal);
+      cyl(at(0.01), at(-0.045), 0.062, plateMat);
+      cyl(at(-0.16), at(-0.215), 0.062, plateMat);
     }
     if (props.cable) {
       // linka od bloczka do uchwytu (do środka między dłońmi albo do każdej dłoni osobno)
@@ -539,8 +540,20 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
   // grip: 0 = dłoń otwarta, 1 = pełny chwyt. Domyślnie z rekwizytów (hantle, sztanga, uchwyt wyciągu).
   function setGrip(pose) {
     const p = pose.props ?? {};
-    const g = pose.grip ?? (p.dumbbells || p.bar ? 1 : p.goblet ? 0.55 : 0.12);
+    const g = pose.grip ?? (p.dumbbells || p.bar ? 1 : p.goblet ? 0.45 : 0.12);
     for (const f of fingers) {
+      if (f.chains) {
+        // palce owijają się wokół uchwytu (kąty dobrane do drążka ~3 cm średnicy)
+        for (const [i, c] of f.chains.entries()) {
+          const spread = (i - 1.5) * 0.05 * (1 - g);
+          c[0].rotation.set(-(0.12 + 1.12 * g), 0, -f.sx * spread);
+          c[1].rotation.x = -(0.1 + 0.95 * g);
+          c[2].rotation.x = -(0.06 + 0.72 * g);
+        }
+        f.thumb.rotation.set(-0.35 - 0.75 * g, 0, f.sx * (0.35 + 0.35 * g));
+        f.tj.rotation.x = -0.15 - 0.6 * g;
+        continue;
+      }
       f.f1.rotation.x = -1.45 * g;
       f.f2.rotation.x = -1.5 * g;
       f.thumb.rotation.set(-0.9 * g, 0, f.sx * (0.25 + 0.5 * g));

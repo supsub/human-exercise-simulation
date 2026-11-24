@@ -44,6 +44,7 @@
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.setScissorTest(true);
 
     // osobna scena na każdy wygląd (rekwizyty dokładane są do sceny swojego ciała)
@@ -52,7 +53,7 @@
       scene.background = new THREE.Color(0x0f141c);
       scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x1a1f28, 1.1));
       const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(2.5, 4.5, 3); sun.castShadow = true;
-      sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -2.5, right: 2.5, top: 2.5, bottom: -2.5 });
+      sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.008; Object.assign(sun.shadow.camera, { left: -2.5, right: 2.5, top: 2.5, bottom: -2.5 });
       scene.add(sun);
       const rim = new THREE.DirectionalLight(0x7fa8ff, 0.8); rim.position.set(-3, 2, -3); scene.add(rim);
       const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 64), new THREE.MeshStandardMaterial({ color: 0x1b2230, roughness: 0.95 }));
@@ -60,9 +61,11 @@
       const body = createBody({ look });
       scene.add(body.root);
       const scenery = new THREE.Group(); scene.add(scenery);
+      if (q.has('nomuscles')) body.muscleMeshes.forEach((m) => (m.visible = false));
       return { scene, body, scenery, look };
     }
-    const worlds = [makeWorld('classic'), makeWorld('organic')];
+    const worlds = q.has('solo') ? [makeWorld(q.get('solo'))] : [makeWorld('classic'), makeWorld('organic')];
+    if (q.has('solo')) document.querySelectorAll('.lbl,.split').forEach((e) => e.remove());
 
     // kolory aktywacji – jak w aplikacji (nowy wygląd: jasny kolor mięśni w spoczynku)
     const stops = (low) => [[0, low], [0.2, 0x3fa7d6], [0.4, 0xf2c94c], [0.65, 0xf2994a], [1, 0xeb3b3b]].map(([a, c]) => [a, new THREE.Color(c)]);
@@ -98,6 +101,9 @@
       for (const w of worlds) setScenery(w.scenery, ex.scenery);
       const tg = new THREE.Vector3(...(ex.cameraTarget ?? [0, 0.85, 0]));
       camera.position.copy(new THREE.Vector3(...ex.cameraPosition).sub(tg).multiplyScalar(1.05).add(tg));
+      // zbliżenia do testów: &cam=x,y,z&target=x,y,z
+      if (q.has('target')) tg.set(...q.get('target').split(',').map(Number));
+      if (q.has('cam')) camera.position.set(...q.get('cam').split(',').map(Number));
       controls.target.copy(tg);
       document.querySelectorAll('#exs button').forEach((b) => b.classList.toggle('on', b.dataset.id === id));
     }
@@ -116,7 +122,7 @@
       for (const id in smoothed) smoothed[id] += (act[id] - smoothed[id]) * k;
       const W = innerWidth, H = innerHeight;
       renderer.setSize(W, H, false);
-      camera.aspect = W / 2 / H; camera.updateProjectionMatrix();
+      const n = worlds.length; camera.aspect = W / n / H; camera.updateProjectionMatrix();
       controls.update();
       worlds.forEach((w, i) => {
         w.body.setPose(w.body.resolvePose(ex.pose(s.depth, {})));
@@ -126,7 +132,7 @@
           colorOf(w.look, smoothed[m.id], mat.color);
           mat.emissive.copy(mat.color).multiplyScalar(Math.min(1, smoothed[m.id]) * 0.45);
         }
-        renderer.setViewport(i * W / 2, 0, W / 2, H); renderer.setScissor(i * W / 2, 0, W / 2, H);
+        renderer.setViewport(i * W / n, 0, W / n, H); renderer.setScissor(i * W / n, 0, W / n, H);
         renderer.render(w.scene, camera);
       });
       requestAnimationFrame(frame);

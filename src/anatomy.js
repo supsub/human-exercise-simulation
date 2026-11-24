@@ -15,7 +15,8 @@ function catmull(p0, p1, p2, p3, t) {
 
 export class Loft {
   // rings: [{ y, w, d, db?, x0?, z0? }] w dowolnej kolejności; exp – wykładnik superelipsy (2 = elipsa, >2 = bardziej „kanciasty”)
-  constructor(rings, { exp = 2, seg = 36, steps = 48 } = {}) {
+  constructor(rings, { exp = 2, seg = 36, steps = 48, caps = true } = {}) {
+    this.caps = caps;
     this.r = rings.map((r) => ({ db: r.d, x0: 0, z0: 0, ...r })).sort((a, b) => a.y - b.y);
     this.exp = exp; this.seg = seg; this.steps = steps;
     this.y0 = this.r[0].y; this.y1 = this.r[this.r.length - 1].y;
@@ -59,7 +60,13 @@ export class Loft {
       const a = j * (S + 1) + i, b = a + 1, c = a + S + 1, d = c + 1;
       idx.push(a, c, b, b, c, d);
     }
-    return finish(pos, idx, (p, n) => n.x * (p.x - 0) * 0 + 1); // orientacja sprawdzana niżej
+    // zamknięte końce (bez „dziur” widocznych przy dużych kątach w stawach)
+    if (!this.caps) return finish(pos, idx);
+    const c0 = pos.length / 3, top = N * (S + 1);
+    const p0 = this.params(this.y0), p1 = this.params(this.y1);
+    pos.push(p0.x0 * sx, this.y0, p0.z0, p1.x0 * sx, this.y1, p1.z0);
+    for (let i = 0; i < S; i++) idx.push(c0, i, i + 1, c0 + 1, top + i + 1, top + i);
+    return finish(pos, idx);
   }
 }
 
@@ -162,7 +169,7 @@ export function softEdges(mat) {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFade = fade;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying float vFade;')
-      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= smoothstep(0.0, 0.85, vFade);');
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= smoothstep(0.0, 0.5, vFade);');
   };
   mat.needsUpdate = true;
   return mat;
