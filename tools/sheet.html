@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <title>Arkusz animacji – wszystkie ćwiczenia</title>
+  <!-- Narzędzie deweloperskie: wszystkie animacje w pozycji startowej (A) i końcowej (B) na jednej stronie.
+       Otwórz: http://localhost:8000/tools/sheet.html  (opcjonalnie ?only=bench,row) -->
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+  </script>
+  <style>
+    body { margin: 0; background: #0f141c; color: #e6ebf2; font: 12px system-ui, sans-serif; }
+    #grid { position: relative; }
+    canvas { display: block; }
+    .lbl { position: absolute; padding: 3px 6px; background: rgba(0,0,0,.55); border-radius: 0 0 6px 0; }
+  </style>
+</head>
+<body>
+  <div id="grid"><canvas id="c"></canvas></div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { createBody } from '../src/body.js';
+    import { EXERCISES } from '../src/exercises/index.js';
+    import { sampleExercise } from '../src/exercises/common.js';
+
+    const only = new URLSearchParams(location.search).get('only')?.split(',');
+    const list = EXERCISES.filter((e) => !only || only.includes(e.id));
+    const q = new URLSearchParams(location.search);
+    const W = +(q.get('w') ?? 240), H = +(q.get('h') ?? 210), COLS = +(q.get('cols') ?? 8);
+    const cells = list.flatMap((ex) => [[ex, 0], [ex, 1]]);
+    const rows = Math.ceil(cells.length / COLS);
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setSize(W * COLS, H * rows);
+    renderer.setScissorTest(true);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0f141c);
+    scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x1a1f28, 1.3));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.0); sun.position.set(2.5, 4.5, 3); scene.add(sun);
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(3, 48), new THREE.MeshStandardMaterial({ color: 0x1b2230 }));
+    floor.rotation.x = -Math.PI / 2; scene.add(floor);
+    scene.add(new THREE.GridHelper(6, 24, 0x2c3648, 0x222a38));
+    const body = createBody();
+    scene.add(body.root);
+    const scenery = new THREE.Group(); scene.add(scenery);
+    const COLORS = { pad: 0x343b48, frame: 0x5d6572, metal: 0x9aa1ab, wall: 0x232a36 };
+    function setScenery(defs = []) {
+      scenery.clear();
+      for (const d of defs) {
+        const mat = new THREE.MeshStandardMaterial({ color: COLORS[d.color ?? (d.box ? 'pad' : 'metal')] });
+        let m;
+        if (d.box) { m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat); m.position.set(...d.box); m.scale.set(...d.size); m.rotation.x = d.rx ?? 0; }
+        else {
+          const a = new THREE.Vector3(...d.cyl[0]), b = new THREE.Vector3(...d.cyl[1]);
+          m = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 12), mat);
+          m.position.copy(a).add(b).multiplyScalar(0.5); m.scale.set(d.r ?? 0.02, a.distanceTo(b), d.r ?? 0.02);
+          m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+        }
+        scenery.add(m);
+      }
+    }
+    const camera = new THREE.PerspectiveCamera(40, W / H, 0.05, 50);
+    const grid = document.getElementById('grid');
+    cells.forEach(([ex, which], i) => {
+      const cx = (i % COLS) * W, cy = Math.floor(i / COLS) * H;
+      // A = pozycja na początku cyklu, B = najgłębszy / najwyższy punkt (koniec drugiej fazy)
+      const t = which === 0 ? 0.01 : (ex.phases[1]?.end ?? 0.5) - 0.01;
+      const pose = body.resolvePose(ex.pose(sampleExercise(ex, t).depth, {}));
+      body.setPose(pose);
+      body.setBreath(0.4);
+      setScenery(ex.scenery);
+      const tg = new THREE.Vector3(...(ex.cameraTarget ?? [0, 0.85, 0]));
+      const pos = new THREE.Vector3(...ex.cameraPosition).sub(tg).multiplyScalar(1.15).add(tg);
+      camera.position.copy(pos); camera.lookAt(tg);
+      const y = H * rows - cy - H;
+      renderer.setViewport(cx, y, W, H); renderer.setScissor(cx, y, W, H);
+      renderer.render(scene, camera);
+      const l = document.createElement('div');
+      l.className = 'lbl'; l.style.left = cx + 'px'; l.style.top = cy + 'px';
+      l.textContent = `${ex.id} ${which ? 'B' : 'A'}`;
+      grid.appendChild(l);
+    });
+  </script>
+</body>
+</html>

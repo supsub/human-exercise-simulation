@@ -49,13 +49,23 @@ export function bisect(f, lo, hi, target, iterations = 60) {
 }
 
 // Liniowe mieszanie dwóch póz (płynne przejścia między ćwiczeniami).
+// Staw może być liczbą (obrót X) albo [x, y, z].
+const vec3 = (v) => (Array.isArray(v) ? v : [v ?? 0, 0, 0]);
 export function blendPose(a, b, t) {
   const joints = {};
   const keys = new Set([...Object.keys(a.joints), ...Object.keys(b.joints)]);
-  for (const k of keys) joints[k] = lerp(a.joints[k] ?? 0, b.joints[k] ?? 0, t);
+  for (const k of keys) {
+    const va = a.joints[k], vb = b.joints[k];
+    if (Array.isArray(va) || Array.isArray(vb)) {
+      const x = vec3(va), y = vec3(vb);
+      joints[k] = [lerp(x[0], y[0], t), lerp(x[1], y[1], t), lerp(x[2], y[2], t)];
+    } else joints[k] = lerp(va ?? 0, vb ?? 0, t);
+  }
+  const r = (k) => lerp(a.root[k] ?? 0, b.root[k] ?? 0, t);
   return {
-    root: { y: lerp(a.root.y, b.root.y, t), z: lerp(a.root.z, b.root.z, t), rx: lerp(a.root.rx, b.root.rx, t) },
+    root: { x: r('x'), y: r('y'), z: r('z'), rx: r('rx'), ry: r('ry'), rz: r('rz') },
     joints,
+    shrug: lerp(a.shrug ?? 0, b.shrug ?? 0, t),
     props: t < 0.5 ? a.props : b.props,
   };
 }

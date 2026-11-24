@@ -187,6 +187,35 @@ export function updateBreathPuffs(dt, exhaling) {
   }
 }
 
+// ---------- Scenografia ćwiczenia (ławki, drążki, maszyny) ----------
+// defs: [{ box: [x,y,z], size: [w,h,d], rx?, color? } | { cyl: [[x,y,z],[x,y,z]], r, color? }]
+const sceneryGroup = new THREE.Group();
+scene.add(sceneryGroup);
+const SCENERY_COLORS = { pad: 0x343b48, frame: 0x5d6572, metal: 0x9aa1ab, wall: 0x232a36 };
+const sceneryBox = new THREE.BoxGeometry(1, 1, 1);
+const sceneryCyl = new THREE.CylinderGeometry(1, 1, 1, 16);
+export function setScenery(defs = []) {
+  sceneryGroup.clear();
+  for (const d of defs) {
+    const mat = new THREE.MeshStandardMaterial({ color: SCENERY_COLORS[d.color ?? (d.box ? 'pad' : 'metal')], roughness: d.box ? 0.8 : 0.35, metalness: d.box ? 0.05 : 0.7 });
+    let m;
+    if (d.box) {
+      m = new THREE.Mesh(sceneryBox, mat);
+      m.position.set(...d.box);
+      m.scale.set(...d.size);
+      m.rotation.x = d.rx ?? 0;
+    } else {
+      const a = new THREE.Vector3(...d.cyl[0]), b = new THREE.Vector3(...d.cyl[1]);
+      m = new THREE.Mesh(sceneryCyl, mat);
+      m.position.copy(a).add(b).multiplyScalar(0.5);
+      m.scale.set(d.r ?? 0.02, a.distanceTo(b), d.r ?? 0.02);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+    }
+    m.castShadow = m.receiveShadow = true;
+    sceneryGroup.add(m);
+  }
+}
+
 // ---------- Kamera ----------
 export const cameraGoal = new THREE.Vector3(0, 0.85, 0);
 let camFly = null;

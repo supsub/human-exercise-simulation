@@ -6,7 +6,8 @@ import { blendPose, smoothstep, lerp } from './kinematics.js';
 // przełączanie poprawna technika ↔ typowy błąd i wygładzone aktywacje mięśni.
 // Nie dotyka DOM ani sceny – zwraca stan, który widok rysuje.
 
-export function createPlayer() {
+// resolve: funkcja dopasowująca pozę do kotwic (body.resolvePose)
+export function createPlayer(resolve = (p) => p) {
   const s = {
     exercise: null,   // definicja ćwiczenia z animacją albo null (pozycja stojąca)
     t: 0,
@@ -67,7 +68,7 @@ export function createPlayer() {
         const params = {};
         if (s.mistake) for (const [k, v] of Object.entries(s.mistake.params)) params[k] = v * mix;
         sample = sampleExercise(ex, s.t, params.rom ?? 0);
-        target = ex.pose(sample.depth, params);
+        target = resolve(ex.pose(sample.depth, params));
         raw = computeActivations(ex, sample);
         if (s.mistake && mix > 0) {
           const bad = computeActivations(ex, sample, s.mistake.muscles);

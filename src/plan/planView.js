@@ -1,5 +1,5 @@
 import { paintMuscles, flyCamera, jumpCamera, controls, body, pickMuscle, showTooltip, cssColor, volumeColor, cssVolumeColor,
-  updateBreathPuffs, updateStressMarkers, WEEK_THRESHOLDS, DAY_THRESHOLDS } from '../scene.js';
+  updateBreathPuffs, updateStressMarkers, setScenery, WEEK_THRESHOLDS, DAY_THRESHOLDS } from '../scene.js';
 import { MUSCLES, MUSCLE_BY_ID } from '../muscles.js';
 import { roleOf, PHASE_KIND, BREATH } from '../exercises/common.js';
 import { EXERCISE_BY_ID } from '../exercises/index.js';
@@ -27,7 +27,7 @@ const ui = {
   breathLabel: $('breath-label'), phaseKind: $('phase-kind'),
 };
 
-const player = createPlayer();
+const player = createPlayer(body.resolvePose);
 const figure = createFigure($('figure'));
 
 let store = load();
@@ -265,6 +265,7 @@ function selectExercise(ex, from, { t = null, mistake = null } = {}) {
   if (anim) (t !== null ? jumpCamera : flyCamera)(...cameraFor(anim));
   else flyCamera(...PLAN_CAMERA);
   ui.bar.hidden = !anim;
+  setScenery(anim?.scenery);
   if (anim) buildTimeline(anim);
   renderTechnique();
   if (mistake && anim) {
@@ -280,6 +281,7 @@ function deselect() {
   player.setExercise(null);
   ui.bar.hidden = true;
   ui.detail.hidden = true;
+  setScenery([]);
   updateStressMarkers([], 0, 0);
 }
 
@@ -338,7 +340,11 @@ function renderTechnique() {
   const anim = selected.anim;
   if (!anim) { ui.dTech.innerHTML = ''; return; }
   const cur = player.state.pending;
-  ui.dTech.innerHTML = `
+  const hasMistakes = anim.mistakes.length > 0;
+  ui.dTech.innerHTML = !hasMistakes ? `
+    <details class="cues-box"><summary>Wskazówki techniczne i oddech</summary>
+      <ul class="cues">${anim.cues.map((c) => `<li>${c}</li>`).join('')}</ul>
+      ${anim.breathingTip ? `<p class="breath-tip">🫁 ${anim.breathingTip}</p>` : ''}</details>` : `
     <div class="mistakes-head">
       <h3>Technika – porównaj</h3>
       <label class="mini-toggle" title="Pokazuj opis błędu i etykiety przeciążeń na modelu"><input type="checkbox" ${showNotes ? 'checked' : ''}> opisy</label>
@@ -352,11 +358,11 @@ function renderTechnique() {
       <ul class="cues">${anim.cues.map((c) => `<li>${c}</li>`).join('')}</ul>
       ${anim.breathingTip ? `<p class="breath-tip">🫁 ${anim.breathingTip}</p>` : ''}</details>`;
   ui.dTech.querySelectorAll('.mistake-btn').forEach((b) => (b.onclick = () => setMistake(anim.mistakes.find((m) => m.id === b.dataset.id) ?? null)));
-  ui.dTech.querySelector('.mini-toggle input').onchange = (e) => {
+  ui.dTech.querySelector('.mini-toggle input')?.addEventListener('change', (e) => {
     showNotes = e.target.checked;
     localStorage.setItem('hes.mistakeNotes', showNotes ? '1' : '0');
     renderTechnique();
-  };
+  });
 }
 function setMistake(m, instant = false) {
   const anim = selected.anim;

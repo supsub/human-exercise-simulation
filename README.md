@@ -32,6 +32,7 @@ Parametry URL przydatne do demo i testów:
 | `src/exercises/common.js` | oś czasu faz i model aktywacji |
 | `src/figure.js` | statyczna figura przód/tył z pracującymi mięśniami |
 | `src/scene.js` | wspólna scena 3D: kamera, światła, kolorowanie mięśni, znaczniki przeciążeń, oddech |
+| `src/exercises/build.js`, `library.js` | silnik póz kluczowych i animacje ćwiczeń katalogu |
 | `src/player.js` | odtwarzanie ćwiczenia: oś czasu, przejścia, błędy techniki, wygładzone aktywacje |
 | `src/plan/catalog.js` | katalog ćwiczeń do planu (waga zaangażowania mięśni) |
 | `src/plan/analysis.js` | analiza planu: objętość, ostrzeżenia, rekomendacje (bez UI) |
@@ -40,6 +41,8 @@ Parametry URL przydatne do demo i testów:
 
 ## Dodanie ćwiczenia
 
-1. Utwórz `src/exercises/<nazwa>.js` z `phases` (z `breath`), `pose(depth, params)`, `muscles` (`rest`, `peak`, `w`) i opcjonalnie `mistakes`, wzorując się na `pushup.js`.
-2. Dopisz je do `src/exercises/index.js`, a w `src/plan/catalog.js` ustaw `animated: "<id>"`.
-3. Zaktualizuj `docs/index.html` (tabela funkcjonalności i dziennik zmian).
+1. Dopisz ćwiczenie do `src/plan/catalog.js` (wagi mięśni) i jego opis do `INFO` w tym samym pliku.
+2. Dodaj animację w `src/exercises/library.js`: zwykle wystarczą dwie pozy kluczowe (`keyframes(base, A, B)`), kotwica (np. stopy na podłodze) i rekwizyty. Konwencje kątów są opisane w `src/exercises/build.js`. Aktywacje mięśni liczą się automatycznie z wag w katalogu.
+3. Sprawdź wszystkie animacje naraz: <http://localhost:8000/tools/sheet.html> (pozycja A i B każdego ćwiczenia; `?only=bench,row` zawęża listę).
+4. Ćwiczenie z typowymi błędami techniki: osobny plik jak `src/exercises/pushup.js`, dopisany w `src/exercises/index.js`.
+5. Zaktualizuj `docs/index.html` (tabela funkcjonalności i dziennik zmian).
