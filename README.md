@@ -69,4 +69,4 @@ Wzrokowo – arkusze zbliżeń (`tools/sheet.html?ts=0.01,0.5&focus=handL&dist=0
 - [ ] przy przełączeniu na błąd technika różni się tylko tym błędem (kamera zostaje w miejscu – porównanie 1:1)
 - [ ] błędy „dynamiczne” (bujanie, szarpanie) naprawdę się ruszają w czasie – poza dostaje `params.cycleT` (czas w cyklu 0–1); podgląd: `tools/sheet.html?only=leg_raise&mistake=swing&ts=0,0.125,…`
 
-Narzędzia: `tools/points.html?ex=db_row&t=0,0.5&pts=handR,toeL` – pozycje punktów ciała (do ustawiania sprzętu i podparć), `tools/sheet.html?grips` – tabela chwytu wszystkich ćwiczeń, `tools/look.html` – porównanie wyglądów (domyślny: realistyczny, `?look=classic` – dawny ludzik z brył).
+Narzędzia: `tools/points.html?ex=db_row&t=0,0.5&pts=handR,toeL` – pozycje punktów ciała (do ustawiania sprzętu i podparć), `tools/sheet.html?grips` – tabela chwytu wszystkich ćwiczeń, `tools/phone.html?u=?ex=squat` – podgląd w rozmiarze telefonu, `tools/look.html` – porównanie wyglądów (domyślny: realistyczny, `?look=classic` – dawny ludzik z brył).

@@ -403,7 +403,7 @@ function renderDetailTop() {
         ? inWorkout(ex.id, focusId)
           ? `<div class="d-impact">✓ Już jest w: <b>${esc(workout(focusId).name)}</b> (${inWorkout(ex.id, focusId).sets} × ${inWorkout(ex.id, focusId).reps}). Chcesz więcej pracy? Zwiększ liczbę serii.</div>`
           : `<button class="d-add-btn">+ Dodaj do: ${esc(workout(focusId).name)}</button><div class="d-impact">${impact}</div>`
-        : '<div class="d-impact">Aby dodać, kliknij trening po lewej.</div>'}
+        : '<div class="d-impact">Aby dodać, kliknij trening w planie.</div>'}
       ${inPlan.length ? `<div class="d-impact muted">Już w treningach: ${inPlan.join(', ')}</div>` : ''}
     </div>
     <p class="d-text">${ex.how}</p>
@@ -461,6 +461,12 @@ function setMistake(m, instant = false) {
   renderTechnique();
   renderMuscleSummary();
 }
+
+// ---------- Telefon: zakładki Plan / Analiza ----------
+document.querySelectorAll('#mobile-tabs button').forEach((b) => (b.onclick = () => {
+  document.body.classList.toggle('tab-analysis', b.dataset.tab === 'analysis');
+  document.querySelectorAll('#mobile-tabs button').forEach((x) => x.classList.toggle('active', x === b));
+}));
 
 // ---------- Pasek odtwarzania ----------
 function buildTimeline(ex) {

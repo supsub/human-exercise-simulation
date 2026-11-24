@@ -140,8 +140,8 @@ export function updateStressMarkers(list, strength, time, showLabels = true) {
     // etykieta przy pierwszym znaczniku
     m.meshes[0].getWorldPosition(_p).project(camera);
     const r = canvas.getBoundingClientRect();
-    m.el.style.left = ((_p.x + 1) / 2) * r.width + 'px';
-    m.el.style.top = ((1 - _p.y) / 2) * r.height + 'px';
+    m.el.style.left = r.left + ((_p.x + 1) / 2) * r.width + 'px';
+    m.el.style.top = r.top + ((1 - _p.y) / 2) * r.height + 'px';
     m.el.textContent = '⚠ ' + s.label;
     m.el.style.opacity = strength;
     m.el.hidden = !showLabels || strength < 0.05 || _p.z > 1;

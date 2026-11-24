@@ -275,3 +275,30 @@ input:focus { border-color: var(--accent); }
 .day-head .w-rename, .day-head .w-del { padding: 2px 5px; font-size: 11px; color: var(--muted); opacity: 0; transition: opacity .15s; }
 .day-card:hover .w-rename, .day-card:hover .w-del { opacity: 1; }
 .rec-add .wbadge { width: 18px; height: 18px; }
+
+/* ---------- Telefon: model u góry, treść pod nim, zakładki Plan / Analiza na dole ---------- */
+.mobile-tabs { display: none; }
+@media (max-width: 760px) {
+  :root { --nav: 44px; --stage: 44vh; --tabs: 52px; }
+  .topnav { padding: 0 12px; font-size: 13px; }
+  .nav-sub { display: none; }
+  .logo { margin-right: 8px; }
+  #scene { top: var(--nav); height: var(--stage); bottom: auto; }
+  .plan-left, .plan-right, .side-panel {
+    top: calc(var(--nav) + var(--stage)); left: 0; right: 0; bottom: var(--tabs); width: auto;
+    border-radius: 14px 14px 0 0; border-bottom: none; padding: 12px;
+  }
+  .side-panel { z-index: 20; }
+  .side-panel .modal-box { width: 100%; max-width: none; border-radius: 14px 14px 0 0; }
+  body:not(.tab-analysis) .plan-right { display: none; }
+  body.tab-analysis .plan-left { display: none; }
+  .player-bar { left: 8px; right: 8px; bottom: auto; top: calc(var(--nav) + var(--stage) - 66px); padding: 8px 10px; gap: 8px; }
+  .mobile-tabs { display: flex; position: fixed; left: 0; right: 0; bottom: 0; height: var(--tabs); z-index: 30;
+    background: var(--panel); border-top: 1px solid var(--border); }
+  .mobile-tabs button { flex: 1; background: none; border: none; border-radius: 0; color: var(--muted); font-size: 15px; font-weight: 600; }
+  .mobile-tabs button.active { color: var(--text); box-shadow: inset 0 3px 0 var(--accent); }
+  /* dotyk: przyciski zmiany nazwy / usuwania treningu zawsze widoczne, większe pola */
+  .day-head .w-rename, .day-head .w-del { opacity: 1; }
+  input, select { font-size: 16px; }   /* iOS nie powiększa strony przy wpisywaniu */
+  .plan-head button { padding: 6px 9px; }
+}
