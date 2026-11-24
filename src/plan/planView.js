@@ -1,7 +1,7 @@
 import { paintMuscles, flyCamera, jumpCamera, controls, body, pickMuscle, showTooltip, cssColor, volumeColor, cssVolumeColor,
   updateBreathPuffs, updateStressMarkers, setScenery, WEEK_THRESHOLDS, DAY_THRESHOLDS } from '../scene.js';
 import { MUSCLES, MUSCLE_BY_ID } from '../muscles.js';
-import { roleOf, PHASE_KIND, BREATH } from '../exercises/common.js';
+import { roleOf } from '../exercises/common.js';
 import { EXERCISE_BY_ID } from '../exercises/index.js';
 import { createPlayer } from '../player.js';
 import { createFigure } from '../figure.js';
@@ -24,10 +24,12 @@ const ui = {
   focus: $('plan-focus'), legend: $('plan-legend'), score: $('plan-score'), groups: $('plan-groups'), warnings: $('plan-warnings'), recs: $('plan-recs'),
   panel: $('picker'), panelTitle: $('picker-title'), panelClose: $('picker-close'),
   browse: $('picker-browse'), search: $('picker-search'), cats: $('picker-cats'), list: $('picker-list'),
-  detail: $('picker-detail'), dTop: $('d-top'), dTech: $('d-technique'), dMuscles: $('d-muscles'),
-  bar: $('player-bar'), play: $('play'), timeline: $('timeline'), playhead: $('playhead'), speed: $('speed'),
-  breathLabel: $('breath-label'), phaseKind: $('phase-kind'), phaseHint: $('phase-hint'),
+  detail: $('picker-detail'), dTop: $('d-top'), dInfo: $('d-info'), dTech: $('d-technique'), dMuscles: $('d-muscles'),
+  bar: $('player-bar'), play: $('play'), speed: $('speed'), pbName: $('pb-name'), pbClose: $('pb-close'),
 };
+// Telefon: wybór ćwiczenia z planu nie zasłania planu – model ćwiczy, a opis / błędy / mięśnie
+// otwierają się przyciskami na pasku pod modelem (arkusz z jedną sekcją, bez długiego przewijania)
+const phone = () => matchMedia('(max-width: 760px)').matches;
 
 const player = createPlayer(body.resolvePose);
 const figure = createFigure($('figure'));
@@ -41,7 +43,6 @@ let browseCat = null;
 let listHover = null;       // ćwiczenie wskazane na liście (podgląd mięśni)
 let muscleHover = null;     // mięsień wskazany w panelu
 let showNotes = localStorage.getItem('hes.mistakeNotes') !== '0';
-let scrubbing = false;
 let display = Object.fromEntries(MUSCLES.map((m) => [m.id, 0]));
 
 function load() {
@@ -290,7 +291,7 @@ function closePanel() {
 ui.cats.innerHTML = ['Wszystkie', ...CATEGORIES].map((c) => `<button class="chip" data-c="${c}">${c}</button>`).join('');
 ui.cats.querySelectorAll('button').forEach((b) => (b.onclick = () => { browseCat = b.dataset.c === 'Wszystkie' ? null : b.dataset.c; renderList(); }));
 ui.search.oninput = renderList;
-ui.panelClose.onclick = closePanel;
+ui.panelClose.onclick = () => (phone() && selected?.from === 'plan' ? closeSheet() : closePanel());
 
 function renderList() {
   const q = ui.search.value.toLowerCase().trim();
@@ -352,17 +353,20 @@ function selectExercise(ex, from, { t = null, mistake = null } = {}) {
   muscleHover = null;
   player.state.frozen = t !== null;
   player.setExercise(anim, t);
-  ui.panel.hidden = false;
+  // telefon + plan: plan zostaje na ekranie, szczegóły dopiero po kliknięciu przycisku na pasku
+  ui.panel.hidden = phone() && from === 'plan';
   ui.browse.hidden = true;
   ui.detail.hidden = false;
-  ui.detail.scrollTop = 0;
-  ui.panelTitle.textContent = from === 'list' ? `Dodaj ćwiczenie – ${workout(browseId).name}` : 'Ćwiczenie';
+  ui.detail.classList.toggle('from-plan', from === 'plan');
+  showSection('info');
+  ui.panelTitle.textContent = from === 'list' ? `Dodaj ćwiczenie – ${workout(browseId).name}` : phone() ? ex.name : 'Ćwiczenie';
+  ui.pbName.textContent = ex.name;
   controls.autoRotate = !anim; // bez animacji model się obraca, żeby było widać też mięśnie z tyłu
   if (anim) (t !== null ? jumpCamera : flyCamera)(...cameraFor(anim));
   else flyCamera(...PLAN_CAMERA);
-  ui.bar.hidden = !anim;
+  ui.bar.hidden = !anim && !phone();
+  ui.bar.classList.toggle('static', !anim);
   setScenery(anim?.scenery);
-  if (anim) buildTimeline(anim);
   renderTechnique();
   if (mistake && anim) {
     const m = anim.mistakes.find((x) => x.id === mistake);
@@ -405,9 +409,8 @@ function renderDetailTop() {
           : `<button class="d-add-btn">+ Dodaj do: ${esc(workout(focusId).name)}</button><div class="d-impact">${impact}</div>`
         : '<div class="d-impact">Aby dodać, kliknij trening w planie.</div>'}
       ${inPlan.length ? `<div class="d-impact muted">Już w treningach: ${inPlan.join(', ')}</div>` : ''}
-    </div>
-    <p class="d-text">${ex.how}</p>
-    <p class="d-tip">💡 ${ex.tip}</p>`;
+    </div>`;
+  ui.dInfo.innerHTML = `<p class="d-text">${ex.how}</p><p class="d-tip">💡 ${ex.tip}</p>`;
   ui.dTop.querySelector('.back')?.addEventListener('click', backToList);
   ui.dTop.querySelector('.d-add-btn')?.addEventListener('click', () => addToWorkout(ex, focusId));
   renderMuscleSummary();
@@ -435,8 +438,12 @@ function renderMuscleSummary() {
 // Typowe błędy techniki (tylko ćwiczenia z animacją): klik przełącza animację na błędną technikę
 function renderTechnique() {
   const anim = selected.anim;
+  const cur = anim ? player.state.pending : null;
+  // przyciski „Błędy”: ukryte bez animacji/błędów, czerwone, gdy model pokazuje błędną technikę
+  document.querySelectorAll('[data-sec="tech"]').forEach((b) => {
+    if (b.tagName === 'BUTTON') { b.hidden = !anim?.mistakes.length; b.classList.toggle('bad-on', !!cur); }
+  });
   if (!anim) { ui.dTech.innerHTML = ''; return; }
-  const cur = player.state.pending;
   const hasMistakes = anim.mistakes.length > 0;
   ui.dTech.innerHTML = !hasMistakes ? '' : `
     <div class="mistakes-head">
@@ -468,34 +475,38 @@ document.querySelectorAll('#mobile-tabs button').forEach((b) => (b.onclick = () 
   document.querySelectorAll('#mobile-tabs button').forEach((x) => x.classList.toggle('active', x === b));
 }));
 
-// ---------- Pasek odtwarzania ----------
-function buildTimeline(ex) {
-  ui.timeline.querySelectorAll('.seg').forEach((s) => s.remove());
-  for (const p of ex.phases) {
-    const seg = document.createElement('div');
-    seg.className = 'seg ' + p.kind;
-    seg.style.left = p.start * 100 + '%';
-    seg.title = `${p.name} – ${PHASE_KIND[p.kind].hint}, ${BREATH[p.breath].label.toLowerCase()}`;
-    // segment bez tekstu (żeby nic nie było ucinane), pełny opis w podpowiedzi
-    seg.style.width = `calc(${(p.end - p.start) * 100}% - 3px)`;
-    ui.timeline.appendChild(seg);
-  }
+// ---------- Sekcje szczegółów (telefon: jedna naraz) ----------
+function showSection(sec) {
+  ui.detail.dataset.sec = sec;
+  ui.detail.scrollTop = 0;
+  document.querySelectorAll('#pb-chips button').forEach((b) =>
+    b.classList.toggle('active', b.dataset.sec === sec && !ui.panel.hidden));
 }
+// Przycisk na pasku: otwiera arkusz z tą sekcją; drugi klik w ten sam – zamyka arkusz (ćwiczenie dalej trwa)
+function toggleSheet(sec) {
+  if (!ui.panel.hidden && ui.detail.dataset.sec === sec && !ui.detail.hidden) { closeSheet(); return; }
+  ui.panel.hidden = false;
+  ui.browse.hidden = true;
+  ui.detail.hidden = false;
+  showSection(sec);
+}
+function closeSheet() {
+  ui.panel.hidden = true;
+  showSection(ui.detail.dataset.sec);
+}
+document.querySelectorAll('#pb-chips button').forEach((b) => (b.onclick = () => toggleSheet(b.dataset.sec)));
+ui.pbClose.onclick = closePanel;
+
+// ---------- Pasek odtwarzania: pauza i tempo ----------
 ui.play.onclick = () => { player.state.frozen = false; player.state.playing = !player.state.playing; };
 ui.speed.onchange = () => (player.state.speed = parseFloat(ui.speed.value));
-function scrubAt(clientX) {
-  const r = ui.timeline.getBoundingClientRect();
-  player.seek((clientX - r.left) / r.width);
-}
-ui.timeline.addEventListener('pointerdown', (e) => { scrubbing = true; ui.timeline.setPointerCapture(e.pointerId); scrubAt(e.clientX); });
-ui.timeline.addEventListener('pointermove', (e) => scrubbing && scrubAt(e.clientX));
-ui.timeline.addEventListener('pointerup', () => (scrubbing = false));
 
 window.addEventListener('keydown', (e) => {
   const typing = ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName);
   if (e.key === 'Escape') {
     if (selected?.from === 'list') backToList();
-    else if (!ui.panel.hidden) closePanel();
+    else if (phone() && selected && !ui.panel.hidden) closeSheet();
+    else if (!ui.panel.hidden || selected) closePanel();
   } else if (e.code === 'Space' && selected?.anim && !typing) {
     e.preventDefault();
     ui.play.click();
@@ -543,7 +554,7 @@ ui.workoutNew.onclick = () => {
 let mode = null, lastMode = null;
 export function frame(dt, time) {
   if (!analysis) return;
-  const out = player.frame(dt, scrubbing);
+  const out = player.frame(dt, false);
   body.setPose(out.pose);
   body.setBreath(out.sample ? out.sample.breath : 0.4);
   updateBreathPuffs(dt, out.sample?.phase.breath === 'out' && player.state.playing ? 1 : 0);
@@ -596,16 +607,7 @@ export function frame(dt, time) {
     figure.render();
     ui.dMuscles.querySelectorAll('.role-item').forEach((el) => el.classList.toggle('hover', el.dataset.id === hovered));
   }
-  if (out.sample) {
-    const ph = out.sample.phase;
-    ui.playhead.style.left = player.state.t * 100 + '%';
-    ui.timeline.querySelectorAll('.seg').forEach((s, i) => s.classList.toggle('current', selected.anim.phases[i] === ph));
-    ui.breathLabel.textContent = `${BREATH[ph.breath].icon} ${BREATH[ph.breath].label}`;
-    ui.breathLabel.className = 'breath-label ' + ph.breath;
-    ui.phaseKind.textContent = ph.name;
-    ui.phaseHint.textContent = PHASE_KIND[ph.kind].hint;
-    ui.play.textContent = player.state.playing ? '❚❚' : '▶';
-  }
+  if (out.sample) ui.play.textContent = player.state.playing ? '❚❚' : '▶';
 }
 
 function renderLegend(m) {
@@ -625,7 +627,8 @@ function renderLegend(m) {
 
 // Start. Parametry do demo/testów:
 //   ?focus=A – wybrany trening (litera), ?picker=B – lista ćwiczeń dla treningu, &preview=row – podgląd z listy,
-//   ?ex=squat – szczegóły ćwiczenia, &t=0.5 – zatrzymanie animacji, &mistake=valgus – typowy błąd
+//   ?ex=squat – szczegóły ćwiczenia, &t=0.5 – zatrzymanie animacji, &mistake=valgus – typowy błąd,
+//   &sec=info|tech|muscles – otwarta sekcja (telefon: arkusz pod modelem)
 export function start() {
   flyCamera(...PLAN_CAMERA);
   controls.autoRotate = true;
@@ -641,6 +644,7 @@ export function start() {
   if (ex) {
     if (byLetter(q.get('focus'))) focusId = byLetter(q.get('focus'));
     selectExercise(ex, q.get('picker') ? 'list' : 'plan', { t: q.has('t') ? parseFloat(q.get('t')) : null, mistake: q.get('mistake') });
+    if (q.get('sec')) toggleSheet(q.get('sec'));
   }
 }
 controls.addEventListener('start', () => (controls.autoRotate = false));

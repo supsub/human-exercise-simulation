@@ -71,37 +71,37 @@
           <div id="picker-list" class="picker-list"></div>
           <div class="muted small">Kliknij ćwiczenie, aby zobaczyć szczegóły. Najechanie pokazuje mięśnie na modelu.</div>
         </div>
-        <div id="picker-detail" class="picker-detail" hidden>
+        <div id="picker-detail" class="picker-detail" data-sec="info" hidden>
           <div id="d-top"></div>
-          <div id="d-technique"></div>
-          <h3>Pracujące mięśnie</h3>
-          <div class="figure-box">
-            <canvas id="figure"></canvas>
-            <span class="fig-label l">PRZÓD</span><span class="fig-label r">TYŁ</span>
+          <!-- telefon: jedna sekcja naraz (przełączana przyciskami na pasku pod modelem) -->
+          <div class="d-sec" data-sec="info"><div id="d-info"></div></div>
+          <div class="d-sec" data-sec="tech"><div id="d-technique"></div></div>
+          <div class="d-sec" data-sec="muscles">
+            <h3>Pracujące mięśnie</h3>
+            <div class="figure-box">
+              <canvas id="figure"></canvas>
+              <span class="fig-label l">PRZÓD</span><span class="fig-label r">TYŁ</span>
+            </div>
+            <div class="legend"><span>nie pracuje</span><div class="legend-bar"></div><span>mocno</span></div>
+            <div id="d-muscles" class="d-muscles"></div>
           </div>
-          <div class="legend"><span>nie pracuje</span><div class="legend-bar"></div><span>mocno</span></div>
-          <div id="d-muscles" class="d-muscles"></div>
         </div>
       </div>
     </div>
 
-    <!-- Sterowanie animacją wybranego ćwiczenia -->
+    <!-- Sterowanie animacją: pauza i tempo; na telefonie także przyciski otwierające opis / błędy / mięśnie -->
     <div id="player-bar" class="panel player-bar" hidden>
       <button id="play" class="play" title="Odtwórz / pauza (spacja)">❚❚</button>
-      <div class="pb-main">
-        <div class="pb-info">
-          <div id="phase-kind" class="pb-name"></div>
-          <div class="pb-sub"><span id="phase-hint"></span> · <span id="breath-label" class="breath-label"></span></div>
-        </div>
-        <div id="timeline" class="timeline" title="Kliknij lub przeciągnij, aby przewinąć">
-          <div id="playhead" class="playhead"></div>
-        </div>
-      </div>
       <select id="speed" title="Tempo">
         <option value="0.25">0,25×</option>
         <option value="0.5">0,5×</option>
         <option value="1" selected>1×</option>
       </select>
+      <div id="pb-name" class="pb-name"></div>
+      <div id="pb-chips" class="pb-chips">
+        <button data-sec="info">Opis</button><button data-sec="tech">Błędy</button><button data-sec="muscles">Mięśnie</button>
+      </div>
+      <button id="pb-close" class="icon" title="Zakończ podgląd ćwiczenia">✕</button>
     </div>
   </div>
 

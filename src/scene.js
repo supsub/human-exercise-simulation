@@ -15,8 +15,8 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 export const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0f141c);
-scene.fog = new THREE.Fog(0x0f141c, 6, 14);
+scene.background = new THREE.Color(0x5b6b82);   // średni szaroniebieski: kontrast i z jasnym ciałem, i z ciemnymi obciążnikami
+scene.fog = new THREE.Fog(0x5b6b82, 7, 16);
 
 export const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 50);
 camera.position.set(2.4, 1.5, 2.6);
@@ -41,11 +41,11 @@ const rim = new THREE.DirectionalLight(0x7fa8ff, 0.8);
 rim.position.set(-3, 2, -3);
 scene.add(rim);
 
-const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 64), new THREE.MeshStandardMaterial({ color: 0x1b2230, roughness: 0.95 }));
+const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 64), new THREE.MeshStandardMaterial({ color: 0x4b5a70, roughness: 0.95 }));
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
-const grid = new THREE.GridHelper(8, 32, 0x2c3648, 0x222a38);
+const grid = new THREE.GridHelper(8, 32, 0x63738b, 0x56657c);
 grid.position.y = 0.001;
 scene.add(grid);
 

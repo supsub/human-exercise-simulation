@@ -98,36 +98,14 @@ input:focus { border-color: var(--accent); }
 .role-item .up { color: #ff9b6b; } .role-item .down { color: #7fbfff; }
 .disclaimer { font-size: 11px; color: var(--muted); margin: 10px 0 0; }
 
-/* pasek odtwarzania: jedna linia opisu + cienka oś faz (nazwy faz w podpowiedzi) */
-.player-bar { left: 502px; right: 472px; bottom: 16px; display: flex; gap: 12px; align-items: center; padding: 10px 12px; }
-.pb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
-.pb-info { display: flex; flex-direction: column; gap: 1px; line-height: 1.3; }
-.pb-name { font-size: 13.5px; font-weight: 600; }
-.pb-sub { font-size: 12px; color: var(--muted); }
-.pb-sub .breath-label { font-size: 12px; }
-.pb-kind b { color: var(--text); font-weight: 600; }
-.player-bar .timeline { flex: none; height: 8px; border-radius: 4px; overflow: visible; background: transparent; display: flex; gap: 3px; }
-.player-bar .timeline::before { content: ""; position: absolute; inset: -8px 0; }   /* większy obszar do klikania */
-.player-bar .seg { position: absolute; top: 0; bottom: 0; border-radius: 4px; border: none; padding: 0; opacity: .45; transition: opacity .2s; }
-.player-bar .seg.current { opacity: 1; box-shadow: none; }
-.player-bar .seg.ecc { background: var(--ecc); }
-.player-bar .seg.con { background: var(--con); }
-.player-bar .seg.iso { background: #6b7891; }
-.player-bar .playhead { top: -4px; bottom: -4px; width: 4px; margin-left: -2px; border-radius: 2px; }
+/* pasek odtwarzania: tylko pauza, tempo i nazwa (na telefonie zamiast nazwy przyciski sekcji) */
+.player-bar { left: 50%; transform: translateX(-50%); bottom: 16px; display: flex; gap: 10px; align-items: center; padding: 7px 10px; max-width: calc(100vw - 960px); min-width: 240px; }
+.pb-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-chips { display: none; }
 .player-bar .play { width: 38px; height: 38px; border-radius: 50%; padding: 0; }
 .player-bar select { padding: 5px 6px; font-size: 12px; }
+.player-bar.static .play, .player-bar.static select { display: none; }
 .play { width: 40px; height: 38px; font-size: 14px; flex: none; }
-.timeline { position: relative; flex: 1; height: 40px; background: #0b1017; border-radius: 9px; overflow: hidden;
-  cursor: pointer; user-select: none; touch-action: none; }
-.seg { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 8px;
-  border-right: 2px solid var(--bg); font-size: 11.5px; white-space: nowrap; overflow: hidden; }
-.seg span { overflow: hidden; text-overflow: ellipsis; }
-.seg-breath { color: #8fd3ff; font-size: 11px; opacity: .8; }
-.seg.ecc { background: rgba(63,167,214,.28); }
-.seg.con { background: rgba(242,153,74,.28); }
-.seg.iso { background: rgba(107,120,145,.22); }
-.playhead { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: #fff;
-  box-shadow: 0 0 8px rgba(255,255,255,.7); pointer-events: none; }
 
 .tooltip { position: fixed; pointer-events: none; background: rgba(8,12,18,.95); border: 1px solid var(--border);
   border-radius: 8px; padding: 7px 10px; font-size: 12px; z-index: 10; max-width: 320px; }
@@ -248,7 +226,6 @@ input:focus { border-color: var(--accent); }
 @media (max-width: 1100px) {
   .plan-left { width: 400px; }
   .plan-right { width: 320px; }
-  .player-bar { left: 432px; right: 472px; }
 }
 
 /* ---------- Plan: harmonogram (kalendarz cyklu) i treningi ---------- */
@@ -292,7 +269,24 @@ input:focus { border-color: var(--accent); }
   .side-panel .modal-box { width: 100%; max-width: none; border-radius: 14px 14px 0 0; }
   body:not(.tab-analysis) .plan-right { display: none; }
   body.tab-analysis .plan-left { display: none; }
-  .player-bar { left: 8px; right: 8px; bottom: auto; top: calc(var(--nav) + var(--stage) - 66px); padding: 8px 10px; gap: 8px; }
+  .player-bar { left: 6px; right: 6px; transform: none; max-width: none; min-width: 0; bottom: auto;
+    top: calc(var(--nav) + var(--stage) - 56px); padding: 6px; gap: 6px; z-index: 25; }
+  .player-bar .play { width: 36px; height: 36px; }
+  .player-bar select { font-size: 14px; padding: 5px 2px; }
+  .pb-name { display: none; }
+  .pb-chips { display: flex; gap: 5px; flex: 1; min-width: 0; overflow-x: auto; }
+  .pb-chips button { flex: 1; padding: 7px 6px; font-size: 13px; border-radius: 999px; white-space: nowrap; }
+  .pb-chips button.active { background: var(--accent); color: #06121f; }
+  .pb-chips button.bad-on { box-shadow: inset 0 0 0 2px #eb3b3b; }
+  #pb-close { flex: none; width: 32px; }
+  /* szczegóły ćwiczenia: jedna sekcja naraz */
+  .picker-detail .d-sec { display: none; }
+  .picker-detail[data-sec="info"] .d-sec[data-sec="info"],
+  .picker-detail[data-sec="tech"] .d-sec[data-sec="tech"],
+  .picker-detail[data-sec="muscles"] .d-sec[data-sec="muscles"] { display: block; }
+  .picker-detail.from-plan .d-title, .picker-detail.from-plan .d-add { display: none; }
+  .picker-detail .d-sec h3:first-child, .picker-detail .mistakes-head h3 { margin-top: 4px; }
+  .figure-box { max-height: 34vh; }
   .mobile-tabs { display: flex; position: fixed; left: 0; right: 0; bottom: 0; height: var(--tabs); z-index: 30;
     background: var(--panel); border-top: 1px solid var(--border); }
   .mobile-tabs button { flex: 1; background: none; border: none; border-radius: 0; color: var(--muted); font-size: 15px; font-weight: 600; }
