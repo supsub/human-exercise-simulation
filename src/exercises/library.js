@@ -57,7 +57,7 @@ const dips = animated({
     { cyl: [[0.24, 0, 0.3], [0.24, 1.12, 0.3]], r: 0.03, color: 'frame' }, { cyl: [[-0.24, 0, 0.3], [-0.24, 1.12, 0.3]], r: 0.03, color: 'frame' },
   ],
   steps: ['Podpór na poręczach', 'Opuszczanie ciała', 'Dolna pozycja', 'Wypychanie w górę'],
-  pose: keyframes({ thigh: -20, shin: 70, anchor: { pt: 'handL', at: { y: 1.12, z: 0 } } },
+  pose: keyframes({ thigh: -20, shin: 70, grip: 1, anchor: { pt: 'handL', at: { y: 1.12, z: 0 } } },
     { rx: 10, arm: 0, fore: 0 }, { rx: 25, arm: 72, fore: -6 }),
 });
 const fly = animated({
@@ -80,7 +80,7 @@ const cable_fly = animated({
 const pullup = animated({
   id: 'pullup', type: 'lift', camera: 'hang', scenery: pullBar(),
   steps: ['Zwis na drążku', 'Podciąganie', 'Broda nad drążkiem', 'Opuszczanie'],
-  pose: keyframes({ anchor: { pt: 'handL', at: { y: 2.12, z: 0 } }, thigh: -10, shin: 30 },
+  pose: keyframes({ anchor: { pt: 'handL', at: { y: 2.12, z: 0 } }, thigh: -10, shin: 30, grip: 1 },
     { arm: 180, fore: 180, rx: 0, trunk: 0 }, { arm: 348, fore: 176, rx: -8, trunk: -14, head: -5 }),
 });
 const pulldownMachine = [seat(0.44), { cyl: [[-0.25, 0.68, 0.3], [0.25, 0.68, 0.3]], r: 0.05, color: 'pad' }, column(-0.45, 2.5),
@@ -176,19 +176,23 @@ const curlPose = (d, p) => curl.pose(d, p);
 const hammer = animated({
   id: 'hammer', type: 'lift',
   steps: ['Ręce opuszczone, chwyt młotkowy', 'Uginanie', 'Szczytowe napięcie', 'Opuszczanie'],
-  pose: (d) => ({ ...curlPose(d, {}), props: { dumbbells: true, neutralGrip: true } }),
+  pose: (d, p = {}) => ({ ...curlPose(d, p), props: { dumbbells: true, neutralGrip: true } }),
   cameraPosition: [1.5, 1.45, 2.7], cameraTarget: [0, 1.0, 0],
 });
 const reverse_curl = animated({
   id: 'reverse_curl', type: 'lift',
   steps: ['Sztanga opuszczona, nachwyt', 'Uginanie', 'Szczytowe napięcie', 'Opuszczanie'],
-  pose: (d) => ({ ...curlPose(d, {}), props: { bar: { len: 1.2, plates: true } } }),
+  pose: (d, p = {}) => {
+    const out = curlPose(d, p);
+    const w = (p.wrist ?? 0) * d * 0.6;   // opadające nadgarstki
+    return { ...out, joints: { ...out.joints, wristL: out.joints.wristL + w, wristR: out.joints.wristR + w }, props: { bar: { len: 1.2, plates: true } } };
+  },
   cameraPosition: [1.5, 1.45, 2.7], cameraTarget: [0, 1.0, 0],
 });
 const triceps_oh = animated({
   id: 'triceps_oh', type: 'lower',
   steps: ['Hantel nad głową', 'Opuszczanie za głowę', 'Rozciągnięcie tricepsa', 'Prostowanie ramion'],
-  pose: keyframes({ ...FEET, props: { goblet: true } }, { arm: 178, fore: 179 }, { arm: 170, fore: 25 }),
+  pose: keyframes({ ...FEET, abd: -9, props: { goblet: true } }, { arm: 178, fore: 179 }, { arm: 170, fore: 25 }),
   cameraTarget: [0, 1.25, 0],
 });
 const pushdown = animated({
@@ -206,15 +210,19 @@ const wrist_curl = animated({
 
 // ---------- Nogi ----------
 // Przysiad frontowy i goblet: ruch nóg jak w przysiadzie, tułów bardziej pionowy, ręce z przodu
-function squatVariant(armGlobal, foreGlobal, uprightness, props) {
-  return (d) => {
-    const p = squat.pose(d, {});
-    const rx = p.root.rx * uprightness;
+function squatVariant(armGlobal, foreGlobal, uprightness, props, adduct = 0) {
+  return (d, prm = {}) => {
+    const p = squat.pose(d, { valgus: 0.32 * (prm.valgus ?? 0), heels: 0.3 * (prm.heels ?? 0) });
+    const drop = (prm.elbows ?? 0) * d;    // opadające łokcie w przysiadzie frontowym
+    const arm = armGlobal + 55 * drop, fore = foreGlobal + 25 * drop;
+    const rx = p.root.rx * (uprightness + 0.6 * drop);
     const j = { ...p.joints };
     j.hipL = j.hipR = p.joints.hipL + (p.root.rx - rx);
     const trunk = rx + p.joints.lumbar;
-    j.shoulderL = j.shoulderR = armGlobal / D - trunk;
-    j.elbowL = j.elbowR = (foreGlobal - armGlobal) / D;
+    // rotacja wewnętrzna ramienia zbliża dłonie do siebie (np. hantel trzymany oburącz przy klatce)
+    j.shoulderL = [arm / D - trunk, -adduct / D, 0];
+    j.shoulderR = [arm / D - trunk, adduct / D, 0];
+    j.elbowL = j.elbowR = (fore - arm) / D;
     j.neck = -trunk * 0.6;
     return { ...p, root: { ...p.root, rx }, joints: j, props };
   };
@@ -228,7 +236,7 @@ const front_squat = animated({
 const goblet_squat = animated({
   id: 'goblet_squat', camera: 'stand',
   steps: ['Hantel przy klatce', 'Zejście w dół', 'Dolna pozycja', 'Wstawanie'],
-  pose: squatVariant(-18, -160, 0.7, { goblet: true }),
+  pose: squatVariant(-22, -158, 0.7, { goblet: true }, 45),
   cameraTarget: [0, 0.8, 0],
 });
 const deadlift = animated({
@@ -248,8 +256,8 @@ const rdl = animated({
   cameraTarget: [0, 0.75, 0],
 });
 // Wykrok w miejscu (split squat): przednia stopa płasko, tylna na palcach
-function lungePose(d) {
-  const hip = { z: 0.02, y: 0.92 - 0.38 * d };
+function lungePose(d, prm = {}) {
+  const hip = { z: 0.02 + 0.16 * (prm.forward ?? 0) * d, y: 0.92 - 0.38 * d };
   const ankleF = { z: 0.38, y: DIMS.ankleHeight };
   const ankleB = { z: -0.46, y: 0.15 };
   const kF = twoBoneIK(hip, ankleF, DIMS.thigh, DIMS.shin, +1);
@@ -259,6 +267,7 @@ function lungePose(d) {
     root: { y: hip.y, z: hip.z }, rx: 2, head: 0,
     thigh: [g(hip, kF), g(hip, kB)], shin: [g(kF, ankleF), g(kB, ankleB)], foot: [0, 60],
     arm: 0, fore: 0, props: { dumbbells: true },
+    legIn: 16 * (prm.valgus ?? 0) * d,
   });
 }
 const lunge = animated({ id: 'lunge', steps: ['Rozkrok, pozycja wysoka', 'Opuszczanie tylnego kolana', 'Dolna pozycja', 'Wstawanie'], pose: lungePose, cameraTarget: [0, 0.75, 0] });
@@ -319,15 +328,17 @@ const tib_raise = animated({
 });
 
 // ---------- Pośladki ----------
-function hipThrustPose(d) {
-  const T = -55 - 38 * d;                 // nachylenie tułowia (plecy oparte o ławkę)
+function hipThrustPose(d, prm = {}) {
+  const T = -55 - (38 + 14 * (prm.arch ?? 0)) * d;                 // nachylenie tułowia (plecy oparte o ławkę)
   const sh = { z: -0.34, y: 0.56 };
   const t = T / D;
   const hip = { z: sh.z - 0.5 * Math.sin(t), y: sh.y - 0.5 * Math.cos(t) };
   const ankle = { z: 0.5, y: DIMS.ankleHeight };
   const knee = twoBoneIK(hip, ankle, DIMS.thigh, DIMS.shin, +1);
   const g = (a, b) => downAngle(a, b) * D;
-  return makePose({ root: hip, rx: T, head: T + 45, thigh: g(hip, knee), shin: g(knee, ankle), foot: 0, el: -25, props: { bar: { len: 1.6 } } });
+  const arch = 22 * (prm.arch ?? 0) * d;  // przeprost: tułów odgina się względem miednicy
+  return makePose({ root: hip, rx: T + arch, trunk: T, head: T + 45 - arch, thigh: g(hip, knee), shin: g(knee, ankle), foot: 0, el: -25,
+    legIn: 16 * (prm.valgus ?? 0) * d, props: { bar: { len: 1.6 } } });
 }
 const hip_thrust = animated({
   id: 'hip_thrust', type: 'lift', camera: 'floor', scenery: [{ box: [0, 0.21, -0.46], size: [1.1, 0.42, 0.35] }],
@@ -338,8 +349,8 @@ const hip_thrust = animated({
 const band_walk = animated({
   id: 'band_walk', type: 'walk',
   steps: ['Krok w bok', 'Dostawienie nogi'],
-  pose: (d) => {
-    const p = squat.pose(0.32, {});
+  pose: (d, prm = {}) => {
+    const p = squat.pose(0.32 * (1 - 0.85 * (prm.tall ?? 0)), { valgus: 0.35 * (prm.valgus ?? 0) });
     const step = Math.sin(Math.PI * Math.min(d, 1)), follow = Math.sin(Math.PI * Math.max(0, d - 1));
     const aL = 4 + 14 * step, aR = 4 + 14 * follow;
     const j = { ...p.joints };
@@ -353,13 +364,13 @@ const band_walk = animated({
 // ---------- Core ----------
 const plank = animated({
   id: 'plank', type: 'hold', camera: 'floor', steps: ['Utrzymanie deski – wdech', 'Utrzymanie deski – wydech'],
-  pose: () => makePose({ rx: 78, head: 70, arm: 0, fore: -90, hand: -90, foot: 84,
-    anchor: { pt: 'elbowL', at: { y: 0.06, z: 0.3 } }, anchor2: { pt: 'toeL', y: 0.01 } }),
+  pose: keyframes({ rx: 78, head: 70, arm: 0, fore: -90, hand: -90, foot: 84,
+    anchor: { pt: 'elbowL', at: { y: 0.06, z: 0.3 } }, anchor2: { pt: 'toeL', y: 0.01 } }, {}, {}),
 });
 const side_plank = animated({
   id: 'side_plank', type: 'hold', camera: 'floor', steps: ['Utrzymanie – wdech', 'Utrzymanie – wydech'],
-  pose: () => makePose({ rx: 78, ry: 90, head: 78, abd: [0, 90], el: [0, -90], arm: [78, undefined],
-    anchor: { pt: 'elbowR', at: { y: 0.06, z: 0.3 } }, anchor2: { pt: 'ankleR', y: 0.06 } }),
+  pose: keyframes({ rx: 78, ry: 90, head: 78, abd: [0, 90], el: [0, -90], arm: [78, undefined],
+    anchor: { pt: 'elbowR', at: { y: 0.06, z: 0.3 } }, anchor2: { pt: 'ankleR', y: 0.06 } }, {}, {}),
   cameraPosition: [2.6, 1.1, 0.8], cameraTarget: [0, 0.3, -0.2],
 });
 const crunch = animated({
@@ -371,19 +382,20 @@ const crunch = animated({
 const leg_raise = animated({
   id: 'leg_raise', type: 'lift', camera: 'hang', scenery: pullBar(),
   steps: ['Zwis na drążku', 'Unoszenie nóg', 'Nogi w poziomie', 'Opuszczanie nóg'],
-  pose: keyframes({ anchor: { pt: 'handL', at: { y: 2.12, z: 0 } }, arm: 180, fore: 180, trunk: 0 },
+  pose: keyframes({ anchor: { pt: 'handL', at: { y: 2.12, z: 0 } }, arm: 180, fore: 180, trunk: 0, grip: 1 },
     { rx: 0, thigh: 0, shin: 4 }, { rx: -16, thigh: -96, shin: -92 }),
 });
 const farmer = animated({
   id: 'farmer', type: 'walk',
   steps: ['Krok lewą nogą', 'Krok prawą nogą'],
-  pose: (d) => {
+  pose: (d, prm = {}) => {
+    const h = prm.hunch ?? 0;
     const s = d <= 1 ? 1 - 2 * d : 2 * d - 3;                  // +1 → −1 → +1: lewa noga z tyłu → z przodu → z tyłu
     const lift = d <= 1 ? Math.sin(Math.PI * d) : 0, liftR = d > 1 ? Math.sin(Math.PI * (d - 1)) : 0;
     return makePose({
       root: { y: DIMS.hipHeight - 0.03, z: 0 },
       thigh: [22 * s - 18 * lift, -22 * s - 18 * liftR], shin: [22 * s + 20 * lift, -22 * s + 20 * liftR],
-      foot: [6 * s, -6 * s], arm: 0, fore: 0, props: { dumbbells: true },
+      foot: [6 * s, -6 * s], arm: 0, fore: 0, trunk: 18 * h, head: 38 * h, props: { dumbbells: true },
     });
   },
 });

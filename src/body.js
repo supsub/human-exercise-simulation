@@ -138,6 +138,7 @@ export function createBody() {
   neck.add(ellipsoid([0.06, 0.012, 0.01], faceMat, [0, 0.19, 0.1]).rotateX(-0.2));
 
   const props = { dumbbells: [] };
+  const fingers = [];
 
   for (const side of ['L', 'R']) {
     const sx = side === 'L' ? 1 : -1;
@@ -147,9 +148,30 @@ export function createBody() {
     const el = joint('elbow' + side, sh, [0, -DIMS.upperArm, 0], joints);
     el.add(limb(0.038, DIMS.forearm));
     const wr = joint('wrist' + side, el, [0, -DIMS.forearm, 0], joints);
-    const hand = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, 0.03), jointMat));
-    hand.position.y = -0.055;
-    wr.add(hand);
+    // Dłoń: śródręcze + dwuczłonowe palce + kciuk. Palce zaciskają się na trzymanym przedmiocie
+    // (uchwyt jest w punkcie 'hand', ok. 7 cm pod nadgarstkiem, tuż przed wnętrzem dłoni).
+    const palm = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.07, 0.026), jointMat));
+    palm.position.set(0, -0.038, -0.02);
+    wr.add(palm);
+    const f1 = new THREE.Group();
+    f1.position.set(0, -0.073, -0.02);
+    wr.add(f1);
+    const seg1 = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.032, 0.022), jointMat));
+    seg1.position.y = -0.016;
+    f1.add(seg1);
+    const f2 = new THREE.Group();
+    f2.position.y = -0.032;
+    f1.add(f2);
+    const seg2 = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.066, 0.026, 0.02), jointMat));
+    seg2.position.y = -0.013;
+    f2.add(seg2);
+    const thumb = new THREE.Group();
+    thumb.position.set(-sx * 0.036, -0.03, -0.012);
+    wr.add(thumb);
+    const tm = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.045, 0.02), jointMat));
+    tm.position.y = -0.022;
+    thumb.add(tm);
+    fingers.push({ f1, f2, thumb, sx });
     const db = dumbbell();
     wr.add(db);
     props.dumbbells.push(db);
@@ -341,8 +363,20 @@ export function createBody() {
     for (let i = used; i < pool.length; i++) pool[i].visible = false;
   }
 
+  // grip: 0 = dłoń otwarta, 1 = pełny chwyt. Domyślnie z rekwizytów (hantle, sztanga, uchwyt wyciągu).
+  function setGrip(pose) {
+    const p = pose.props ?? {};
+    const g = pose.grip ?? (p.dumbbells || p.bar ? 1 : p.goblet ? 0.55 : 0.12);
+    for (const f of fingers) {
+      f.f1.rotation.x = -1.45 * g;
+      f.f2.rotation.x = -1.5 * g;
+      f.thumb.rotation.set(-0.9 * g, 0, f.sx * (0.25 + 0.5 * g));
+    }
+  }
+
   function setPose(pose) {
     applyAngles(pose);
+    setGrip(pose);
     const db = pose.props?.dumbbells;
     props.dumbbells.forEach((d, i) => {
       d.visible = db === true || db === (i === 0 ? 'L' : 'R');

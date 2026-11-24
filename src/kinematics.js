@@ -66,6 +66,7 @@ export function blendPose(a, b, t) {
     root: { x: r('x'), y: r('y'), z: r('z'), rx: r('rx'), ry: r('ry'), rz: r('rz') },
     joints,
     shrug: lerp(a.shrug ?? 0, b.shrug ?? 0, t),
+    grip: a.grip !== undefined || b.grip !== undefined ? lerp(a.grip ?? 0.12, b.grip ?? 0.12, t) : undefined,
     props: t < 0.5 ? a.props : b.props,
   };
 }

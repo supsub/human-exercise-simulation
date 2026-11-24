@@ -1,6 +1,7 @@
 import { defineExercise } from './common.js';
 import { DIMS } from '../dims.js';
 import { CATALOG_BY_ID } from '../plan/catalog.js';
+import { MISTAKES } from './mistakes.js';
 
 // Budowanie animacji z dwóch póz kluczowych (A = głębokość 0, B = głębokość 1).
 //
@@ -39,10 +40,14 @@ export function makePose(s) {
     j['elbow' + S] = elbow * R;
     j['wrist' + S] = (el !== undefined ? side(s.wr, i) ?? 0 : hand - fore) * R;
   });
+  // błędy techniki: kolana do środka / łokcie na zewnątrz (skręt całego łańcucha, patrz body.js)
+  if (s.legIn !== undefined) j.legInL = j.legInR = s.legIn * R;
+  if (s.armOut !== undefined) j.armOutL = j.armOutR = s.armOut * R;
   const pose = {
     root: { x: s.root?.x ?? 0, y: s.root?.y ?? DIMS.hipHeight, z: s.root?.z ?? 0, rx: rx * R, ry: (s.ry ?? 0) * R, rz: (s.rz ?? 0) * R },
     joints: j,
     shrug: s.shrug ?? 0,
+    grip: s.grip,
     props: s.props ?? {},
   };
   if (s.anchor) pose.anchor = s.anchor;
@@ -61,7 +66,17 @@ function mix(a, b, t) {
   }
   return a ?? b;
 }
-export const keyframes = (base, A, B) => (d) => makePose(mix({ ...base, ...A }, { ...base, ...B }, d));
+// Typowy błąd w pozach kluczowych: { A, B, both } – nadpisania specyfikacji; params[id] = 0..1 (płynne przejście)
+export const keyframes = (base, A, B) => (d, params = {}, mistakes = []) => {
+  let spec = mix({ ...base, ...A }, { ...base, ...B }, d);
+  for (const m of mistakes) {
+    const w = params[m.id] ?? 0;
+    if (w <= 0 || !(m.A || m.B || m.both)) continue;
+    const bad = mix({ ...base, ...A, ...m.both, ...m.A }, { ...base, ...B, ...m.both, ...m.B }, d);
+    spec = mix(spec, bad, w);
+  }
+  return makePose(spec);
+};
 
 // Szablony faz. 'lower' – najpierw opuszczanie (głębokość 0→1), 'lift' – najpierw unoszenie/przyciąganie,
 // 'hold' – utrzymanie pozycji, 'walk' – dwa kroki (głębokość 0→1→2).
@@ -110,8 +125,19 @@ export function musclesFrom(weights) {
   return out;
 }
 
+// Błąd z mistakes.js → format silnika: parametry pozy, zmienione aktywacje (shift = zmiana udziału mięśnia), przeciążenia
+function engineMistake(m, weights) {
+  const muscles = {};
+  for (const [mid, dw] of Object.entries(m.shift ?? {})) {
+    const w = Math.max(0, Math.min(1.1, (weights[mid] ?? 0) + dw));
+    muscles[mid] = { rest: 0.02 + 0.08 * w, peak: 0.06 + 0.58 * w, w: 0.75 };
+  }
+  return { ...m, params: m.rom ? { rom: m.rom } : { [m.id]: 1 }, muscles, stress: m.stress ?? [] };
+}
+
 export function animated({ id, type = 'lower', steps, pose, camera = 'stand', scenery = [], cues = [], ...rest }) {
   const cat = CATALOG_BY_ID[id];
+  const mistakes = (MISTAKES[id] ?? []).map((m) => engineMistake(m, cat.muscles));
   return defineExercise({
     id,
     name: cat.name,
@@ -122,8 +148,8 @@ export function animated({ id, type = 'lower', steps, pose, camera = 'stand', sc
     muscles: musclesFrom(cat.muscles),
     load: type === 'hold' || type === 'walk' ? () => 1 : undefined,
     scenery,
-    pose,
-    mistakes: [],
+    pose: (d, params) => pose(d, params, mistakes),
+    mistakes,
     ...CAMERAS[camera],
     ...rest,
   });
