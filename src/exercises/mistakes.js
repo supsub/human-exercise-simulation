@@ -94,8 +94,8 @@ export const MISTAKES = {
     ROM('Drążek zatrzymuje się nad głową.', 'Plecy pracują tylko w części zakresu.', 'Ściągaj drążek do górnej części klatki.', { latissimus: -0.3 }),
   ],
   lat_pulldown_wide: [
-    { id: 'behind', name: 'Ściąganie za kark', B: { rx: 18, trunk: 28, head: 58, hands: { w: 1.1, y: 1.24, z: -0.22, pole: [1, -0.7, 0.1] } },
-      M: { trunk: 15, head: 40, hands: { w: 1.1, y: 1.6, z: -0.16, pole: [1, -0.7, 0] } },
+    { id: 'behind', name: 'Ściąganie za kark', B: { rx: 18, trunk: 28, head: 58, hands: { w: 1.0, y: 1.24, z: -0.22, pole: [1, -0.7, 0.1] } },
+      M: { trunk: 15, head: 40, hands: { w: 1.0, y: 1.6, z: -0.16, pole: [1, -0.7, 0] } },
       what: 'Tułów pochyla się do przodu, a drążek trafia za głowę.',
       why: 'Barki pracują w skrajnej rotacji zewnętrznej, a szyja jest zgięta – to obciąża barki i kręgi szyjne.',
       fix: 'Zawsze ściągaj drążek przed twarz, do górnej części klatki.',
@@ -119,7 +119,7 @@ export const MISTAKES = {
       shift: { trap_upper: 0.5, latissimus: -0.3 }, stress: [] },
   ],
   db_row: [
-    { id: 'twist', name: 'Skręcanie tułowia', B: { ry: -22 },
+    { id: 'twist', name: 'Skręcanie tułowia', B: { ry: -10 },
       what: 'Przy przyciąganiu tułów obraca się, a bark wędruje w górę.',
       why: 'Ruch wykonuje skręt tułowia zamiast pleców, a odcinek lędźwiowy dostaje skręcające obciążenie.',
       fix: 'Barki równolegle do podłogi, ciągnij łokciem w stronę biodra.',
@@ -264,7 +264,7 @@ export const MISTAKES = {
     { id: 'elbows', name: 'Łokcie odjeżdżają od tułowia', A: { arm: -45 }, B: { arm: 8 },
       what: 'Łokcie przesuwają się w przód i w tył zamiast stać w miejscu.', why: 'Do ruchu włączają się barki i plecy, a triceps pracuje słabiej.',
       fix: 'Łokcie przyklejone do boków – ruch tylko w łokciach.', shift: { triceps_lat: -0.25, latissimus: 0.35, delt_ant: 0.2 }, stress: [{ joint: 'shoulder', label: 'Bark' }] },
-    { id: 'lean', name: 'Pochylanie się nad uchwytem', both: { rx: 25, trunk: 45, head: 30 },
+    { id: 'lean', name: 'Pochylanie się nad uchwytem', both: { rx: 15, trunk: 32, head: 22 },
       what: 'Tułów mocno pochyla się nad uchwytem.', why: 'Ciężar ciała pomaga w ruchu, a triceps dostaje słabszy bodziec.',
       fix: 'Stań prosto, z lekkim pochyleniem.', shift: { triceps_lat: -0.2, pec_stern: 0.25 }, stress: [] },
   ],
@@ -339,7 +339,7 @@ export const MISTAKES = {
       fix: 'Kolana w linii stóp przez cały ruch.', shift: { glute_med: -0.2, adductors: 0.2 }, stress: [{ joint: 'knee', label: 'Więzadła kolana' }] },
   ],
   leg_ext: [
-    { id: 'kick', name: 'Wyrzucanie nóg i odrywanie bioder', B: { rx: -28, trunk: -30 },
+    { id: 'kick', name: 'Wyrzucanie nóg i odrywanie bioder', B: { rx: -10, trunk: -11 },   // plecy zostają na oparciu (oparcie ~11° w tył)
       what: 'Nogi są wyrzucane w górę, a biodra unoszą się z siedziska.', why: 'Pęd zastępuje pracę mięśni, a kolano dostaje szarpnięcia w pełnym wyproście.',
       fix: 'Wolny, kontrolowany ruch, trzymaj się uchwytów, biodra na siedzisku.', shift: { rectus_femoris: 0.2 }, stress: [{ joint: 'knee', label: 'Kolano – szarpnięcie' }] },
     ROM('Nogi nie prostują się do końca.', 'Czworogłowy nie dochodzi do pełnego skurczu.', 'Prostuj nogi prawie do końca i zatrzymaj na chwilę.', { vastus_medialis: -0.3 }),

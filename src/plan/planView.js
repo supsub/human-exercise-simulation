@@ -201,17 +201,33 @@ function renderAnalysis(p) {
     : `Pokazuję: <b>cały tydzień</b>${analysis.schedule.weeks > 1 ? ' (średnio w cyklu)' : ''} <span class="muted">– kliknij trening, aby zobaczyć jego mięśnie</span>`;
   ui.focus.querySelector('#focus-week')?.addEventListener('click', () => { focusId = null; if (!ui.panel.hidden) closePanel(); else render(); });
 
-  const pct = Math.round((a.trained / MUSCLES.length) * 100);
-  ui.score.innerHTML = `
-    <div class="score-ring" style="--p:${pct}"><span>${pct}%</span></div>
+  // Wybrany trening: liczymy tylko ten jeden trening (serie w jednej sesji), a nie cały tydzień
+  const per = focusId ? a.perWorkout[focusId] : null;
+  const worked = per ? MUSCLES.filter((m) => per[m.id] >= 1).length : a.trained;
+  const pct = Math.round((worked / MUSCLES.length) * 100);
+  ui.score.innerHTML = per
+    ? `<div class="score-ring" style="--p:${pct}"><span>${pct}%</span></div>
+    <div><b>${worked} z ${MUSCLES.length}</b> mięśni pracuje w tym treningu<br>
+    <span class="muted">${MUSCLES.filter((m) => per[m.id] >= 3).length} dostaje solidną dawkę (≥ 3 serie)</span></div>`
+    : `<div class="score-ring" style="--p:${pct}"><span>${pct}%</span></div>
     <div><b>${a.trained} z ${MUSCLES.length}</b> mięśni dostaje bodziec (≥ 3 serie/tydz.)<br>
     <span class="muted">${a.optimal} w zakresie optymalnym (8–20 serii)</span></div>`;
 
-  ui.groups.innerHTML = a.groups.map((g) => {
-    const w = Math.min(100, (g.sets / OPTIMAL_WEEKLY) * 100);
+  // partie: tydzień (strefa 8–20 serii) albo jeden trening (strefa 2–6 serii w sesji)
+  const SESSION_MAX = 8;
+  const sessionStatus = (x) => (x < 1 ? { id: 'low', label: 'prawie nic' } : x < 2 ? { id: 'min', label: 'lekko' }
+    : x <= 6 ? { id: 'ok', label: 'solidnie' } : { id: 'high', label: 'bardzo dużo' });
+  const groups = per
+    ? a.groups.map((g) => { const sets = g.members.reduce((t, id) => t + per[id], 0) / g.members.length; return { ...g, sets, status: sessionStatus(sets) }; })
+    : a.groups;
+  document.getElementById('groups-title').innerHTML = per
+    ? 'Partie w tym treningu <span class="muted small">(efektywne serie)</span>'
+    : 'Tygodniowa objętość wg partii <span class="muted small">(efektywne serie)</span>';
+  ui.groups.innerHTML = groups.map((g) => {
+    const w = Math.min(100, (g.sets / (per ? SESSION_MAX : OPTIMAL_WEEKLY)) * 100);
     return `<div class="g-row">
       <span class="g-name">${g.group}</span>
-      <div class="g-bar"><div class="g-zone"></div><div class="g-fill" style="width:${w}%;background:${cssVolumeColor(g.sets)}"></div></div>
+      <div class="g-bar"><div class="g-zone"${per ? ' style="left:25%;width:50%"' : ''}></div><div class="g-fill" style="width:${w}%;background:${cssVolumeColor(per ? g.sets * 2.5 : g.sets)}"></div></div>
       <span class="g-val">${g.sets.toFixed(1)}</span>
       <span class="g-status ${g.status.id}">${g.status.label}</span>
     </div>`;
@@ -440,10 +456,8 @@ function renderTechnique() {
   });
 }
 function setMistake(m, instant = false) {
-  const anim = selected.anim;
   player.setMistake(m, instant);
-  const pos = m?.camera ?? anim.cameraPosition;
-  (instant ? jumpCamera : flyCamera)(...cameraFor(anim, pos));
+  // kamera zostaje tam, gdzie była – poprawną i błędną technikę porównujemy z tego samego ujęcia
   renderTechnique();
   renderMuscleSummary();
 }

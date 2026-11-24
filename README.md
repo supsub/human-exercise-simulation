@@ -44,5 +44,26 @@ Parametry URL przydatne do demo i testów:
 1. Dopisz ćwiczenie do `src/plan/catalog.js` (wagi mięśni) i jego opis do `INFO` w tym samym pliku.
 2. Dodaj animację w `src/exercises/library.js`: zwykle wystarczą dwie pozy kluczowe (`keyframes(base, A, B)`), kotwica (np. stopy na podłodze) i rekwizyty. Gdy dłonie trzymają drążek, podaj tor drążka i szerokość chwytu (`hands: { w, y, z, pole }`) – ramiona policzy kinematyka odwrotna, a chwyt się nie przesuwa. Konwencje kątów są opisane w `src/exercises/build.js`. Aktywacje mięśni liczą się automatycznie z wag w katalogu.
 3. Sprawdź wszystkie animacje naraz: <http://localhost:8000/tools/sheet.html> (pozycja A i B każdego ćwiczenia; `?only=bench,row` zawęża listę, `?mistakes` pokazuje wszystkie typowe błędy, `?check` uruchamia test fizyki z `src/physics.js` – musi zwrócić „OK” przed każdym commitem zmieniającym animacje, `&cam=x,y,z&target=x,y,z` ustawia kamerę).
-4. Typowe błędy dopisz w `src/exercises/mistakes.js` (zmiana pozy, mięśni, przeciążenia i opis).
-5. Zaktualizuj `docs/index.html` (tabela funkcjonalności i dziennik zmian).
+4. Chwyt: dopisz ćwiczenie do `src/exercises/grips.js` – w którą stronę patrzy wnętrze dłoni i kciuk w pozycji wyjściowej (np. `'stopy/środek'` dla wyciskania leżąc) oraz obrót przedramienia `pron` (0 = podchwyt, 90 = młotkowy, 180 = nachwyt). Sztanga/drążek: typ chwytu `props.bar.grip` (`'over'` domyślnie / `'under'`), stały rozstaw `props.bar.width` (albo `hands`), chwyt do wyciskania `props.bar.press`. Dłoń oparta o sprzęt: `handL` / `handR: { at, pole }`.
+5. Typowe błędy dopisz w `src/exercises/mistakes.js` (zmiana pozy, mięśni, przeciążenia i opis).
+6. Przejdź checklistę poniżej i zaktualizuj `docs/index.html` (tabela funkcjonalności i dziennik zmian).
+
+## Checklista jakości ćwiczenia (przed każdym commitem zmieniającym animacje)
+
+Automatycznie – `tools/sheet.html?check` musi zwrócić „OK – brak naruszeń fizyki” (sprawdza 60 chwil cyklu, poprawną technikę i każdy błąd):
+
+- [ ] sprzęt (sztanga, hantle, hantel oburącz) nie wchodzi w ciało, dłonie nie wchodzą w tułów, głowę ani uda
+- [ ] nogi nie nachodzą na siebie, nic nie przechodzi przez podłogę
+- [ ] ciało, dłonie i stopy (cała podeszwa i śródstopie) nie wchodzą w sprzęt: ławki, siedziska, podnóżki, oparcia
+- [ ] chwyt zgodny ze specyfikacją z `grips.js` (wnętrze dłoni i kciuk we właściwą stronę)
+- [ ] chwyt nie zmienia się w trakcie ruchu (nachwyt ↔ podchwyt), dłonie nie przesuwają się po drążku
+- [ ] zaciśnięta dłoń zawsze coś trzyma (drążek, poręcz, uchwyt maszyny) – nie zaciska się w powietrzu
+
+Wzrokowo – arkusze zbliżeń (`tools/sheet.html?ts=0.01,0.5&focus=handL&dist=0.5`, `&focus=feet`, `?mistakes`):
+
+- [ ] ciężar leży tam, gdzie w rzeczywistości: sztanga przy wyciskaniu w nasadzie dłoni nad przedramieniem, hantel w goblecie oparty na dłoniach, przy podciąganiu palce zahaczone o drążek
+- [ ] dłonie bez rekwizytu wyglądają naturalnie (zwisają wnętrzem do ud, leżą płasko na udach, pięści w desce)
+- [ ] stopy stoją płasko tam, gdzie powinny (podłoga, platforma, podnóżek), sprzęt ma sensowne wymiary
+- [ ] przy przełączeniu na błąd technika różni się tylko tym błędem (kamera zostaje w miejscu – porównanie 1:1)
+
+Narzędzia: `tools/points.html?ex=db_row&t=0,0.5&pts=handR,toeL` – pozycje punktów ciała (do ustawiania sprzętu i podparć), `tools/sheet.html?grips` – tabela chwytu wszystkich ćwiczeń, `tools/look.html` – porównanie wyglądów.

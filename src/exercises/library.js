@@ -12,7 +12,7 @@ const FEET = { anchor: { pt: 'ankleL', at: { y: DIMS.ankleHeight, z: 0 } }, foot
 
 // ---------- Scenografia ----------
 const flatBench = [
-  { box: [0, 0.2, -0.2], size: [0.32, 0.4, 1.25] },
+  { box: [0, 0.2, -0.26], size: [0.32, 0.4, 1.13] },
   { box: [0, 0.05, 0.3], size: [0.5, 0.1, 0.08], color: 'frame' },
   { box: [0, 0.05, -0.7], size: [0.5, 0.1, 0.08], color: 'frame' },
 ];
@@ -22,6 +22,11 @@ const pullBar = (y = 2.12) => [
   { cyl: [[-0.75, 0, 0], [-0.75, y + 0.05, 0]], r: 0.035, color: 'frame' },
 ];
 const seat = (y = 0.45, z = 0, d = 0.42) => ({ box: [0, y / 2, z], size: [0.4, y, d] });
+// uchwyt maszyny przy siedzisku: pręt w dłoni (oś z, środek w punkcie chwytu) i łącznik do ramy (do x = ±xIn)
+const handles = (x, y, z, xIn) => [1, -1].flatMap((s) => [
+  { cyl: [[s * x, y, z - 0.08], [s * x, y, z + 0.08]], r: 0.016, color: 'frame' },
+  { cyl: [[s * xIn, y - 0.03, z], [s * x, y, z]], r: 0.014, color: 'frame' },
+]);
 const column = (z, h = 2.4) => ({ box: [0, h / 2, z], size: [0.16, h, 0.16], color: 'frame' });
 
 // ---------- Klatka ----------
@@ -31,7 +36,7 @@ const bench = animated({
   id: 'bench', camera: 'lie', scenery: flatBench,
   steps: ['Sztanga nad klatką', 'Opuszczanie sztangi', 'Sztanga przy klatce', 'Wyciskanie'],
   // stały chwyt (82 cm), sztanga pionowo nad dolną częścią klatki; łokcie liczy IK (w dół i lekko na boki)
-  pose: keyframes({ ...lying, props: { bar: { len: 1.6 } } },
+  pose: keyframes({ ...lying, props: { bar: { len: 1.6, press: true } } },
     { hands: { w: 0.82, y: 1.12, z: -0.17, pole: [1, -0.9, 0.3] } }, { hands: { w: 0.82, y: 0.71, z: -0.08, pole: [1, -0.9, 0.3] } }),
 });
 const db_bench = animated({
@@ -86,7 +91,7 @@ const pullup = animated({
     { arm: 180, fore: 180, rx: 0, trunk: 0 }, { arm: 348, fore: 176, rx: -8, trunk: -14, head: -5 }),
 });
 // Wyciąg górny: siedzisko, wałek na uda, kolumna z obciążeniem PRZED ćwiczącym, bloczek nad drążkiem
-const pulldownMachine = [{ box: [0, 0.245, -0.1], size: [0.34, 0.49, 1.1] }, { cyl: [[-0.25, 0.68, 0.32], [0.25, 0.68, 0.32]], r: 0.05, color: 'pad' },
+const pulldownMachine = [{ box: [0, 0.245, -0.2], size: [0.34, 0.49, 0.8] }, { cyl: [[-0.25, 0.68, 0.32], [0.25, 0.68, 0.32]], r: 0.05, color: 'pad' },
   { box: [0, 0.4, 0.33], size: [0.06, 0.56, 0.06], color: 'frame' }, column(0.72, 2.55), { box: [0, 0.65, 0.72], size: [0.3, 0.5, 0.2], color: 'wall' },
   { box: [0, 2.5, 0.42], size: [0.08, 0.07, 0.68], color: 'frame' }, { cyl: [[0, 2.47, 0.12], [0, 2.47, 0.72]], r: 0.006 }];
 const seated = { root: { y: 0.56, z: 0 }, thigh: -85, shin: 8, foot: 0 };
@@ -104,8 +109,8 @@ const lat_pulldown_wide = animated({
   cameraPosition: [1.7, 1.75, -2.2], cameraTarget: [0, 1.15, 0.1],   // z tyłu i z boku – widać pracę pleców
   steps: ['Szeroki chwyt, ręce w górze', 'Ściąganie łokciami w dół i na boki', 'Drążek przy klatce', 'Powrót w górę'],
   pose: keyframes({ ...seated, rx: -8, trunk: -14, grip: 1, props: { bar: { len: 1.55, plates: false }, cable: { from: [[0, 2.47, 0.12]] } } },
-    { hands: { w: 1.1, y: 1.56, z: -0.04, pole: [1, -0.7, -0.25] } }, { hands: { w: 1.1, y: 1.15, z: 0.14, pole: [1, -0.7, -0.25] } },
-    { hands: { w: 1.1, y: 1.4, z: 0.2, pole: [1, -0.7, -0.25] } }),
+    { hands: { w: 1.0, y: 1.56, z: -0.04, pole: [1, -0.7, -0.25] } }, { hands: { w: 1.0, y: 1.15, z: 0.14, pole: [1, -0.7, -0.25] } },
+    { hands: { w: 1.0, y: 1.4, z: 0.2, pole: [1, -0.7, -0.25] } }),
 });
 const hinge = { ...FEET, rx: 65, head: 40, thigh: -22, shin: 16 };
 const row = animated({
@@ -115,14 +120,15 @@ const row = animated({
 });
 const db_row = animated({
   id: 'db_row', type: 'lift',
-  scenery: [{ box: [-0.22, 0.25, 0.55], size: [0.35, 0.5, 0.9] }],
+  scenery: [{ box: [-0.4, 0.25, 0.55], size: [0.35, 0.5, 0.9] }],
   steps: ['Hantel w opuszczonej ręce', 'Przyciąganie do biodra', 'Łokieć z tyłu', 'Opuszczanie'],
-  pose: keyframes({ ...FEET, rx: 72, trunk: 78, head: 50, thigh: [-28, -20], shin: [18, 24], props: { dumbbells: 'L' } },
+  pose: keyframes({ ...FEET, rx: 72, trunk: 78, head: 50, thigh: [-28, -20], shin: [18, 24], props: { dumbbells: 'L' },
+    handR: { at: [-0.29, 0.515, 0.8], pole: [-0.4, 0, -1] } },   // ręka podporowa stoi na ławce w jednym miejscu
     { arm: [2, -40], fore: [0, -40] }, { arm: [72, -40], fore: [-14, -40] }),
 });
 const cable_row = animated({
   id: 'cable_row', type: 'lift', camera: 'floor',
-  scenery: [{ box: [0, 0.16, -0.1], size: [0.35, 0.32, 1.0] }, { box: [0, 0.18, 0.86], size: [0.5, 0.36, 0.05], color: 'frame' }, column(1.7, 1.2)],
+  scenery: [{ box: [0, 0.16, -0.26], size: [0.35, 0.32, 0.72] }, { box: [0, 0.18, 0.93], size: [0.5, 0.36, 0.05], color: 'frame' }, column(1.7, 1.2)],
   steps: ['Ręce wyciągnięte do przodu', 'Przyciąganie uchwytu do brzucha', 'Ściągnięte łopatki', 'Powrót do przodu'],
   pose: keyframes({ root: { y: 0.42, z: 0 }, thigh: -80, shin: -62, foot: -95, head: 0,
     props: { bar: { len: 0.28, plates: false }, cable: { from: [[0, 0.52, 1.62]] } } },
@@ -146,22 +152,23 @@ const face_pull = animated({
 const shrug = animated({
   id: 'shrug', type: 'lift',
   steps: ['Ręce opuszczone', 'Unoszenie barków', 'Barki przy uszach', 'Opuszczanie barków'],
-  pose: keyframes({ ...FEET, abd: 9, props: { dumbbells: true, neutralGrip: true } }, { shrug: 0 }, { shrug: 0.07, head: 3 }),
+  pose: keyframes({ ...FEET, abd: 9, pron: 90, props: { dumbbells: true } }, { shrug: 0 }, { shrug: 0.07, head: 3 }),
 });
+// podkładka pod udami, poniżej zgięcia bioder – tułów zgina się nad jej górną krawędzią
 const back_ext = animated({
   id: 'back_ext', type: 'lift',
-  scenery: [{ box: [0.0, 0.72, 0.14], size: [0.42, 0.3, 0.1], rx: Math.PI / 4 }, { cyl: [[-0.2, 0.3, -0.58], [0.2, 0.3, -0.58]], r: 0.045, color: 'pad' },
+  scenery: [{ box: [0.0, 0.646, 0.065], size: [0.42, 0.24, 0.1], rx: Math.PI / 4 }, { cyl: [[-0.2, 0.3, -0.58], [0.2, 0.3, -0.58]], r: 0.045, color: 'pad' },
     { box: [0, 0.32, -0.15], size: [0.08, 0.64, 0.9], color: 'frame' }],
   steps: ['Tułów opuszczony', 'Prostowanie tułowia', 'Ciało w linii', 'Opuszczanie tułowia'],
   pose: keyframes({ anchor: { pt: 'ankleL', at: { y: 0.27, z: -0.52 } }, thigh: 45, shin: 45, foot: 120, shX: -40, abd: 12, el: -130 },
-    { rx: 140, trunk: 150, head: 120 }, { rx: 45, trunk: 45, head: 30 }),
+    { rx: 122, trunk: 130, head: 110 }, { rx: 45, trunk: 45, head: 30 }),
 });
 
 // ---------- Barki ----------
 const ohp = animated({
   id: 'ohp', type: 'lift',
   steps: ['Sztanga na wysokości barków', 'Wyciskanie nad głowę', 'Ręce wyprostowane', 'Opuszczanie do barków'],
-  pose: keyframes({ ...FEET, props: { bar: { len: 1.6 } } }, { arm: -28, fore: -168, head: 0 }, { arm: -178, fore: -180, head: 4 }),
+  pose: keyframes({ ...FEET, props: { bar: { len: 1.6, press: true } } }, { arm: -28, fore: -168, head: 0 }, { arm: -178, fore: -180, head: 4 }),
 });
 const db_ohp = animated({
   id: 'db_ohp', type: 'lift',
@@ -186,7 +193,7 @@ const curlPose = (d, p) => curl.pose(d, p);
 const hammer = animated({
   id: 'hammer', type: 'lift',
   steps: ['Ręce opuszczone, chwyt młotkowy', 'Uginanie', 'Szczytowe napięcie', 'Opuszczanie'],
-  pose: (d, p = {}) => ({ ...curlPose(d, p), props: { dumbbells: true, neutralGrip: true } }),
+  pose: (d, p = {}) => ({ ...curlPose(d, p), pron: 90, props: { dumbbells: true } }),
   cameraPosition: [1.5, 1.45, 2.7], cameraTarget: [0, 1.0, 0],
 });
 const reverse_curl = animated({
@@ -198,7 +205,7 @@ const reverse_curl = animated({
     const fwd = -0.3 * (1 - d);           // na dole sztanga przed udami, nie w nich
     const j = { ...out.joints, wristL: out.joints.wristL + w, wristR: out.joints.wristR + w };
     j.shoulderL = [j.shoulderL[0] + fwd, 0, 0.05]; j.shoulderR = [j.shoulderR[0] + fwd, 0, -0.05];
-    return { ...out, joints: j, props: { bar: { len: 1.2, plates: true } } };
+    return { ...out, joints: j, props: { bar: { len: 1.2, plates: true, width: 0.42 } } };
   },
   cameraPosition: [1.5, 1.45, 2.7], cameraTarget: [0, 1.0, 0],
 });
@@ -209,9 +216,9 @@ const triceps_oh = animated({
   cameraTarget: [0, 1.25, 0],
 });
 const pushdown = animated({
-  id: 'pushdown', type: 'lift', scenery: [column(0.55, 2.3), { box: [0, 2.2, 0.42], size: [0.1, 0.06, 0.3], color: 'frame' }],
+  id: 'pushdown', type: 'lift', scenery: [column(0.9, 2.3), { box: [0, 2.2, 0.62], size: [0.1, 0.06, 0.6], color: 'frame' }],
   steps: ['Łokcie przy bokach, przedramiona w górze', 'Prostowanie ramion w dół', 'Pełny wyprost', 'Powrót'],
-  pose: keyframes({ ...FEET, rx: 4, trunk: 10, arm: -6, props: { bar: { len: 0.5, plates: false }, cable: { from: [[0, 2.18, 0.38]] } } },
+  pose: keyframes({ ...FEET, rx: 4, trunk: 10, arm: -6, props: { bar: { len: 0.5, plates: false, press: true }, cable: { from: [[0, 2.18, 0.38]] } } },
     { fore: -100 }, { fore: -4 }),
 });
 const wrist_curl = animated({
@@ -238,8 +245,8 @@ function squatVariant(armGlobal, foreGlobal, uprightness, props, adduct = 0) {
     j.shoulderR = [arm / D - trunk, adduct / D, 0];
     j.elbowL = j.elbowR = (fore - arm) / D;
     j.neck = -trunk * 0.6;
-    // hantel oburącz: wnętrza dłoni zwrócone do siebie, obejmują górny talerz
-    if (props.goblet) { j.wristL = [0, -126 / D, 0]; j.wristR = [0, 126 / D, 0]; }
+    // hantel oburącz: nadgarstki odgięte, wnętrza dłoni do góry tworzą „miseczkę” pod górnym talerzem
+    if (props.goblet) { j.wristL = [90 / D, -50 / D, 0]; j.wristR = [90 / D, 50 / D, 0]; }
     return { ...p, root: { ...p.root, rx }, joints: j, props };
   };
 }
@@ -252,13 +259,13 @@ const front_squat = animated({
 const goblet_squat = animated({
   id: 'goblet_squat', camera: 'stand',
   steps: ['Hantel przy klatce', 'Zejście w dół', 'Dolna pozycja', 'Wstawanie'],
-  pose: squatVariant(-22, -158, 0.7, { goblet: true }, 45),
+  pose: squatVariant(-22, -158, 0.7, { goblet: true }, 55),
   cameraTarget: [0, 0.8, 0],
 });
 const deadlift = animated({
   id: 'deadlift', type: 'lift',
   steps: ['Sztanga przy podłodze', 'Podnoszenie – nogi i biodra', 'Pełny wyprost', 'Odkładanie sztangi'],
-  pose: keyframes({ ...FEET, props: { bar: { len: 1.6 } } },
+  pose: keyframes({ ...FEET, props: { bar: { len: 1.6, width: 0.5 } } },
     { rx: 58, trunk: 55, head: 25, thigh: -70, shin: 24, arm: -14, fore: -14 },
     { rx: 0, trunk: -2, head: 0, thigh: 0, shin: 0, arm: -12, fore: -12, abd: 6 },
     { rx: 30, trunk: 28, thigh: -30, shin: 10, arm: -16, fore: -16 }),
@@ -267,7 +274,7 @@ const deadlift = animated({
 const rdl = animated({
   id: 'rdl',
   steps: ['Wyprost, sztanga przy udach', 'Cofanie bioder, pochylenie', 'Rozciągnięcie tyłu uda', 'Powrót do wyprostu'],
-  pose: keyframes({ ...FEET, props: { bar: { len: 1.6 } } },
+  pose: keyframes({ ...FEET, props: { bar: { len: 1.6, width: 0.5 } } },
     { rx: 0, head: 0, thigh: 0, shin: 0, arm: -12, fore: -12, abd: 6 },
     { rx: 78, trunk: 76, head: 45, thigh: -18, shin: 8, arm: -8, fore: -8 }),
   cameraTarget: [0, 0.75, 0],
@@ -291,7 +298,7 @@ function lungePose(d, prm = {}) {
   return makePose({
     root: { y: hip.y, z: hip.z }, rx: 2, head: 0,
     thigh: [g(hip, kF), g(hip, kB)], shin: [g(kF, ankleF), g(kB, ankleB)], foot: [0, 60],
-    arm: 0, fore: 0, abd: 9, props: { dumbbells: true, neutralGrip: true },
+    arm: 0, fore: 0, abd: 9, pron: 90, props: { dumbbells: true },
     legIn: 16 * (prm.valgus ?? 0) * d,
   });
 }
@@ -300,31 +307,34 @@ const leg_press = animated({
   id: 'leg_press', camera: 'seat',
   scenery: [{ box: [0, 0.45, 0.02], size: [0.45, 0.08, 0.4], rx: -0.3 }, { box: [0, 0.66, -0.33], size: [0.45, 0.8, 0.08], rx: -50 * Math.PI / 180 },
     { cyl: [[0.28, 0.25, 0.3], [0.28, 1.45, 1.5]], r: 0.03 }, { cyl: [[-0.28, 0.25, 0.3], [-0.28, 1.45, 1.5]], r: 0.03 },
-    { box: [0, 0.2, 0], size: [0.3, 0.4, 0.3], color: 'frame' }],
+    { box: [0, 0.2, 0], size: [0.3, 0.4, 0.3], color: 'frame' }, ...handles(0.388, 0.482, 0.082, 0.22)],
   steps: ['Nogi wyprostowane, platforma w górze', 'Opuszczanie platformy', 'Kolana przy klatce', 'Wypychanie'],
-  pose: keyframes({ root: { y: 0.55, z: 0 }, rx: -50, head: -40, foot: -135, props: { plate: true } },
+  pose: keyframes({ root: { y: 0.55, z: 0 }, rx: -50, head: -40, foot: -135, abd: 16, props: { plate: true } },
     { thigh: -128, shin: -138 }, { thigh: -172, shin: -78 }),
   cameraPosition: [2.6, 1.6, 2.4], cameraTarget: [0, 0.8, 0.4],
 });
 const machineSeat = [seat(0.48, 0.02, 0.5), { box: [0, 0.85, -0.27], size: [0.45, 0.7, 0.08], rx: -0.2 }];
 const leg_ext = animated({
-  id: 'leg_ext', type: 'lift', camera: 'seat', scenery: [...machineSeat, { box: [0.32, 0.28, 0.42], size: [0.06, 0.56, 0.06], color: 'frame' }],
+  id: 'leg_ext', type: 'lift', camera: 'seat', scenery: [...machineSeat, { box: [0.32, 0.28, 0.42], size: [0.06, 0.56, 0.06], color: 'frame' }, ...handles(0.215, 0.462, 0, 0.2)],
   steps: ['Kolana zgięte', 'Prostowanie nóg', 'Pełny wyprost', 'Opuszczanie'],
   pose: keyframes({ root: { y: 0.55, z: 0 }, rx: -10, trunk: -12, thigh: -88, arm: 12, fore: -30, props: { rollers: ['shin'] } },
     { shin: -8 }, { shin: -84 }),
 });
 const leg_curl = animated({
   id: 'leg_curl', type: 'lift', camera: 'lie',
-  scenery: [{ box: [0, 0.24, 0.25], size: [0.4, 0.48, 1.3] }, { box: [0, 0.2, -0.7], size: [0.08, 0.4, 0.08], color: 'frame' }],
+  scenery: [{ box: [0, 0.24, 0.25], size: [0.4, 0.48, 1.3] }, { box: [0, 0.2, -0.7], size: [0.08, 0.4, 0.08], color: 'frame' },
+    ...handles(0.26, 0.4, 0.8, 0.2)],   // uchwyty z przodu ławki
   steps: ['Nogi wyprostowane', 'Uginanie nóg', 'Pięty przy pośladkach', 'Opuszczanie'],
-  pose: keyframes({ root: { y: 0.57, z: 0 }, rx: 90, head: 75, thigh: 92, arm: -40, fore: 8, props: { rollers: ['calf'] } },
+  pose: keyframes({ root: { y: 0.57, z: 0 }, rx: 90, head: 75, thigh: 92, arm: -40, fore: 8, props: { rollers: ['calf'] },
+    handL: { at: [0.26, 0.4, 0.8], pole: [1, 0.3, -0.5] }, handR: { at: [-0.26, 0.4, 0.8], pole: [-1, 0.3, -0.5] } },
     { shin: 92 }, { shin: 205 }),
   cameraPosition: [2.2, 1.4, 1.2], cameraTarget: [0, 0.6, -0.1],
 });
 const adductor = animated({
-  id: 'adductor', type: 'lift', camera: 'seat', scenery: machineSeat,
+  id: 'adductor', type: 'lift', camera: 'seat', scenery: [...machineSeat, ...handles(0.472, 0.559, 0.088, 0.2)],
   steps: ['Nogi rozchylone', 'Ściąganie kolan do środka', 'Kolana razem', 'Rozchylanie'],
-  pose: keyframes({ root: { y: 0.55, z: 0 }, rx: -6, trunk: -10, thigh: -86, shin: 0, foot: 0, arm: 10, fore: -40, abd: 30 },
+  pose: keyframes({ root: { y: 0.55, z: 0 }, rx: -6, trunk: -10, thigh: -86, shin: 0, foot: 0, arm: 10, fore: -40, abd: 30,
+    handL: { at: [0.472, 0.559, 0.088], pole: [1, -0.5, -0.5] }, handR: { at: [-0.472, 0.559, 0.088], pole: [-1, -0.5, -0.5] } },   // dłonie na uchwytach
     { hipAbd: 38 }, { hipAbd: 4 }),
   cameraPosition: [0.6, 1.5, 2.6], cameraTarget: [0, 0.6, 0.2],
 });
@@ -423,7 +433,7 @@ const farmer = animated({
     const reach = (i) => DIMS.thigh * Math.cos(thigh[i] / D) + DIMS.shin * Math.cos(shin[i] / D);
     return makePose({
       root: { y: DIMS.ankleHeight + 0.015 + Math.max(reach(0), reach(1)), z: 0 },
-      thigh, shin, foot: [6 * s, -6 * s], arm: 0, fore: 0, abd: 9, trunk: 18 * h, head: 38 * h, props: { dumbbells: true, neutralGrip: true },
+      thigh, shin, foot: [6 * s, -6 * s], arm: 0, fore: 0, abd: 9, trunk: 18 * h, head: 38 * h, pron: 90, props: { dumbbells: true },
     });
   },
 });

@@ -37,7 +37,8 @@ function pose(depth, p = {}) {
   const fore = downAngle(elbow, WRIST);
   const hand = -Math.PI / 2;                    // dłoń płasko, palce w stronę głowy (+Z)
 
-  const shoulderL = upper - rxT, elbowL = fore - upper, wristL = hand - fore;
+  // przedramię nawrócone (pron 180, dłoń wnętrzem do podłogi) – zgięcie nadgarstka liczone w obróconym układzie dłoni
+  const shoulderL = upper - rxT, elbowL = fore - upper, wristL = -(hand - fore);
   const flare = (p.flare ?? 0) * (0.3 + 0.7 * depth);
   return {
     root: { y: root.y, z: root.z, rx: rxP },
@@ -48,6 +49,7 @@ function pose(depth, p = {}) {
       neck: -0.25,
       ankleL: 0.15, ankleR: 0.15,
     },
+    pron: 180, grip: 0,
     props: {},
   };
 }

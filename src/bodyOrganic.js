@@ -14,7 +14,7 @@ const TORSO = [
   { y: 0.465, w: 0.14, d: 0.07, db: 0.08 }, { y: 0.5, w: 0.07, d: 0.05, db: 0.06 }, { y: 0.53, w: 0.055, d: 0.045, db: 0.05 },
 ];
 const PELVIS = [
-  { y: -0.148, w: 0.03, d: 0.025, db: 0.04 }, { y: -0.128, w: 0.095, d: 0.06, db: 0.088 }, { y: -0.09, w: 0.138, d: 0.08, db: 0.115 },
+  { y: -0.156, w: 0.004, d: 0.004, db: 0.005 }, { y: -0.15, w: 0.04, d: 0.03, db: 0.045 }, { y: -0.138, w: 0.075, d: 0.05, db: 0.075 }, { y: -0.12, w: 0.105, d: 0.066, db: 0.095 }, { y: -0.09, w: 0.138, d: 0.08, db: 0.115 },
   { y: -0.04, w: 0.156, d: 0.09, db: 0.122 }, { y: 0.01, w: 0.16, d: 0.092, db: 0.114 }, { y: 0.06, w: 0.148, d: 0.088, db: 0.098 },
   { y: 0.12, w: 0.124, d: 0.08, db: 0.082 },
 ];
@@ -32,7 +32,7 @@ const FOREARM = [
   { y: 0.03, w: 0.03, d: 0.03 }, { y: 0.0, w: 0.042, d: 0.04 }, { y: -0.06, w: 0.045, d: 0.042 }, { y: -0.14, w: 0.037, d: 0.033 },
   { y: -0.22, w: 0.029, d: 0.022 }, { y: -0.27, w: 0.027, d: 0.019 }, { y: -0.285, w: 0.012, d: 0.01 },
 ];
-// palce: x – położenie knykcia (+ = strona małego palca), długości i promienie 3 członów (wskazujący, środkowy, serdeczny, mały)
+// palce: x – położenie knykcia (+ = strona małego palca, kciuk po przeciwnej), długości i promienie 3 członów (wskazujący, środkowy, serdeczny, mały)
 const HAND_FINGERS = [
   { x: -0.027, y: -0.073, len: [0.027, 0.018, 0.015], r: [0.0088, 0.0081, 0.0074] },
   { x: -0.009, y: -0.076, len: [0.03, 0.02, 0.016], r: [0.009, 0.0083, 0.0075] },
@@ -42,11 +42,14 @@ const HAND_FINGERS = [
 const PALM = [{ y: 0.005, w: 0.026, d: 0.015, z0: -0.012 }, { y: -0.02, w: 0.036, d: 0.016, z0: -0.012 }, { y: -0.055, w: 0.04, d: 0.014, z0: -0.012 }, { y: -0.074, w: 0.039, d: 0.011, z0: -0.012 }, { y: -0.08, w: 0.028, d: 0.008, z0: -0.012 }];
 const THIGH = [
   { y: 0.06, w: 0.008, d: 0.008 }, { y: 0.05, w: 0.036, d: 0.036 }, { y: 0.028, w: 0.064, d: 0.064 }, { y: -0.01, w: 0.084, d: 0.082, db: 0.086 }, { y: -0.08, w: 0.085, d: 0.082 }, { y: -0.2, w: 0.074, d: 0.07 },
-  { y: -0.32, w: 0.062, d: 0.058 }, { y: -0.41, w: 0.053, d: 0.05 }, { y: -0.47, w: 0.045, d: 0.045 }, { y: -0.49, w: 0.01, d: 0.01 },
+  { y: -0.32, w: 0.062, d: 0.058 }, { y: -0.41, w: 0.055, d: 0.05 }, { y: -0.455, w: 0.054, d: 0.046, db: 0.05 },
+  { y: -0.485, w: 0.044, d: 0.036, db: 0.04 }, { y: -0.505, w: 0.012, d: 0.01, db: 0.012 },
 ];
+// goleń: wąski przód (piszczel tuż pod skórą), szeroka łydka z tyłu – przekrój nie jest okrągły
 const SHIN = [
-  { y: 0.03, w: 0.05, d: 0.05 }, { y: -0.03, w: 0.052, d: 0.05, db: 0.056 }, { y: -0.1, w: 0.05, d: 0.048, db: 0.066 },
-  { y: -0.2, w: 0.044, d: 0.04, db: 0.052 }, { y: -0.3, w: 0.034, d: 0.032, db: 0.036 }, { y: -0.39, w: 0.027, d: 0.026 },
+  { y: 0.035, w: 0.03, d: 0.03 }, { y: 0.015, w: 0.05, d: 0.044 }, { y: -0.03, w: 0.054, d: 0.042, db: 0.056 },
+  { y: -0.1, w: 0.05, d: 0.036, db: 0.072 }, { y: -0.2, w: 0.044, d: 0.032, db: 0.058 }, { y: -0.3, w: 0.034, d: 0.028, db: 0.038 },
+  { y: -0.39, w: 0.027, d: 0.026 },
   { y: -0.43, w: 0.026, d: 0.026 }, { y: -0.45, w: 0.008, d: 0.008 },
 ];
 const FOOT = [
@@ -56,7 +59,7 @@ const FOOT = [
 ];
 
 const SHAPES = {
-  torso: new Loft(TORSO, { exp: 2.4 }), pelvis: new Loft(PELVIS, { exp: 2.2, caps: false }),
+  torso: new Loft(TORSO, { exp: 2.4 }), pelvis: new Loft(PELVIS, { exp: 2.2, caps: 'bottom' }),   // zamknięta od spodu (krocze), otwarta u góry pod tułowiem
   upperArm: new Loft(UPPER_ARM), forearm: new Loft(FOREARM), thigh: new Loft(THIGH), shin: new Loft(SHIN),
 };
 
@@ -145,15 +148,15 @@ export function buildOrganic(ctx) {
     el.add(ell([0.016, 0.02, 0.014], [0, 0.0, -0.036], skinMat));                         // wyrostek łokciowy – kierunek łokcia
     // dłoń: śródręcze z kłębem kciuka + 4 palce (3 człony, różne długości) + kciuk (2 człony); zginanie: setGrip w body.js
     wr.add(mesh(new Loft(PALM).geometry(sx), skinMat));
-    wr.add(ell([0.014, 0.024, 0.011], [-sx * 0.024, -0.032, -0.006], skinMat));            // kłąb kciuka
-    wr.add(ell([0.011, 0.022, 0.009], [sx * 0.027, -0.04, -0.008], skinMat));              // kłąb palca małego
+    wr.add(ell([0.014, 0.024, 0.011], [sx * 0.024, -0.032, -0.006], skinMat));             // kłąb kciuka
+    wr.add(ell([0.011, 0.022, 0.009], [-sx * 0.027, -0.04, -0.008], skinMat));             // kłąb palca małego
     const chains = [];
     for (const F of HAND_FINGERS) {
       let parent = wr;
       const chain = [];
       F.len.forEach((len, k) => {
         const g = new THREE.Group();
-        if (k === 0) g.position.set(F.x * sx, F.y, -0.012); else g.position.y = -F.len[k - 1];
+        if (k === 0) g.position.set(-F.x * sx, F.y, -0.012); else g.position.y = -F.len[k - 1];
         parent.add(g);
         const r = F.r[k], seg = mesh(new THREE.CapsuleGeometry(r, Math.max(0.001, len - r * 0.6), 4, 10), skinMat);
         seg.position.y = -len / 2; seg.scale.set(1.08, 1, 0.92);
@@ -162,7 +165,7 @@ export function buildOrganic(ctx) {
       });
       chains.push(chain);
     }
-    const thumb = new THREE.Group(); thumb.position.set(-sx * 0.03, -0.02, -0.004); wr.add(thumb);
+    const thumb = new THREE.Group(); thumb.position.set(sx * 0.03, -0.02, -0.004); wr.add(thumb);
     const t1 = mesh(new THREE.CapsuleGeometry(0.0105, 0.022, 4, 10), skinMat); t1.position.y = -0.016; thumb.add(t1);
     const tj = new THREE.Group(); tj.position.y = -0.03; thumb.add(tj);
     const t2 = mesh(new THREE.CapsuleGeometry(0.0092, 0.012, 4, 10), skinMat); t2.position.y = -0.011; tj.add(t2);
@@ -170,8 +173,10 @@ export function buildOrganic(ctx) {
     fingers.push({ f1, f2, thumb, tj, chains, sx });
 
     hip.add(mesh(SHAPES.thigh.geometry(sx), skinMat));
-    hip.add(ell([0.021, 0.025, 0.01], [0, -0.448, 0.043], skinMat));                       // rzepka – kierunek kolana
+    hip.add(ell([0.025, 0.028, 0.016], [0, -0.458, 0.034], skinMat));                       // rzepka – kierunek kolana
     kn.add(mesh(SHAPES.shin.geometry(sx), skinMat));
+    // staw kolanowy: kłykcie – zaokrąglenie zgiętego kolana
+    kn.add(ell([0.054, 0.046, 0.048], [0, -0.005, -0.004], skinMat));
     for (const mx of [0.03, -0.028]) an.add(ell([0.011, 0.014, 0.012], [mx * sx, 0, 0], skinMat)); // kostki
     an.add(mesh(loftZ(FOOT, sx), skinMat));
   }

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pl">
+<!-- Narzędzie autorskie: pozycje punktów ciała (świat, metry) w danej chwili ćwiczenia.
+     tools/points.html?ex=db_row&t=0,0.5&pts=handR,toeL,heelL[&mistake=round] -->
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }</script>
+<pre id="out"></pre>
+<script type="module">
+  import * as THREE from 'three';
+  import { createBody } from '../src/body.js';
+  import { EXERCISE_BY_ID } from '../src/exercises/index.js';
+  import { sampleExercise } from '../src/exercises/common.js';
+  const q = new URLSearchParams(location.search);
+  const ex = EXERCISE_BY_ID[q.get('ex') ?? 'squat'];
+  const mistake = ex.mistakes.find((m) => m.id === q.get('mistake'));
+  const body = createBody();
+  new THREE.Scene().add(body.root);
+  const rows = [];
+  for (const t of (q.get('t') ?? '0').split(',').map(Number)) {
+    const prm = mistake?.params ?? {};
+    body.setPose(body.resolvePose(ex.pose(sampleExercise(ex, t, prm.rom ?? 0).depth, prm)));
+    for (const n of (q.get('pts') ?? 'handL,handR').split(',')) {
+      const v = (body.points[n] ?? body.joints[n]).getWorldPosition(new THREE.Vector3());
+      rows.push(`t=${t} ${n.padEnd(10)} x=${v.x.toFixed(3)} y=${v.y.toFixed(3)} z=${v.z.toFixed(3)}`);
+    }
+  }
+  document.getElementById('out').textContent = rows.join('\n');
+</script>
+</html>

@@ -28,6 +28,8 @@ function muscleGeometry(shape) {
   return latheCache[shape];
 }
 
+// punkt chwytu dłoni (odległość od nadgarstka): zwykły chwyt – w zgiętych palcach, wyciskanie – w nasadzie dłoni
+const HAND_GRIP = 0.058, HAND_PRESS = 0.038;
 const skinMat = new THREE.MeshStandardMaterial({ color: 0xc3c9d4, roughness: 0.6, metalness: 0.05 });
 const jointMat = new THREE.MeshStandardMaterial({ color: 0xaab1be, roughness: 0.6, metalness: 0.05 });
 const faceMat = new THREE.MeshStandardMaterial({ color: 0x8a93a3, roughness: 0.5 });
@@ -195,7 +197,7 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     seg2.position.y = -0.013;
     f2.add(seg2);
     const thumb = new THREE.Group();
-    thumb.position.set(-sx * 0.036, -0.03, -0.012);
+    thumb.position.set(sx * 0.036, -0.03, -0.012);
     wr.add(thumb);
     const tm = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.045, 0.02), jointMat));
     tm.position.y = -0.022;
@@ -224,9 +226,10 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     bones[side] = { upperArm: sh, forearm: el, thigh: hip, shin: kn };
     // bark i biodro: zgięcie (X), potem odwiedzenie (Z), na końcu rotacja wzdłuż kości (Y)
     sh.rotation.order = 'XZY';
+    wr.rotation.order = 'YXZ';
     hip.rotation.order = 'XZY';
     // punkty pomocnicze: chwyt dłoni, palce i pięta stopy, przód/tył goleni (wałki maszyn)
-    marker('hand' + side, wr, [0, -0.058, 0.01]);   // punkt chwytu: między śródręczem a zgiętymi palcami
+    marker('hand' + side, wr, [0, -HAND_GRIP, 0.01]);   // punkt chwytu: między śródręczem a zgiętymi palcami (przy wyciskaniu: HAND_PRESS)
     marker('toe' + side, an, [0, -DIMS.ankleHeight, DIMS.footFront]);
     marker('heel' + side, an, [0, -DIMS.ankleHeight, DIMS.footBack]);
     marker('shinFront' + side, kn, [0, -DIMS.shin + 0.08, 0.075]);
@@ -280,6 +283,14 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
       if (Array.isArray(v)) g.rotation.set(v[0], v[1], v[2]);
       else g.rotation.set(v, 0, 0);
     }
+    // obrót przedramienia (nawrócenie): 0 = podchwyt, 90 = młotkowy, 180 = nachwyt; liczba albo [lewa, prawa]
+    if (pose.pron !== undefined) for (const [i, S] of ['L', 'R'].entries()) {
+      const pr = Array.isArray(pose.pron) ? pose.pron[i] : pose.pron;
+      joints['wrist' + S].rotation.y += -(S === 'L' ? 1 : -1) * pr * Math.PI / 180;
+    }
+    // chwyt do wyciskania (props.bar.press): drążek leży w nasadzie dłoni, nad przedramieniem, a nie w palcach
+    const press = !!pose.props?.bar?.press;
+    for (const S of ['L', 'R']) points['hand' + S].position.set(0, press ? -HAND_PRESS : -HAND_GRIP, press ? 0.002 : 0.01);
     // unoszenie barków (szrugsy)
     joints.shoulderL.position.y = joints.shoulderR.position.y = SHOULDER_Y + (pose.shrug ?? 0);
     // błędy techniki: łokcie na zewnątrz / kolana do środka
@@ -372,13 +383,19 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
   const _S = new THREE.Vector3(), _T = new THREE.Vector3(), _P = new THREE.Vector3(), _E = new THREE.Vector3(), _kd = new THREE.Vector3();
   const _ua = new THREE.Vector3(), _fv = new THREE.Vector3(), _xa = new THREE.Vector3(), _ya = new THREE.Vector3(), _za = new THREE.Vector3();
   const _mb = new THREE.Matrix4(), _qw = new THREE.Quaternion(), _qp = new THREE.Quaternion(), _eu = new THREE.Euler();
-  const GRIP = 0.058; // nadgarstek → punkt chwytu
   function solveArm(S, ik, out) {
     const sh = joints['shoulder' + S], el = joints['elbow' + S], wr = joints['wrist' + S];
     sh.getWorldPosition(_S);
     _T.set(...ik.target);
-    const a = DIMS.upperArm, b = DIMS.forearm + GRIP;
+    const a = DIMS.upperArm, b = DIMS.forearm - points['hand' + S].position.y;   // nadgarstek → punkt chwytu
     _kd.subVectors(_T, _S);
+    // cel poza zasięgiem: przybliżamy go tylko w poprzek drążka (y, z) – położenie dłoni wzdłuż drążka (x) zostaje,
+    // więc chwyt nigdy nie „ślizga się” po drążku
+    const reach = a + b - 2e-3;
+    if (_kd.length() > reach && Math.abs(_kd.x) < reach) {
+      const k = Math.sqrt(reach * reach - _kd.x * _kd.x) / Math.hypot(_kd.y, _kd.z);
+      _kd.y *= k; _kd.z *= k;
+    }
     const dist = Math.min(a + b - 1e-3, Math.max(Math.abs(a - b) + 1e-3, _kd.length()));
     _kd.normalize();
     _P.set(...ik.pole).addScaledVector(_kd, -_P.dot(_kd)).normalize();
@@ -413,13 +430,29 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     const finishIK = () => {
       if (!out.ik) return;
       applyAngles(out);
-      solveArm('L', out.ik.L, out);
-      solveArm('R', out.ik.R, out);
+      if (out.ik.L) solveArm('L', out.ik.L, out);
+      if (out.ik.R) solveArm('R', out.ik.R, out);
       delete out.ik;
+    };
+    // stały rozstaw dłoni na sztandze (props.bar.width): po ułożeniu pozy dłonie wracają na swoje miejsca na drążku
+    const fixWidth = () => {
+      const w = pose.props?.bar?.width;
+      if (!w) return;
+      applyAngles(out);
+      pointWorld('handL', _a); pointWorld('handR', _b);
+      const mid = _a.clone().add(_b).multiplyScalar(0.5);
+      const ik = {};
+      for (const [S, sx, h] of [['L', 1, _a], ['R', -1, _b]]) {
+        const sh = pointWorld('shoulder' + S, new THREE.Vector3()), el = pointWorld('elbow' + S, new THREE.Vector3());
+        const pole = el.sub(sh.add(h).multiplyScalar(0.5));
+        ik[S] = { target: [mid.x + sx * w / 2, mid.y, mid.z], pole: pole.toArray() };
+      }
+      solveArm('L', ik.L, out); solveArm('R', ik.R, out);
     };
     if (!pose.anchor) {
       finishIK();
       if (needsAvoid) avoidBar(out);
+      fixWidth();
       return out;
     }
     const place = () => {
@@ -444,6 +477,7 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     place();
     finishIK();
     if (needsAvoid) { avoidBar(out); place(); }
+    fixWidth();
     delete out.anchor; delete out.anchor2;
     return out;
   }
@@ -478,6 +512,7 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     if (_u.lengthSq() < 0.5) _u.set(1, 0, 0);
     return cyl(_l.copy(_c).addScaledVector(_u, len / 2), _r.copy(_c).addScaledVector(_u, -len / 2), r, mat);
   }
+  const gobletShape = { base: null, r: 0 };
   function updateWorldProps(props = {}) {
     if (!worldProps.parent && root.parent) root.parent.add(worldProps);
     used = 0;
@@ -504,11 +539,20 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     }
     if (props.goblet) {
       // jeden hantel trzymany pionowo oburącz
-      // górny talerz ściśnięty między dłońmi, palce obejmują jego górną krawędź; rączka i dolny talerz pod nim
-      const at = (dy) => mid.clone().add(new THREE.Vector3(0, dy, 0));
-      cyl(at(-0.02), at(-0.19), 0.016, metal);
-      cyl(at(0.01), at(-0.045), 0.062, plateMat);
-      cyl(at(-0.16), at(-0.215), 0.062, plateMat);
+      // górny talerz leży na wnętrzach obu dłoni (ciężar oparty o dłonie, palce obejmują brzeg talerza),
+      // rączka i dolny talerz zwisają pod nim. Geometria zapisana w gobletShape – korzysta z niej test fizyki.
+      const pL = joints.wristL.localToWorld(new THREE.Vector3(0, -0.04, 0.004));
+      const pR = joints.wristR.localToWorld(new THREE.Vector3(0, -0.04, 0.004));
+      const base = pL.clone().add(pR).multiplyScalar(0.5);
+      base.y = Math.max(pL.y, pR.y) + 0.006;
+      // talerz wysunięty lekko przed dłonie (od klatki) – nie wchodzi w klatkę, dalej leży na dłoniach
+      const away = base.clone().sub(pointWorld('chest', new THREE.Vector3())); away.y = 0; away.normalize();
+      base.addScaledVector(away, 0.05);
+      const at = (dy) => base.clone().add(new THREE.Vector3(0, dy, 0));
+      gobletShape.base = base; gobletShape.r = 0.1;
+      cyl(at(0), at(0.065), 0.1, plateMat);
+      cyl(at(0.01), at(-0.17), 0.016, metal);
+      cyl(at(-0.15), at(-0.215), 0.1, plateMat);
     }
     if (props.cable) {
       // linka od bloczka do uchwytu (do środka między dłońmi albo do każdej dłoni osobno)
@@ -540,45 +584,48 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
   // grip: 0 = dłoń otwarta, 1 = pełny chwyt. Domyślnie z rekwizytów (hantle, sztanga, uchwyt wyciągu).
   function setGrip(pose) {
     const p = pose.props ?? {};
-    const g = pose.grip ?? (p.dumbbells || p.bar ? 1 : p.goblet ? 0.45 : 0.12);
+    const g = pose.grip ?? (p.dumbbells || p.bar ? 1 : p.goblet ? 0.75 : 0.12);
     for (const f of fingers) {
       if (f.chains) {
         // palce owijają się wokół uchwytu (kąty dobrane do drążka ~3 cm średnicy)
         for (const [i, c] of f.chains.entries()) {
           const spread = (i - 1.5) * 0.05 * (1 - g);
-          c[0].rotation.set(-(0.12 + 1.12 * g), 0, -f.sx * spread);
+          c[0].rotation.set(-(0.12 + 1.12 * g), 0, f.sx * spread);
           c[1].rotation.x = -(0.1 + 0.95 * g);
           c[2].rotation.x = -(0.06 + 0.72 * g);
         }
-        f.thumb.rotation.set(-0.35 - 0.75 * g, 0, f.sx * (0.35 + 0.35 * g));
+        f.thumb.rotation.set(-0.35 - 0.75 * g, 0, -f.sx * (0.35 + 0.35 * g));
         f.tj.rotation.x = -0.15 - 0.6 * g;
         continue;
       }
       f.f1.rotation.x = -1.45 * g;
       f.f2.rotation.x = -1.5 * g;
-      f.thumb.rotation.set(-0.9 * g, 0, f.sx * (0.25 + 0.5 * g));
+      f.thumb.rotation.set(-0.9 * g, 0, -f.sx * (0.25 + 0.5 * g));
     }
   }
 
-  // Dłonie na drążku: obracamy nadgarstek wzdłuż osi przedramienia tak, żeby drążek leżał w zgiętych palcach
-  // (oś "chwytu" dłoni = lokalna oś X nadgarstka ustawiona równolegle do drążka).
-  const _f = new THREE.Vector3(), _x = new THREE.Vector3(), _z = new THREE.Vector3(), _bar = new THREE.Vector3();
-  function alignHandsToBar() {
+  // Dłonie na drążku: obracamy przedramię (oś Y nadgarstka) tak, żeby drążek leżał w poprzek zgiętych palców.
+  // Z dwóch możliwych ustawień wybieramy to, które daje zadany typ chwytu – stały przez cały ruch:
+  //   'over'  (nachwyt) – kciuki skierowane do środka drążka, 'under' (podchwyt) – kciuki na zewnątrz.
+  const _f = new THREE.Vector3(), _x = new THREE.Vector3(), _z = new THREE.Vector3(), _bar = new THREE.Vector3(), _th = new THREE.Vector3();
+  function alignHandsToBar(type = 'over') {
     pointWorld('handL', _a); pointWorld('handR', _b);
     for (const S of ['L', 'R']) {
-      const wr = joints['wrist' + S];
-      wr.rotation.y = 0;
-      wr.updateWorldMatrix(true, false);
-      const e = wr.matrixWorld.elements;
+      const wr = joints['wrist' + S], sx = S === 'L' ? 1 : -1;
+      const e = wr.parent.matrixWorld.elements;   // układ przedramienia (obrót Y nadgarstka = wokół jego osi)
       _x.set(e[0], e[1], e[2]).normalize();
-      _f.set(e[4], e[5], e[6]).normalize();       // oś przedramienia/dłoni
+      _f.set(e[4], e[5], e[6]).normalize();
       _z.set(e[8], e[9], e[10]).normalize();
       _bar.subVectors(_a, _b);
       _bar.addScaledVector(_f, -_bar.dot(_f));
       if (_bar.lengthSq() < 1e-8) continue;
       _bar.normalize();
       let th = Math.atan2(-_bar.dot(_z), _bar.dot(_x));
-      if (th > Math.PI / 2) th -= Math.PI; else if (th < -Math.PI / 2) th += Math.PI;
+      // kciuk = +sx·X dłoni; po obrocie o th: X' = cos·X − sin·Z
+      _th.copy(_x).multiplyScalar(Math.cos(th)).addScaledVector(_z, -Math.sin(th)).multiplyScalar(sx);
+      const inward = _th.dot(_bar) * -sx > 0;          // _bar wskazuje od prawej dłoni do lewej
+      if (inward !== (type === 'over')) th += Math.PI;
+      if (th > Math.PI) th -= 2 * Math.PI;
       wr.rotation.y = th;
     }
     root.updateWorldMatrix(true, true);
@@ -586,12 +633,15 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
 
   function setPose(pose) {
     applyAngles(pose);
-    if (pose.props?.bar && pose.props.bar.on !== 'front') alignHandsToBar();
+    if (pose.props?.bar && pose.props.bar.on !== 'front') {
+      alignHandsToBar(pose.props.bar.grip);
+      // wyciskanie: nadgarstek lekko odgięty, drążek nad kośćmi przedramienia
+      if (pose.props.bar.press) for (const S of ['L', 'R']) joints['wrist' + S].rotation.x = 0.3;
+    }
     setGrip(pose);
     const db = pose.props?.dumbbells;
     props.dumbbells.forEach((d, i) => {
       d.visible = db === true || db === (i === 0 ? 'L' : 'R');
-      d.rotation.y = pose.props?.neutralGrip ? Math.PI / 2 : 0; // chwyt młotkowy
     });
     updateWorldProps(pose.props);
   }
@@ -602,5 +652,5 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     belly.scale.set(1 + 0.015 * b, 1, 1 + 0.1 * b);
   }
 
-  return { root, joints, points, colliders, dumbbells: props.dumbbells, materials, muscleMeshes, nose, setPose, setBreath, resolvePose };
+  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, materials, muscleMeshes, nose, setPose, setBreath, resolvePose };
 }

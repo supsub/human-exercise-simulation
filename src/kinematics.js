@@ -51,6 +51,9 @@ export function bisect(f, lo, hi, target, iterations = 60) {
 // Liniowe mieszanie dwóch póz (płynne przejścia między ćwiczeniami).
 // Staw może być liczbą (obrót X) albo [x, y, z].
 const vec3 = (v) => (Array.isArray(v) ? v : [v ?? 0, 0, 0]);
+const lerpSide = (a, b, t) => (Array.isArray(a) || Array.isArray(b)
+  ? [0, 1].map((i) => lerp(Array.isArray(a) ? a[i] : a, Array.isArray(b) ? b[i] : b, t)) : lerp(a, b, t));
+
 export function blendPose(a, b, t) {
   const joints = {};
   const keys = new Set([...Object.keys(a.joints), ...Object.keys(b.joints)]);
@@ -67,6 +70,7 @@ export function blendPose(a, b, t) {
     joints,
     shrug: lerp(a.shrug ?? 0, b.shrug ?? 0, t),
     grip: a.grip !== undefined || b.grip !== undefined ? lerp(a.grip ?? 0.12, b.grip ?? 0.12, t) : undefined,
+    pron: a.pron !== undefined || b.pron !== undefined ? lerpSide(a.pron ?? 0, b.pron ?? 0, t) : undefined,
     props: t < 0.5 ? a.props : b.props,
     // sprzęt nie znika w połowie przejścia: przy mieszaniu póz tego samego ćwiczenia rekwizyty są wspólne
   };

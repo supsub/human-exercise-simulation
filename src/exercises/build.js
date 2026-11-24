@@ -10,7 +10,8 @@ import { blendPose } from '../kinematics.js';
 //   kończyny (thigh, shin, foot, arm, fore, hand): 0 = segment w dół, −90 = w przód (+Z), 90 = w tył, 180 = w górę
 //   tułów i głowa (rx = miednica, trunk, head):     0 = pionowo w górę, 90 = pochylony w przód, −90 = odchylony w tył
 // Lokalne (bez przeliczania): shX/el = zgięcie barku/łokcia względem rodzica, abd = odwiedzenie barku,
-//   rot = rotacja ramienia wzdłuż kości, hipAbd = odwiedzenie biodra.
+//   rot = rotacja ramienia wzdłuż kości, hipAbd = odwiedzenie biodra,
+//   pron = obrót przedramienia: 0 = podchwyt (wnętrze dłoni w stronę zgięcia łokcia), 90 = młotkowy, 180 = nachwyt.
 // Wartość może być liczbą (obie strony) albo [lewa, prawa].
 // anchor: { pt: 'ankleL' | 'toeL' | 'handL' | 'elbowR' | ..., at: { y, z } } – ten punkt ciała trafia w podane miejsce,
 // anchor2: { pt, y } – dodatkowo dobierz pochylenie całego ciała, żeby drugi punkt miał wysokość y.
@@ -49,6 +50,7 @@ export function makePose(s) {
     joints: j,
     shrug: s.shrug ?? 0,
     grip: s.grip,
+    pron: s.pron,
     props: s.props ?? {},
   };
   // hands: { w, y, z, pole } – stały chwyt o szerokości w na drążku w punkcie (y, z) świata; ramiona liczy IK (body.js)
@@ -56,6 +58,8 @@ export function makePose(s) {
     const { w, y, z, pole = [1, -1, 0] } = s.hands;
     pose.ik = { L: { target: [w / 2, y, z], pole }, R: { target: [-w / 2, y, z], pole: [-pole[0], pole[1], pole[2]] } };
   }
+  // handL / handR: { at: [x, y, z], pole } – jedna dłoń oparta w stałym punkcie (np. ręka podporowa na ławce)
+  for (const S of ['L', 'R']) if (s['hand' + S]) pose.ik = { ...pose.ik, [S]: { target: s['hand' + S].at, pole: s['hand' + S].pole ?? [0, -1, 0] } };
   if (s.anchor) pose.anchor = s.anchor;
   if (s.anchor2) pose.anchor2 = s.anchor2;
   return pose;

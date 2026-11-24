@@ -15,7 +15,7 @@ function catmull(p0, p1, p2, p3, t) {
 
 export class Loft {
   // rings: [{ y, w, d, db?, x0?, z0? }] w dowolnej kolejności; exp – wykładnik superelipsy (2 = elipsa, >2 = bardziej „kanciasty”)
-  constructor(rings, { exp = 2, seg = 36, steps = 48, caps = true } = {}) {
+  constructor(rings, { exp = 2, seg = 36, steps = 48, caps = true } = {}) {   // caps: true | false | 'top' | 'bottom'
     this.caps = caps;
     this.r = rings.map((r) => ({ db: r.d, x0: 0, z0: 0, ...r })).sort((a, b) => a.y - b.y);
     this.exp = exp; this.seg = seg; this.steps = steps;
@@ -65,7 +65,10 @@ export class Loft {
     const c0 = pos.length / 3, top = N * (S + 1);
     const p0 = this.params(this.y0), p1 = this.params(this.y1);
     pos.push(p0.x0 * sx, this.y0, p0.z0, p1.x0 * sx, this.y1, p1.z0);
-    for (let i = 0; i < S; i++) idx.push(c0, i, i + 1, c0 + 1, top + i + 1, top + i);
+    for (let i = 0; i < S; i++) {
+      if (this.caps !== 'top') idx.push(c0, i, i + 1);
+      if (this.caps !== 'bottom') idx.push(c0 + 1, top + i + 1, top + i);
+    }
     return finish(pos, idx);
   }
 }
