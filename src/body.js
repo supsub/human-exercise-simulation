@@ -665,6 +665,11 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     mouth.scale.set(0.022 - 0.008 * v, 0.004 + 0.0055 * v, 0.004 + 0.002 * v);
     mouth.material.color.lerpColors(MOUTH_SHUT, MOUTH_OPEN, v);
   }
+  // punkt, z którego wylatuje powietrze przy wydechu: środek ust (także ust z twarzy ze zdjęcia), lekko przed wargami
+  function mouthWorld(out = new THREE.Vector3()) {
+    if (mouth) return mouth.localToWorld(out.set(0, 0, 1.5));   // skala ust: z = głębokość → 1,5× przed środkiem
+    return joints.neck.localToWorld(out.set(0, 0.118, 0.11));    // wygląd klasyczny (bez ust)
+  }
   function setMouthOnFace(pos, color) {
     if (!mouth) return;
     mouthHome ??= mouth.position.clone();
@@ -688,5 +693,5 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     belly.scale.set(1 + 0.015 * b, 1, 1 + 0.1 * b);
   }
 
-  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, plateShape, materials, muscleMeshes, nose, faceParts, setPose, setBreath, setMouth, setMouthOnFace, resolvePose };
+  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, plateShape, materials, muscleMeshes, nose, faceParts, setPose, setBreath, setMouth, setMouthOnFace, mouthWorld, resolvePose };
 }

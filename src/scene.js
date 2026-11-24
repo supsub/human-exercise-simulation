@@ -190,7 +190,7 @@ export function updateBreathPuffs(dt, exhaling) {
     puffTimer = 0.06;
     const p = puffs.find((x) => !x.visible);
     if (p) {
-      body.nose.getWorldPosition(p.position);
+      body.mouthWorld(p.position);
       body.nose.parent.getWorldQuaternion(_q);
       _dir.set((Math.random() - 0.5) * 0.25, -0.15 + (Math.random() - 0.5) * 0.2, 1).normalize().applyQuaternion(_q);
       p.userData.vel.copy(_dir).multiplyScalar(0.5 * exhaling);
