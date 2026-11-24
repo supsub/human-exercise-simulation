@@ -87,10 +87,13 @@ function renderDays(p) {
     card.querySelector('input').onchange = (e) => { day.active = e.target.checked; render(); };
     card.querySelector('.switch').addEventListener('click', (e) => e.stopPropagation());
     // cała karta dnia jest klikalna (wiersze ćwiczeń, pola i przyciski mają własne akcje)
+    card.title = selected ? `Wybierz ${d.name} – potem „Dodaj do”` : `Dodaj ćwiczenia na ${d.name} i zobacz mięśnie z tego dnia`;
     card.onclick = () => {
-      // przy wybranym ćwiczeniu klik w dzień tylko go zaznacza (cel "Dodaj"), bez odznaczania
-      focusDay = selected ? d.id : focusDay === d.id ? null : d.id;
-      render();
+      // wybrane ćwiczenie: klik w dzień tylko go zaznacza (cel przycisku "Dodaj do")
+      if (selected) { focusDay = d.id; render(); return; }
+      // ponowny klik w dzień z otwartą listą – zamknij listę
+      if (!ui.panel.hidden && !ui.browse.hidden && browseDay === d.id) { focusDay = null; closePanel(); return; }
+      openBrowse(d.id);
     };
     const list = card.querySelector('.day-items');
     if (day.active) {
@@ -112,11 +115,7 @@ function renderDays(p) {
         row.onclick = (e) => { e.stopPropagation(); selected?.ex === ex ? closePanel() : selectExercise(ex, 'plan'); };
         list.appendChild(row);
       });
-      const add = document.createElement('button');
-      add.className = 'add-ex';
-      add.textContent = '+ Dodaj ćwiczenie';
-      add.onclick = (e) => { e.stopPropagation(); openBrowse(d.id); };
-      list.appendChild(add);
+      if (!day.items.length) list.innerHTML = '<div class="day-empty">Kliknij, aby dodać ćwiczenia</div>';
     }
     ui.days.appendChild(card);
   }
@@ -126,8 +125,8 @@ function renderAnalysis(p) {
   const a = analysis;
   ui.focus.innerHTML = focusDay
     ? `Pokazuję: <b>${DAY_BY_ID[focusDay].name}</b> <button id="focus-week" class="link">pokaż cały tydzień</button>`
-    : 'Pokazuję: <b>cały tydzień</b> <span class="muted">(kliknij nazwę dnia, aby zobaczyć jeden trening)</span>';
-  ui.focus.querySelector('#focus-week')?.addEventListener('click', () => { focusDay = null; render(); });
+    : 'Pokazuję: <b>cały tydzień</b> <span class="muted">(kliknij dzień, aby dodać ćwiczenia i zobaczyć jego mięśnie)</span>';
+  ui.focus.querySelector('#focus-week')?.addEventListener('click', () => { focusDay = null; if (!ui.panel.hidden) closePanel(); else render(); });
 
   const pct = Math.round((a.trained / MUSCLES.length) * 100);
   ui.score.innerHTML = `
@@ -315,7 +314,7 @@ function renderDetailTop() {
         ? inDay(ex.id, focusDay)
           ? `<div class="d-impact">✓ Już jest w: <b>${DAY_BY_ID[focusDay].name}</b> (${inDay(ex.id, focusDay).sets} × ${inDay(ex.id, focusDay).reps}). Chcesz więcej pracy? Zwiększ liczbę serii w planie.</div>`
           : `<button class="d-add-btn">+ Dodaj do: ${DAY_BY_ID[focusDay].name}</button><div class="d-impact">${impact}</div>`
-        : '<div class="d-impact">Aby dodać, kliknij nazwę dnia w planie po lewej.</div>'}
+        : '<div class="d-impact">Aby dodać, kliknij dzień w planie po lewej.</div>'}
       ${inPlan.length ? `<div class="d-impact muted">Już w planie: ${inPlan.join(', ')}</div>` : ''}
     </div>
     <p class="d-text">${ex.how}</p>
