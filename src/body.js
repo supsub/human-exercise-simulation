@@ -101,6 +101,9 @@ function twistChain(rootG, midG, endG, angle, lateralSign) {
 export function createBody() {
   const joints = {};
   const points = {};
+  // Bryły kolizyjne skóry (do testu fizyki: sprzęt i dłonie nie mogą wchodzić w ciało)
+  const colliders = [];
+  const collide = (mesh, part, kind, r = 0, half = 0) => { colliders.push({ mesh, part, kind, r, half }); return mesh; };
   const marker = (name, parent, pos) => {
     const g = new THREE.Group();
     g.position.set(...pos);
@@ -112,7 +115,7 @@ export function createBody() {
   const root = new THREE.Group();
   root.name = 'root';
   bones.pelvis = root;
-  root.add(ellipsoid([0.165, 0.11, 0.11], skinMat, [0, 0.02, 0]));
+  root.add(collide(ellipsoid([0.165, 0.11, 0.11], skinMat, [0, 0.02, 0]), 'pelvis', 'ell'));
 
   // Tułów: klatka piersiowa i brzuch to osobne grupy, które "oddychają" (skalują się)
   const torso = joint('lumbar', root, [0, DIMS.lumbarY, 0], joints);
@@ -124,15 +127,15 @@ export function createBody() {
   const belly = new THREE.Group();
   belly.position.y = BELLY_PIVOT;
   torso.add(belly);
-  belly.add(ellipsoid([0.14, 0.15, 0.1], skinMat, [0, 0.12 - BELLY_PIVOT, 0]));
-  ribcage.add(ellipsoid([0.17, 0.155, 0.11], skinMat, [0, 0.33 - RIB_PIVOT, 0]));
+  belly.add(collide(ellipsoid([0.14, 0.15, 0.1], skinMat, [0, 0.12 - BELLY_PIVOT, 0]), 'belly', 'ell'));
+  ribcage.add(collide(ellipsoid([0.17, 0.155, 0.11], skinMat, [0, 0.33 - RIB_PIVOT, 0]), 'chest', 'ell'));
 
   // Szyja i głowa
   const neck = joint('neck', torso, [0, DIMS.neckY, 0], joints);
   const neckMesh = shadowed(new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.06, 4, 12), jointMat));
   neckMesh.position.y = 0.04;
-  neck.add(neckMesh);
-  neck.add(ellipsoid([0.095, 0.115, 0.105], skinMat, [0, 0.17, 0.01]));
+  neck.add(collide(neckMesh, 'neck', 'cap', 0.045, 0.03));
+  neck.add(collide(ellipsoid([0.095, 0.115, 0.105], skinMat, [0, 0.17, 0.01]), 'head', 'ell'));
   const nose = ellipsoid([0.018, 0.028, 0.02], faceMat, [0, 0.16, 0.112]);   // nos – pokazuje kierunek twarzy
   neck.add(nose);
   neck.add(ellipsoid([0.06, 0.012, 0.01], faceMat, [0, 0.19, 0.1]).rotateX(-0.2));
@@ -144,9 +147,9 @@ export function createBody() {
     const sx = side === 'L' ? 1 : -1;
     const sh = joint('shoulder' + side, torso, [sx * DIMS.shoulderX, DIMS.shoulderY, 0], joints);
     sh.add(ellipsoid([0.055, 0.055, 0.055], jointMat));
-    sh.add(limb(0.046, DIMS.upperArm));
+    sh.add(collide(limb(0.046, DIMS.upperArm), 'upperArm' + side, 'cap', 0.046, DIMS.upperArm / 2));
     const el = joint('elbow' + side, sh, [0, -DIMS.upperArm, 0], joints);
-    el.add(limb(0.038, DIMS.forearm));
+    el.add(collide(limb(0.038, DIMS.forearm), 'forearm' + side, 'cap', 0.038, DIMS.forearm / 2));
     const wr = joint('wrist' + side, el, [0, -DIMS.forearm, 0], joints);
     // Dłoń: śródręcze + dwuczłonowe palce + kciuk. Palce zaciskają się na trzymanym przedmiocie
     // (uchwyt jest w punkcie 'hand', ok. 7 cm pod nadgarstkiem, tuż przed wnętrzem dłoni).
@@ -177,9 +180,9 @@ export function createBody() {
     props.dumbbells.push(db);
 
     const hip = joint('hip' + side, root, [sx * DIMS.hipX, 0, 0], joints);
-    hip.add(limb(0.07, DIMS.thigh));
+    hip.add(collide(limb(0.07, DIMS.thigh), 'thigh' + side, 'cap', 0.07, DIMS.thigh / 2));
     const kn = joint('knee' + side, hip, [0, -DIMS.thigh, 0], joints);
-    kn.add(limb(0.052, DIMS.shin));
+    kn.add(collide(limb(0.052, DIMS.shin), 'shin' + side, 'cap', 0.052, DIMS.shin / 2));
     const an = joint('ankle' + side, kn, [0, -DIMS.shin, 0], joints);
     const footLen = DIMS.footFront - DIMS.footBack;
     const foot = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, footLen), jointMat));
@@ -258,9 +261,83 @@ export function createBody() {
   // Kotwice: przesuwa całe ciało tak, by wskazany punkt (np. dłoń na drążku, palce na podłodze)
   // był w zadanym miejscu. anchor2 (opcjonalnie) dobiera dodatkowo pochylenie ciała (root.rx),
   // żeby drugi punkt miał zadaną wysokość (np. palce w desce). Zwraca pozę z policzonym root.
+  // ---------- Fizyka: drążek nie może wchodzić w ciało ----------
+  const _inv = new THREE.Matrix4(), _q2 = new THREE.Vector3(), _hl = new THREE.Vector3(), _hr = new THREE.Vector3(), _m = new THREE.Vector3(), _ud = new THREE.Vector3();
+  const TRUNK_PARTS = new Set(['head', 'neck', 'chest', 'belly', 'pelvis', 'thighL', 'thighR']);
+  function depthIn(c, world) {
+    _inv.copy(c.mesh.matrixWorld).invert();
+    _q2.copy(world).applyMatrix4(_inv);
+    if (c.kind === 'ell') return (1 - _q2.length()) * Math.min(c.mesh.scale.x, c.mesh.scale.y, c.mesh.scale.z);
+    const y = Math.max(-c.half, Math.min(c.half, _q2.y));
+    return c.r - Math.hypot(_q2.x, _q2.y - y, _q2.z);
+  }
+  // największe wniknięcie drążka (między dłońmi, długość len) w tułów, głowę, szyję, miednicę lub uda
+  function barDepth(len) {
+    alignHandsToBar();   // punkt chwytu zależy od obrotu dłoni na drążku
+    pointWorld('handL', _hl); pointWorld('handR', _hr);
+    _m.addVectors(_hl, _hr).multiplyScalar(0.5);
+    _ud.subVectors(_hl, _hr).normalize();
+    let worst = -1;
+    for (const c of colliders) {
+      if (!TRUNK_PARTS.has(c.part)) continue;
+      _inv.copy(c.mesh.matrixWorld).invert();          // raz na bryłę, nie na każdy punkt
+      const sc = c.kind === 'ell' ? Math.min(c.mesh.scale.x, c.mesh.scale.y, c.mesh.scale.z) : 0;
+      for (let s = -len / 2; s <= len / 2; s += 0.04) {
+        _q2.copy(_m).addScaledVector(_ud, s).applyMatrix4(_inv);
+        let d;
+        if (c.kind === 'ell') d = (1 - _q2.length()) * sc;
+        else { const y = Math.max(-c.half, Math.min(c.half, _q2.y)); d = c.r - Math.hypot(_q2.x, _q2.y - y, _q2.z); }
+        if (d + 0.02 > worst) worst = d + 0.02;
+      }
+    }
+    return worst;
+  }
+  // Odsuwa drążek od ciała: w każdym kroku próbuje małych zmian (zgięcie w barkach, ugięcie łokci,
+  // odchylenie tułowia w tył – jak robi to ćwiczący) i wybiera tę, która najbardziej zmniejsza wniknięcie.
+  function avoidBar(out) {
+    const len = out.props.bar.len ?? 1.6;
+    const add = (k, dx) => {
+      const v = out.joints[k];
+      out.joints[k] = Array.isArray(v) ? [v[0] + dx, v[1], v[2]] : (v ?? 0) + dx;
+    };
+    const lumbar0 = typeof out.joints.lumbar === 'number' ? out.joints.lumbar : 0;
+    const moves = [
+      (s) => { add('shoulderL', s * 0.03); add('shoulderR', s * 0.03); },
+      (s) => { add('elbowL', s * 0.035); add('elbowR', s * 0.035); },
+      (s) => { add('lumbar', -s * 0.025); add('shoulderL', s * 0.025); add('shoulderR', s * 0.025); add('neck', s * 0.025); },
+    ];
+    out.joints = { ...out.joints };
+    applyAngles(out);
+    let d = barDepth(len);
+    for (let i = 0; i < 40 && d > 0; i++) {
+      let best = null;
+      for (const [mi, mv] of moves.entries()) {
+        for (const sgn of [1, -1, 3, -3]) {             // mały i duży krok w obie strony
+          if (mi === 2 && sgn < 0) continue;                       // tułów tylko odchylamy w tył
+          if (mi === 2 && lumbar0 - (out.joints.lumbar ?? 0) > 0.35) continue;
+          const saved = { ...out.joints };
+          mv(sgn);
+          applyAngles(out);
+          const nd = barDepth(len);
+          if (!best || nd < best.d) best = { d: nd, joints: { ...out.joints } };
+          out.joints = saved;
+        }
+      }
+      if (!best || best.d >= d) break;
+      out.joints = best.joints;
+      d = best.d;
+    }
+    applyAngles(out);
+  }
+
   function resolvePose(pose) {
-    if (!pose.anchor) return pose;
+    const needsAvoid = pose.props?.bar && pose.props.bar.on !== 'front';
+    if (!pose.anchor && !needsAvoid) return pose;
     const out = { ...pose, root: { ...pose.root } };
+    if (!pose.anchor) {
+      avoidBar(out);
+      return out;
+    }
     const place = () => {
       out.root.x = out.root.y = out.root.z = 0;
       applyAngles(out);
@@ -281,6 +358,7 @@ export function createBody() {
       out.root.rx = (lo + hi) / 2;
     }
     place();
+    if (needsAvoid) { avoidBar(out); place(); }
     delete out.anchor; delete out.anchor2;
     return out;
   }
@@ -424,5 +502,5 @@ export function createBody() {
     belly.scale.set(1 + 0.015 * b, 1, 1 + 0.1 * b);
   }
 
-  return { root, joints, points, materials, muscleMeshes, nose, setPose, setBreath, resolvePose };
+  return { root, joints, points, colliders, dumbbells: props.dumbbells, materials, muscleMeshes, nose, setPose, setBreath, resolvePose };
 }

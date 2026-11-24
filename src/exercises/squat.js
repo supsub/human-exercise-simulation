@@ -24,11 +24,13 @@ function pose(depth, p = {}) {
   const hipL = thigh - lean, kneeL = shin - thigh, ankleL = heels - shin;
   const shoulderL = arm - lean - round;
   const valgus = (p.valgus ?? 0) * depth;
+  // rozstaw na szerokość barków: lekkie odwiedzenie bioder, kolana idą nad palcami (stopy płasko)
+  const ab = 0.1 + 0.12 * depth;
   return {
-    root: { y: hip.y, z: hip.z, rx: lean },
+    root: { y: hip.y - 0.01, z: hip.z, rx: lean },
     joints: {
       lumbar: round,
-      hipL, hipR: hipL, kneeL, kneeR: kneeL, ankleL, ankleR: ankleL,
+      hipL: [hipL, 0, ab], hipR: [hipL, 0, -ab], kneeL, kneeR: kneeL, ankleL: [ankleL, 0, -ab], ankleR: [ankleL, 0, ab],
       legInL: valgus, legInR: valgus,
       shoulderL, shoulderR: shoulderL, elbowL: -0.1, elbowR: -0.1,
       neck: -(lean + round) * 0.75,

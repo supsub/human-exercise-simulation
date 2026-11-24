@@ -16,7 +16,7 @@ function pose(depth, p = {}) {
       lumbar: -0.65 * swing,
       neck: swing,
       kneeL: 0.15 * swing, kneeR: 0.15 * swing, hipL: 0.2 * swing, hipR: 0.2 * swing,
-      shoulderL: shoulder, shoulderR: shoulder, elbowL: elbow, elbowR: elbow,
+      shoulderL: [shoulder, 0, 0.16], shoulderR: [shoulder, 0, -0.16], elbowL: elbow, elbowR: elbow,   // ręce lekko od ud – hantle ich nie dotykają
       wristL: -0.15 * depth, wristR: -0.15 * depth,
     },
     props: { dumbbells: true },

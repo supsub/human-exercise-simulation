@@ -2,6 +2,7 @@ import { defineExercise } from './common.js';
 import { DIMS } from '../dims.js';
 import { CATALOG_BY_ID } from '../plan/catalog.js';
 import { MISTAKES } from './mistakes.js';
+import { blendPose } from '../kinematics.js';
 
 // Budowanie animacji z dwóch póz kluczowych (A = głębokość 0, B = głębokość 1).
 //
@@ -68,20 +69,29 @@ function mix(a, b, t) {
 }
 // Typowy błąd w pozach kluczowych: { A, B, both, M } – nadpisania specyfikacji; params[id] = 0..1 (płynne przejście).
 // M (opcjonalnie) – poza pośrednia w połowie ruchu (np. drążek musi minąć twarz z przodu).
-function spec3(A, B, M, d) {
-  if (!M) return mix(A, B, d);
-  const mid = { ...mix(A, B, 0.5), ...M };
-  return d < 0.5 ? mix(A, mid, d * 2) : mix(mid, B, (d - 0.5) * 2);
+// Mieszamy gotowe pozy (kąty stawów), a nie specyfikacje – dzięki temu parametr podany tylko w jednej
+// pozie kluczowej (np. ręce za głową tylko w B) przechodzi płynnie, zamiast skakać.
+function blendPoses(a, b, t) {
+  const out = blendPose(a, b, t);
+  if (a.anchor) out.anchor = mix(a.anchor, b.anchor ?? a.anchor, t);
+  if (a.anchor2) out.anchor2 = mix(a.anchor2, b.anchor2 ?? a.anchor2, t);
+  return out;
+}
+function track(A, B, M, d) {
+  const pa = makePose(A), pb = makePose(B);
+  if (!M) return blendPoses(pa, pb, d);
+  const pm = makePose({ ...mix(A, B, 0.5), ...M });
+  return d < 0.5 ? blendPoses(pa, pm, d * 2) : blendPoses(pm, pb, (d - 0.5) * 2);
 }
 export const keyframes = (base, A, B, M = null) => (d, params = {}, mistakes = []) => {
-  let spec = spec3({ ...base, ...A }, { ...base, ...B }, M, d);
+  let pose = track({ ...base, ...A }, { ...base, ...B }, M, d);
   for (const m of mistakes) {
     const w = params[m.id] ?? 0;
-    if (w <= 0 || !(m.A || m.B || m.both)) continue;
-    const bad = spec3({ ...base, ...A, ...m.both, ...m.A }, { ...base, ...B, ...m.both, ...m.B }, (M || m.M) && { ...M, ...m.both, ...m.M }, d);
-    spec = mix(spec, bad, w);
+    if (w <= 0 || !(m.A || m.B || m.both || m.M)) continue;
+    const bad = track({ ...base, ...A, ...m.both, ...m.A }, { ...base, ...B, ...m.both, ...m.B }, (M || m.M) && { ...M, ...m.both, ...m.M }, d);
+    pose = blendPoses(pose, bad, w);
   }
-  return makePose(spec);
+  return pose;
 };
 
 // Szablony faz. 'lower' – najpierw opuszczanie (głębokość 0→1), 'lift' – najpierw unoszenie/przyciąganie,
