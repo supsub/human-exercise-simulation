@@ -83,20 +83,25 @@ const pullup = animated({
   pose: keyframes({ anchor: { pt: 'handL', at: { y: 2.12, z: 0 } }, thigh: -10, shin: 30, grip: 1 },
     { arm: 180, fore: 180, rx: 0, trunk: 0 }, { arm: 348, fore: 176, rx: -8, trunk: -14, head: -5 }),
 });
-const pulldownMachine = [seat(0.44), { cyl: [[-0.25, 0.68, 0.3], [0.25, 0.68, 0.3]], r: 0.05, color: 'pad' }, column(-0.45, 2.5),
-  { box: [0, 2.47, -0.2], size: [0.1, 0.06, 0.55], color: 'frame' }];
+// Wyciąg górny: siedzisko, wałek na uda, kolumna z obciążeniem PRZED ćwiczącym, bloczek nad drążkiem
+const pulldownMachine = [{ box: [0, 0.21, -0.1], size: [0.34, 0.42, 1.1] }, { cyl: [[-0.25, 0.68, 0.32], [0.25, 0.68, 0.32]], r: 0.05, color: 'pad' },
+  { box: [0, 0.4, 0.33], size: [0.06, 0.56, 0.06], color: 'frame' }, column(0.72, 2.55), { box: [0, 0.65, 0.72], size: [0.3, 0.5, 0.2], color: 'wall' },
+  { box: [0, 2.5, 0.42], size: [0.08, 0.07, 0.68], color: 'frame' }, { cyl: [[0, 2.47, 0.12], [0, 2.47, 0.72]], r: 0.006 }];
 const seated = { root: { y: 0.52, z: 0 }, thigh: -85, shin: 5, foot: 0 };
 const lat_pulldown = animated({
   id: 'lat_pulldown', type: 'lift', camera: 'seat', scenery: pulldownMachine,
+  cameraPosition: [1.7, 1.75, -2.2], cameraTarget: [0, 1.15, 0.1],   // z tyłu i z boku – widać pracę pleców
   steps: ['Ręce wyprostowane w górze', 'Ściąganie drążka do klatki', 'Drążek przy klatce', 'Powrót w górę'],
-  pose: keyframes({ ...seated, rx: -8, trunk: -12, props: { bar: { len: 1.1, plates: false }, cable: { from: [[0, 2.45, 0.05]] } } },
-    { arm: 175, fore: 180 }, { arm: 340, fore: 186 }),
+  // chwyt nieco szerszy niż barki, łokcie schodzą w dół i na boki, drążek przed twarzą do górnej części klatki
+  pose: keyframes({ ...seated, rx: -8, trunk: -14, grip: 1, props: { bar: { len: 1.25, plates: false }, cable: { from: [[0, 2.47, 0.12]] } } },
+    { shX: 24, abd: 148, rot: 90, el: -12 }, { shX: 26, abd: 44, rot: 90, el: -116 }),
 });
 const lat_pulldown_wide = animated({
   id: 'lat_pulldown_wide', type: 'lift', camera: 'seat', scenery: pulldownMachine,
+  cameraPosition: [1.7, 1.75, -2.2], cameraTarget: [0, 1.15, 0.1],   // z tyłu i z boku – widać pracę pleców
   steps: ['Szeroki chwyt, ręce w górze', 'Ściąganie łokciami w dół i na boki', 'Drążek przy klatce', 'Powrót w górę'],
-  pose: keyframes({ ...seated, rx: -8, trunk: -14, props: { bar: { len: 1.5, plates: false }, cable: { from: [[0, 2.45, 0.05]] } } },
-    { shX: 0, abd: 158, rot: 90, el: -8 }, { shX: 0, abd: 62, rot: 90, el: -105 }),
+  pose: keyframes({ ...seated, rx: -8, trunk: -14, grip: 1, props: { bar: { len: 1.55, plates: false }, cable: { from: [[0, 2.47, 0.12]] } } },
+    { shX: 18, abd: 162, rot: 90, el: -6 }, { shX: 22, abd: 56, rot: 90, el: -104 }),
 });
 const hinge = { ...FEET, rx: 65, head: 40, thigh: -22, shin: 16 };
 const row = animated({
