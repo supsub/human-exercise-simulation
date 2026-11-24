@@ -1,6 +1,8 @@
-import { paintMuscles, flyCamera, controls, body, pickMuscle, showTooltip, cssColor, volumeColor, cssVolumeColor, WEEK_THRESHOLDS, DAY_THRESHOLDS } from '../scene.js';
+import { paintMuscles, flyCamera, jumpCamera, controls, body, pickMuscle, showTooltip, cssColor, volumeColor, cssVolumeColor, updateBreathPuffs, WEEK_THRESHOLDS, DAY_THRESHOLDS } from '../scene.js';
 import { MUSCLES, MUSCLE_BY_ID } from '../muscles.js';
-import { standingPose } from '../exercises/common.js';
+import { standingPose, sampleExercise, computeActivations, peakActivations, roleOf } from '../exercises/common.js';
+import { EXERCISE_BY_ID } from '../exercises/index.js';
+import { blendPose, smoothstep } from '../kinematics.js';
 import { CATALOG, CATALOG_BY_ID, CATEGORIES } from './catalog.js';
 import { DAYS, DAY_BY_ID, analyzePlan, emptyPlan, examplePlan, volumeStatus, OPTIMAL_WEEKLY, newId } from './analysis.js';
 
@@ -14,7 +16,7 @@ const ui = {
   newBtn: $('plan-new'), renameBtn: $('plan-rename'), deleteBtn: $('plan-delete'), exampleBtn: $('plan-example'),
   focus: $('plan-focus'), score: $('plan-score'), groups: $('plan-groups'), warnings: $('plan-warnings'), recs: $('plan-recs'),
   picker: $('picker'), pickerTitle: $('picker-title'), pickerSearch: $('picker-search'), pickerCats: $('picker-cats'),
-  pickerList: $('picker-list'), pickerClose: $('picker-close'),
+  pickerList: $('picker-list'), pickerClose: $('picker-close'), preview: $('plan-preview'),
 };
 
 let store = load();
@@ -63,7 +65,7 @@ function renderDays(p) {
       </div>
       <div class="day-items"></div>`;
     card.querySelector('input').onchange = (e) => { day.active = e.target.checked; if (!day.active && focusDay === d.id) focusDay = null; render(); };
-    card.querySelector('.day-name').onclick = () => { focusDay = focusDay === d.id ? null : d.id; render(); };
+    card.querySelector('.day-name').onclick = () => { if (preview) closePreview(); focusDay = focusDay === d.id ? null : d.id; render(); };
     const list = card.querySelector('.day-items');
     if (day.active) {
       day.items.forEach((it, idx) => {
@@ -74,13 +76,14 @@ function renderDays(p) {
           <span class="item-name" title="${esc(primaryText(ex))}">${esc(ex.name)}</span>
           <input type="number" min="1" max="10" value="${it.sets}" title="Serie"> <span class="x">×</span>
           <input type="number" min="1" max="50" value="${it.reps}" title="Powtórzenia">
-          ${ex.animated ? '<button class="icon play-ex" title="Zobacz animację i aktywację mięśni">▶</button>' : '<span class="icon-spacer"></span>'}
+          ${ex.animated ? '<button class="icon play-ex" title="Podgląd: animacja i pracujące mięśnie">▶</button>' : '<button class="icon play-ex static" title="Podgląd: zaangażowane mięśnie na modelu">◉</button>'}
           <button class="icon del" title="Usuń">✕</button>`;
         const [setsIn, repsIn] = row.querySelectorAll('input');
         setsIn.onchange = () => { it.sets = clampInt(setsIn.value, 1, 10); render(); };
         repsIn.onchange = () => { it.reps = clampInt(repsIn.value, 1, 50); render(); };
         row.querySelector('.del').onclick = () => { day.items.splice(idx, 1); render(); };
-        row.querySelector('.play-ex')?.addEventListener('click', () => openInSimulation(ex.animated, it.reps));
+        if (preview?.ex === ex) row.classList.add('previewing');
+        row.querySelector('.play-ex').onclick = () => (preview?.ex === ex ? closePreview() : openPreview(ex));
         list.appendChild(row);
       });
       const add = document.createElement('button');
@@ -100,10 +103,12 @@ function primaryText(ex) {
 
 function renderAnalysis(p) {
   const a = analysis;
-  ui.focus.innerHTML = focusDay
+  ui.focus.innerHTML = preview
+    ? `Podgląd: <b>${esc(preview.ex.name)}</b> <button id="focus-week" class="link">wróć do mapy planu</button>`
+    : focusDay
     ? `Pokazuję: <b>${DAY_BY_ID[focusDay].name}</b> <button id="focus-week" class="link">pokaż cały tydzień</button>`
     : 'Pokazuję: <b>cały tydzień</b> <span class="muted">(kliknij nazwę dnia, aby zobaczyć jeden trening)</span>';
-  ui.focus.querySelector('#focus-week')?.addEventListener('click', () => { focusDay = null; render(); });
+  ui.focus.querySelector('#focus-week')?.addEventListener('click', () => { if (preview) closePreview(); else { focusDay = null; render(); } });
 
   const pct = Math.round((a.trained / MUSCLES.length) * 100);
   ui.score.innerHTML = `
@@ -212,13 +217,85 @@ ui.exampleBtn.onclick = () => {
   render();
 };
 
+// ---------- Podgląd ćwiczenia w planie (bez wychodzenia z widoku) ----------
+// Ćwiczenia z animacją są odtwarzane na modelu z kolorami aktywacji, pozostałe pokazują mapę zaangażowania.
+const PLAN_CAMERA = [[0, 1.25, 3.4], [0, 0.95, 0]];
+let preview = null;         // { ex: pozycja katalogu, anim: definicja ćwiczenia | null, t, peak }
+let pose = standingPose();
+let poseBlend = null;       // { from, t }
+
+// W planie panele są szersze niż w symulacji – kamera trochę dalej od celu
+function previewCamera(anim) {
+  const tg = anim.cameraTarget ?? [0, 0.85, 0];
+  return [anim.cameraPosition.map((v, i) => tg[i] + (v - tg[i]) * 1.3), tg];
+}
+// instantT: (demo/testy) od razu ustaw pozę w danym punkcie cyklu, bez przejścia i animacji
+function openPreview(ex, instantT = null) {
+  const anim = ex.animated ? EXERCISE_BY_ID[ex.animated] : null;
+  preview = { ex, anim, t: instantT ?? 0, frozen: instantT !== null, peak: anim ? peakActivations(anim) : null };
+  poseBlend = instantT !== null ? null : { from: pose, t: 0 };
+  if (anim && instantT !== null) jumpCamera(...previewCamera(anim));
+  controls.autoRotate = !anim; // bez animacji: obracamy model, żeby było widać też mięśnie z tyłu
+  if (anim) flyCamera(...previewCamera(anim));
+  else flyCamera(...PLAN_CAMERA);
+  ui.preview.hidden = false;
+  ui.preview.innerHTML = `
+    <div class="pv-main"><b>${anim ? '▶' : '◉'} ${esc(ex.name)}</b>
+      <span class="muted small">${anim ? 'animacja – kolory pokazują pracę mięśni w danej fazie' : 'mięśnie zaangażowane w ćwiczenie (bez animacji)'}</span></div>
+    ${anim ? '<button class="pv-sim" title="Pełna symulacja: fazy ruchu, oddech, typowe błędy">Szczegóły w symulacji →</button>' : ''}
+    <button class="icon pv-close" title="Zamknij podgląd (Esc)">✕</button>`;
+  ui.preview.querySelector('.pv-close').onclick = closePreview;
+  ui.preview.querySelector('.pv-sim')?.addEventListener('click', () => { const id = ex.animated; closePreview(); openInSimulation(id); });
+  render();
+}
+function closePreview() {
+  if (!preview) return;
+  preview = null;
+  poseBlend = { from: pose, t: 0 };
+  ui.preview.hidden = true;
+  flyCamera(...PLAN_CAMERA);
+  render();
+}
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ui.picker.hidden) closePreview(); });
+
+function previewFrame(dt) {
+  let target = standingPose();
+  let values;
+  if (preview?.anim) {
+    const a = preview.anim;
+    if (!preview.frozen && (!poseBlend || poseBlend.t > 0.6)) preview.t = (preview.t + dt / a.cycle) % 1;
+    const s = sampleExercise(a, preview.t);
+    target = a.pose(s.depth, {});
+    values = computeActivations(a, s);
+    body.setBreath(s.breath);
+    updateBreathPuffs(dt, s.phase.breath === 'out' ? 1 : 0);
+  } else {
+    body.setBreath(0.4);
+    updateBreathPuffs(dt, 0);
+  }
+  if (poseBlend) {
+    poseBlend.t = Math.min(1, poseBlend.t + dt / 0.8);
+    pose = blendPose(poseBlend.from, target, smoothstep(poseBlend.t));
+    if (poseBlend.t >= 1) poseBlend = null;
+  } else pose = target;
+  body.setPose(pose);
+  return values;
+}
+
 // ---------- Klatka animacji ----------
 export function frame(dt) {
   if (!analysis) return;
+  const animValues = previewFrame(dt);
   // Trzy tryby: podgląd ćwiczenia z listy (udział mięśni), jeden dzień, cały tydzień
-  let target, colorFn, glowFn;
-  if (pickerPreview && !ui.picker.hidden) {
-    target = Object.fromEntries(MUSCLES.map((m) => [m.id, (pickerPreview.muscles[m.id] ?? 0) * 0.9]));
+  let target, colorFn, glowFn, tipEx = preview?.ex;
+  if (preview?.anim) {
+    target = animValues;
+    colorFn = undefined; glowFn = undefined;
+    mode = 'anim';
+  } else if ((pickerPreview && !ui.picker.hidden) || preview) {
+    const src = pickerPreview && !ui.picker.hidden ? pickerPreview : preview.ex;
+    tipEx = src;
+    target = Object.fromEntries(MUSCLES.map((m) => [m.id, (src.muscles[m.id] ?? 0) * 0.9]));
     colorFn = undefined; glowFn = undefined;
     mode = 'preview';
   } else if (focusDay) {
@@ -231,12 +308,15 @@ export function frame(dt) {
     mode = 'week';
   }
   if (mode !== lastMode) { lastMode = mode; renderLegend(mode); }
-  const k = 1 - Math.exp(-dt / 0.15);
+  const k = 1 - Math.exp(-dt / (mode === 'anim' ? 0.09 : 0.15));
   for (const id in display) display[id] += (target[id] - display[id]) * k;
 
   const hit = pickMuscle();
   hovered = hit?.id ?? null;
-  if (hit) {
+  if (hit && (mode === 'anim' || mode === 'preview')) {
+    const r = mode === 'anim' ? roleOf(preview.peak[hit.id]) : roleOf((tipEx.muscles[hit.id] ?? 0) * 0.6);
+    showTooltip(hit, `${esc(tipEx.name)}: ${r ? r.one : 'prawie nie pracuje'}`);
+  } else if (hit) {
     const w = analysis.weekly[hit.id];
     const st = volumeStatus(w);
     const dayTxt = focusDay ? `<br>${DAY_BY_ID[focusDay].name}: ${analysis.perDay[focusDay][hit.id].toFixed(1)} serii` : '';
@@ -248,6 +328,10 @@ export function frame(dt) {
 let mode = null, lastMode = null;
 function renderLegend(m) {
   const el = document.getElementById('plan-legend');
+  if (m === 'anim') {
+    el.innerHTML = `<span>aktywacja mięśni:</span><div class="legend-bar"></div><span>mocno</span>`;
+    return;
+  }
   if (m === 'preview') {
     el.innerHTML = `<span>udział mięśnia:</span><div class="legend-bar"></div><span>główny</span>`;
     return;
@@ -259,14 +343,19 @@ function renderLegend(m) {
 }
 
 export function enter() {
-  body.setPose(standingPose());
+  pose = standingPose();
+  poseBlend = null;
+  preview = null;
+  ui.preview.hidden = true;
+  body.setPose(pose);
   body.setBreath(0.4);
-  flyCamera([0, 1.25, 3.4], [0, 0.95, 0]);
+  flyCamera(...PLAN_CAMERA);
   controls.autoRotate = true;
   // parametry do demo/testów: ?focus=mon&picker=wed&preview=row
   const q = new URLSearchParams(location.search);
   if (DAY_BY_ID[q.get('focus')]) focusDay = q.get('focus');
   render();
+  if (CATALOG_BY_ID[q.get('show')]) openPreview(CATALOG_BY_ID[q.get('show')], q.has('t') ? parseFloat(q.get('t')) : null);
   if (DAY_BY_ID[q.get('picker')]) {
     openPicker(q.get('picker'));
     if (CATALOG_BY_ID[q.get('preview')]) pickerPreview = CATALOG_BY_ID[q.get('preview')];
@@ -275,6 +364,9 @@ export function enter() {
 export function leave() {
   controls.autoRotate = false;
   ui.picker.hidden = true;
+  preview = null;
+  ui.preview.hidden = true;
+  updateBreathPuffs(0, 0);
   showTooltip(null);
 }
 export function setOpenInSimulation(fn) { openInSimulation = fn; }

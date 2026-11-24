@@ -27,22 +27,19 @@
 
   <!-- ===================== SYMULACJA ===================== -->
   <div id="sim-view">
-    <header class="panel top-left">
-      <form id="cmd-form" autocomplete="off">
-        <input id="cmd" type="text" placeholder="Wpisz polecenie, np. „zrób 5 pompek”" />
-        <button type="submit">Wykonaj</button>
-      </form>
-      <div id="chips" class="chips"></div>
-      <div id="feedback" class="feedback"></div>
-    </header>
-
     <aside class="panel left">
-      <h2 id="ex-name">Pozycja stojąca</h2>
-      <p id="ex-desc" class="muted">Wydaj polecenie, aby rozpocząć ćwiczenie.</p>
+      <div class="label">Ćwiczenie</div>
+      <div id="ex-chips" class="chips ex-chips"></div>
+      <h2 id="ex-name">—</h2>
+      <p id="ex-desc" class="muted"></p>
       <details class="cues-box"><summary>Wskazówki techniczne</summary><ul id="ex-cues" class="cues"></ul></details>
       <div class="mistakes-box" hidden>
-        <div class="label">Typowe błędy – porównaj</div>
+        <div class="mistakes-head">
+          <div class="label">Typowe błędy – porównaj</div>
+          <label class="mini-toggle" title="Pokazuj opis błędu i etykiety przeciążeń na modelu"><input id="mistake-notes" type="checkbox" checked> opisy</label>
+        </div>
         <div id="mistakes" class="mistakes"></div>
+        <div id="mistake-info" class="mistake-info" hidden></div>
       </div>
       <div class="phase-box">
         <div class="phase-main">
@@ -61,21 +58,17 @@
       </div>
     </aside>
 
-    <div id="mistake-card" class="panel mistake-card" hidden></div>
-
     <aside class="panel right">
-      <div class="right-head">
-        <h2>Aktywacja mięśni</h2>
-        <select id="sort-mode" title="Kolejność">
-          <option value="activation">wg aktywacji</option>
-          <option value="anatomy">wg grup</option>
-        </select>
+      <h2>Pracujące mięśnie</h2>
+      <div class="figure-box">
+        <canvas id="figure"></canvas>
+        <span class="fig-label l">PRZÓD</span><span class="fig-label r">TYŁ</span>
       </div>
       <div class="legend">
-        <span>0%</span><div class="legend-bar"></div><span>100% MVC</span>
+        <span>nie pracuje</span><div class="legend-bar"></div><span>mocno</span>
       </div>
-      <div id="muscle-list" class="muscle-list"></div>
-      <p class="disclaimer">Wartości przybliżone (% maksymalnego dowolnego skurczu, MVC), modelowane na podstawie badań EMG. Służą celom edukacyjnym.</p>
+      <div id="roles" class="roles"></div>
+      <p class="disclaimer">Mapa pokazuje najmocniejsze zaangażowanie w całym powtórzeniu, na podstawie badań EMG (wartości przybliżone, cel edukacyjny).</p>
     </aside>
 
     <footer class="panel bottom">
@@ -117,6 +110,8 @@
       <div id="plan-recs" class="plan-recs"></div>
       <p class="disclaimer">Analiza liczona lokalnie, bez internetu. Progi (3 / 8 / 20 serii tygodniowo) są orientacyjne i dotyczą treningu siłowo-sylwetkowego.</p>
     </aside>
+
+    <div id="plan-preview" class="panel plan-preview" hidden></div>
 
     <div id="picker" class="modal" hidden>
       <div class="modal-box">

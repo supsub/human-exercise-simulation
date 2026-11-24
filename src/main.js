@@ -22,11 +22,11 @@ function show(name) {
 
 window.addEventListener('hashchange', () => show(location.hash.slice(1)));
 
-// Z planu: "▶" przy ćwiczeniu otwiera je w symulacji
+// Z podglądu w planie: "Otwórz w symulacji" (plan zostaje zapisany, można do niego wrócić zakładką)
 planner.setOpenInSimulation((exerciseId) => {
   location.hash = 'sim';
   show('sim');
-  sim.startExercise(EXERCISE_BY_ID[exerciseId], null);
+  sim.startExercise(EXERCISE_BY_ID[exerciseId]);
 });
 
 show(location.hash.slice(1) || 'sim');

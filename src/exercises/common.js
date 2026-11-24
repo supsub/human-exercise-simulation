@@ -5,9 +5,9 @@ import { MUSCLES } from '../muscles.js';
 // Charakter fazy: ecc = ekscentryczna (mięsień wydłuża się pod obciążeniem),
 // con = koncentryczna (skraca się), iso = izometryczna (utrzymanie pozycji).
 export const PHASE_KIND = {
-  ecc: { label: 'ekscentryczna', factor: 0.65 },
-  con: { label: 'koncentryczna', factor: 1.0 },
-  iso: { label: 'izometryczna', factor: 0.7 },
+  ecc: { label: 'ekscentryczna', hint: 'mięśnie hamują ruch', factor: 0.65 },
+  con: { label: 'koncentryczna', hint: 'mięśnie pokonują opór', factor: 1.0 },
+  iso: { label: 'izometryczna', hint: 'mięśnie trzymają pozycję', factor: 0.7 },
 };
 
 // Oddech w fazie: 'in' = wdech, 'out' = wydech, 'hold' = wstrzymanie (napięcie brzucha)
@@ -78,6 +78,26 @@ export function computeActivations(ex, state, overrides = null) {
   }
   return out;
 }
+
+// Szczytowa aktywacja każdego mięśnia w całym cyklu – stała mapa do statycznej figury i listy ról.
+// mistake: opcjonalny błąd techniki (zmienione parametry mięśni i zakres ruchu).
+export function peakActivations(ex, mistake = null) {
+  const romCut = mistake?.params?.rom ?? 0;
+  const peak = Object.fromEntries(MUSCLES.map((m) => [m.id, 0]));
+  for (let i = 0; i < 80; i++) {
+    const a = computeActivations(ex, sampleExercise(ex, i / 80, romCut), mistake?.muscles);
+    for (const id in a) peak[id] = Math.max(peak[id], a[id]);
+  }
+  return peak;
+}
+
+// Rola mięśnia w ćwiczeniu na podstawie szczytowej aktywacji (bez pokazywania liczb)
+export const ROLES = [
+  { id: 'main', min: 0.45, label: 'Pracują najmocniej', one: 'pracuje najmocniej – to główny cel ćwiczenia' },
+  { id: 'assist', min: 0.25, label: 'Pomagają', one: 'pomaga w ruchu' },
+  { id: 'stab', min: 0.1, label: 'Trzymają pozycję', one: 'pracuje lekko, utrzymując stabilną pozycję' },
+];
+export const roleOf = (a) => ROLES.find((r) => a >= r.min) ?? null;
 
 // Pozycja stojąca (punkt wyjścia i pozycja spoczynkowa)
 export function standingPose() {

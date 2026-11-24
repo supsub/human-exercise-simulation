@@ -21,7 +21,8 @@ function muscleGeometry(shape) {
       const r = t < peak ? Math.sin((Math.PI / 2) * (t / peak)) : Math.cos((Math.PI / 2) * ((t - peak) / (1 - peak)));
       pts.push(new THREE.Vector2(Math.max(0.001, Math.pow(Math.max(r, 0), 0.7)), 1 - 2 * t));
     }
-    latheCache[shape] = new THREE.LatheGeometry(pts, 24);
+    // LatheGeometry wymaga punktów od dołu do góry – inaczej ściany są odwrócone (widać tylko tylną połowę bryły)
+    latheCache[shape] = new THREE.LatheGeometry(pts.reverse(), 24);
   }
   return latheCache[shape];
 }

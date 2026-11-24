@@ -1,6 +1,6 @@
 # Human Exercise Simulation
 
-Interaktywny model 3D człowieka, który wykonuje ćwiczenia na polecenie i w czasie rzeczywistym pokazuje aktywację mięśni.
+Planer treningu z interaktywnym modelem 3D: pokazuje, które mięśnie trenuje plan i każde ćwiczenie, z animacją i typowymi błędami techniki.
 
 **Opis projektu, funkcjonalności i roadmapa: [`docs/index.html`](docs/index.html)**. Ta strona jest głównym miejscem śledzenia projektu i jest aktualizowana przy każdej zmianie funkcjonalności.
 
@@ -13,10 +13,10 @@ python3 -m http.server 8000     # albo: npm start
 Następnie otwórz <http://localhost:8000>. Three.js ładuje się z CDN, więc potrzebny jest internet. Projekt nie ma kroku budowania.
 
 Parametry URL przydatne do demo i testów:
-- `?cmd=zrób 5 pompek` uruchamia polecenie od razu,
+- `?ex=pushup` otwiera wybrane ćwiczenie (id z `src/exercises/`),
 - `&t=0.6` zatrzymuje animację w danym punkcie cyklu (0–1),
 - `&mistake=sag` pokazuje typowy błąd (id z `mistakes` w pliku ćwiczenia),
-- `index.html?focus=mon#plan` pokazuje plan z wybranym dniem, a `?picker=wed#plan` otwiera okno wyboru ćwiczeń.
+- `index.html?focus=mon#plan` pokazuje plan z wybranym dniem, a `?picker=wed#plan` otwiera okno wyboru ćwiczeń, a `?show=squat#plan` otwiera podgląd ćwiczenia z katalogu.
 
 `node tools/check.mjs` wypisuje kąty stawów i aktywacje bez przeglądarki (szybki test sanity).
 
@@ -30,7 +30,7 @@ Parametry URL przydatne do demo i testów:
 | `src/kinematics.js` | IK dwóch segmentów, obroty w płaszczyźnie strzałkowej |
 | `src/exercises/*.js` | definicje ćwiczeń: fazy, poza(głębokość), parametry aktywacji |
 | `src/exercises/common.js` | oś czasu faz i model aktywacji |
-| `src/commands.js` | parser poleceń po polsku |
+| `src/figure.js` | statyczna figura przód/tył z pracującymi mięśniami |
 | `src/scene.js` | wspólna scena 3D: kamera, światła, kolorowanie mięśni, znaczniki przeciążeń, oddech |
 | `src/simView.js` | widok Symulacja: ćwiczenia, oś czasu, błędy techniki |
 | `src/plan/catalog.js` | katalog ćwiczeń do planu (waga zaangażowania mięśni) |

@@ -122,9 +122,9 @@ function getMarker(key, label) {
   return markers[key];
 }
 
-// list: [{ joint, label }], strength 0..1
+// list: [{ joint, label }], strength 0..1, showLabels: czy pokazywać podpisy (można je wyłączyć)
 const _p = new THREE.Vector3();
-export function updateStressMarkers(list, strength, time) {
+export function updateStressMarkers(list, strength, time, showLabels = true) {
   const active = new Set(list.map((s) => s.joint));
   for (const s of list) {
     const m = getMarker(s.joint, s.label);
@@ -141,7 +141,7 @@ export function updateStressMarkers(list, strength, time) {
     m.el.style.top = ((1 - _p.y) / 2) * r.height + 'px';
     m.el.textContent = '⚠ ' + s.label;
     m.el.style.opacity = strength;
-    m.el.hidden = strength < 0.05 || _p.z > 1;
+    m.el.hidden = !showLabels || strength < 0.05 || _p.z > 1;
   }
   for (const [key, m] of Object.entries(markers)) {
     if (active.has(key)) continue;
@@ -212,19 +212,45 @@ window.addEventListener('resize', resize);
 resize();
 
 // ---------- Najechanie na mięsień ----------
+// Mięśnie nachodzą na siebie (np. głowy czworogłowego), więc nie bierzemy po prostu pierwszego trafienia.
+// Zbieramy wszystkie mięśnie, przez które przechodzi promień (w warstwie ~6 cm pod powierzchnią),
+// plus kilka promieni wokół kursora, i wybieramy ten, przez którego ŚRODEK promień przechodzi najbliżej
+// (odległość liczona w lokalnym układzie bryły, więc mały mięsień ma takie same szanse jak duży).
 const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
+const _ndc = new THREE.Vector2();
+const _ray = new THREE.Ray();
+const _inv = new THREE.Matrix4();
+const _origin = new THREE.Vector3();
+const RING = [[0, 0], ...Array.from({ length: 8 }, (_, i) => [Math.cos((i * Math.PI) / 4) * 9, Math.sin((i * Math.PI) / 4) * 9])];
+export function pickMuscleAt(clientX, clientY, canvasEl, cam, meshes) {
+  const r = canvasEl.getBoundingClientRect();
+  if (clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) return null;
+  let best = null, bestScore = Infinity;
+  RING.forEach(([dx, dy], ri) => {
+    _ndc.set(((clientX + dx - r.left) / r.width) * 2 - 1, -((clientY + dy - r.top) / r.height) * 2 + 1);
+    raycaster.setFromCamera(_ndc, cam);
+    const hits = raycaster.intersectObjects(meshes, false);
+    if (!hits.length) return;
+    const near = hits[0].distance;
+    for (const h of hits) {
+      if (h.distance > near + 0.06) break;
+      _inv.copy(h.object.matrixWorld).invert();
+      _ray.copy(raycaster.ray).applyMatrix4(_inv);
+      // 0 = promień przez środek bryły, 1 = po jej brzegu; promienie z pierścienia mają karę
+      const score = Math.sqrt(_ray.distanceSqToPoint(_origin.set(0, 0, 0))) + (ri ? 0.6 : 0);
+      if (score < bestScore) { bestScore = score; best = h.object.userData.muscleId; }
+    }
+  });
+  return best ? { id: best, x: clientX, y: clientY } : null;
+}
+
 let pointerEvent = null;
 canvas.addEventListener('pointermove', (e) => (pointerEvent = e));
 canvas.addEventListener('pointerleave', () => (pointerEvent = null));
-// Zwraca { id, x, y } mięśnia pod kursorem albo null
+// Zwraca { id, x, y } mięśnia pod kursorem na głównej scenie albo null
 export function pickMuscle() {
   if (!pointerEvent) return null;
-  const r = canvas.getBoundingClientRect();
-  pointer.set(((pointerEvent.clientX - r.left) / r.width) * 2 - 1, -((pointerEvent.clientY - r.top) / r.height) * 2 + 1);
-  raycaster.setFromCamera(pointer, camera);
-  const hit = raycaster.intersectObjects(body.muscleMeshes, false)[0];
-  return hit ? { id: hit.object.userData.muscleId, x: pointerEvent.clientX, y: pointerEvent.clientY } : null;
+  return pickMuscleAt(pointerEvent.clientX, pointerEvent.clientY, canvas, camera, body.muscleMeshes);
 }
 
 const tooltip = document.getElementById('tooltip');
@@ -234,7 +260,7 @@ export function showTooltip(hit, extraHtml) {
   tooltip.hidden = false;
   tooltip.style.left = hit.x + 14 + 'px';
   tooltip.style.top = hit.y + 14 + 'px';
-  tooltip.innerHTML = `<b>${m.name}</b><br><i>${m.latin}</i><br>${extraHtml}`;
+  tooltip.innerHTML = `<b>${m.name}</b><br><i>${m.latin}</i>${extraHtml ? '<br>' + extraHtml : ''}`;
 }
 
 // ---------- Pętla ----------

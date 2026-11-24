@@ -1,41 +1,44 @@
-import { body, paintMuscles, cssColor, updateStressMarkers, updateBreathPuffs, flyCamera, jumpCamera,
-  pickMuscle, showTooltip } from './scene.js';
-import { MUSCLES, MUSCLE_GROUPS } from './muscles.js';
-import { EXERCISES } from './exercises/index.js';
-import { sampleExercise, computeActivations, standingPose, PHASE_KIND, BREATH } from './exercises/common.js';
+import { body, paintMuscles, updateStressMarkers, updateBreathPuffs, flyCamera, jumpCamera,
+  pickMuscle, showTooltip, cssColor } from './scene.js';
+import { MUSCLES } from './muscles.js';
+import { EXERCISES, EXERCISE_BY_ID } from './exercises/index.js';
+import { sampleExercise, computeActivations, peakActivations, roleOf, ROLES, standingPose, PHASE_KIND, BREATH } from './exercises/common.js';
 import { blendPose, smoothstep, lerp } from './kinematics.js';
-import { parseCommand } from './commands.js';
+import { createFigure } from './figure.js';
 
-// Widok "Symulacja": wykonywanie ćwiczeń, aktywacja mięśni na żywo, oddech, typowe błędy.
+// Widok "Symulacja": animacja ćwiczenia z kolorowaniem mięśni, oddech, typowe błędy,
+// a w panelu statyczna figura (przód/tył) z mięśniami, które pracują w ćwiczeniu.
 
 const state = {
   exercise: null,
   t: 0,               // pozycja w cyklu [0,1)
   playing: false,
   speed: 1,
-  repsTarget: null,   // null = bez końca
   repsDone: 0,
   blend: null,        // { from: pose, t } – płynne przejście do nowego ćwiczenia
   mistake: null,      // wybrany błąd techniki (obiekt) albo null
+  pendingMistake: null,
   mistakeMix: 0,      // 0 = poprawnie, 1 = pełny błąd (animowane przejście)
   smoothed: Object.fromEntries(MUSCLES.map((m) => [m.id, 0.02])),
+  peakGood: {},       // szczytowe aktywacje – poprawna technika
+  peakBad: null,      // szczytowe aktywacje – z wybranym błędem
   hovered: null,
   scrubbing: false,
-  idleBreath: 0,
+  showNotes: localStorage.getItem('hes.mistakeNotes') !== '0',
 };
 let currentPose = standingPose();
 
 const $ = (id) => document.getElementById(id);
 const ui = {
-  root: $('sim-view'),
-  input: $('cmd'), form: $('cmd-form'), feedback: $('feedback'), chips: $('chips'),
+  root: $('sim-view'), chips: $('ex-chips'),
   exName: $('ex-name'), exDesc: $('ex-desc'), exCues: $('ex-cues'),
   phaseName: $('phase-name'), phaseKind: $('phase-kind'), reps: $('reps'),
   timeline: $('timeline'), playhead: $('playhead'), play: $('play'), speed: $('speed'),
-  muscleList: $('muscle-list'), sortMode: $('sort-mode'),
   breathFill: $('breath-fill'), breathLabel: $('breath-label'), breathTip: $('breath-tip'),
-  mistakes: $('mistakes'), mistakeCard: $('mistake-card'),
+  mistakes: $('mistakes'), mistakeInfo: $('mistake-info'), notes: $('mistake-notes'),
+  roles: $('roles'),
 };
+const figure = createFigure($('figure'));
 
 // ---------- Budowa UI ----------
 for (const ex of EXERCISES) {
@@ -43,35 +46,8 @@ for (const ex of EXERCISES) {
   b.className = 'chip';
   b.dataset.id = ex.id;
   b.textContent = ex.name;
-  b.onclick = () => startExercise(ex, null);
+  b.onclick = () => startExercise(ex);
   ui.chips.appendChild(b);
-}
-
-// Lista mięśni: nagłówki grup + wiersze
-const rows = {};
-const groupHeaders = {};
-MUSCLE_GROUPS.forEach((g, gi) => {
-  const h = document.createElement('div');
-  h.className = 'group-head';
-  h.textContent = g;
-  h.style.order = gi * 100;
-  ui.muscleList.appendChild(h);
-  groupHeaders[g] = h;
-});
-MUSCLES.forEach((m, i) => {
-  const row = document.createElement('div');
-  row.className = 'muscle-row';
-  row.innerHTML = `<div class="m-name"><span>${m.name}${m.deep ? ' <em>(głęboki)</em>' : ''}</span><small>${m.latin}</small></div>
-    <div class="m-bar"><div class="m-fill"></div></div><div class="m-val">0%</div>`;
-  row.onmouseenter = () => (state.hovered = m.id);
-  row.onmouseleave = () => (state.hovered = null);
-  ui.muscleList.appendChild(row);
-  rows[m.id] = { row, fill: row.querySelector('.m-fill'), val: row.querySelector('.m-val'), groupIndex: MUSCLE_GROUPS.indexOf(m.group), i };
-});
-
-function say(msg, kind = 'ok') {
-  ui.feedback.textContent = msg;
-  ui.feedback.className = 'feedback ' + kind;
 }
 
 function buildTimeline(ex) {
@@ -107,28 +83,62 @@ function buildMistakes(ex) {
 function setMistake(m) {
   // przy zmianie z jednego błędu na inny najpierw wracamy do poprawnej pozy (mix maleje), potem idziemy w nowy
   state.pendingMistake = m;
-  if (!state.mistake) { state.mistake = m; }
+  if (!state.mistake) state.mistake = m;
+  state.peakBad = m && state.exercise ? peakActivations(state.exercise, m) : null;
   ui.mistakes.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.id === (m ? m.id : '')));
   if (m) {
-    ui.mistakeCard.hidden = false;
-    ui.mistakeCard.innerHTML = `<h3>✗ ${m.name}</h3>
-      <p><b>Co się dzieje:</b> ${m.what}</p>
+    ui.mistakeInfo.innerHTML = `<p>${m.what}</p>
       <p><b>Dlaczego to problem:</b> ${m.why}</p>
       <p class="fix"><b>Jak poprawić:</b> ${m.fix}</p>`;
     if (!state.playing && state.exercise) state.playing = true;
     flyCamera(m.camera ?? state.exercise?.cameraPosition);
-  } else {
-    ui.mistakeCard.hidden = true;
-    if (state.exercise) flyCamera(state.exercise.cameraPosition);
+  } else if (state.exercise) {
+    flyCamera(state.exercise.cameraPosition);
   }
+  ui.mistakeInfo.hidden = !m || !state.showNotes;
+  ui.exDesc.hidden = !!m && state.showNotes; // przy opisie błędu chowamy opis ćwiczenia, żeby panel nie był za długi
+  renderRoles();
 }
 
-export function startExercise(ex, reps, mistakeId = null) {
+ui.notes.checked = state.showNotes;
+ui.notes.onchange = () => {
+  state.showNotes = ui.notes.checked;
+  localStorage.setItem('hes.mistakeNotes', state.showNotes ? '1' : '0');
+  ui.mistakeInfo.hidden = !state.pendingMistake || !state.showNotes;
+  ui.exDesc.hidden = !!state.pendingMistake && state.showNotes;
+};
+
+// Lista ról mięśni (główne / pomocnicze / stabilizujące) – stała dla ćwiczenia, bez procentów.
+// Przy błędzie strzałki pokazują, co pracuje mocniej (↑) lub słabiej (↓) niż przy poprawnej technice.
+function renderRoles() {
+  const ex = state.exercise;
+  if (!ex) { ui.roles.innerHTML = ''; return; }
+  const peak = state.peakBad ?? state.peakGood;
+  const groups = ROLES.map((r) => ({ ...r, items: [] }));
+  for (const m of MUSCLES) {
+    const role = roleOf(peak[m.id]);
+    if (role) groups.find((g) => g.id === role.id).items.push(m);
+  }
+  ui.roles.innerHTML = groups.filter((g) => g.items.length).map((g) => `
+    <div class="role-group"><div class="label">${g.label}</div><div class="role-items">
+      ${g.items.sort((a, b) => peak[b.id] - peak[a.id]).map((m) => {
+        const diff = state.peakBad ? state.peakBad[m.id] - state.peakGood[m.id] : 0;
+        const arrow = diff > 0.07 ? '<b class="up" title="pracuje mocniej niż przy poprawnej technice">↑</b>'
+          : diff < -0.07 ? '<b class="down" title="pracuje słabiej niż przy poprawnej technice">↓</b>' : '';
+        return `<span class="role-item" data-id="${m.id}"><i style="background:${cssColor(peak[m.id])}"></i>${m.name}${m.deep ? ' <em>(głęboki)</em>' : ''}${arrow}</span>`;
+      }).join('')}
+    </div></div>`).join('');
+  ui.roles.querySelectorAll('.role-item').forEach((el) => {
+    el.onmouseenter = () => (state.listHover = el.dataset.id);
+    el.onmouseleave = () => (state.listHover = null);
+  });
+}
+
+export function startExercise(ex, mistakeId = null) {
   const changed = state.exercise !== ex;
   if (changed) state.blend = { from: currentPose, t: 0 };
   state.exercise = ex;
   state.t = 0;
-  state.repsTarget = reps;
   state.repsDone = 0;
   state.playing = true;
   ui.exName.textContent = ex.name;
@@ -137,65 +147,23 @@ export function startExercise(ex, reps, mistakeId = null) {
   ui.breathTip.textContent = ex.breathingTip ?? '';
   ui.chips.querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c.dataset.id === ex.id));
   if (changed) {
+    state.peakGood = peakActivations(ex);
     buildTimeline(ex);
-    buildMistakes(ex);
     state.mistake = null;
     state.mistakeMix = 0;
+    buildMistakes(ex);
     flyCamera(ex.cameraPosition, ex.cameraTarget);
   }
   if (mistakeId) {
     const m = ex.mistakes.find((x) => x.id === mistakeId);
     if (m) { setMistake(m); state.mistake = m; state.mistakeMix = 1; if (m.camera) state.jumpTo = m.camera; }
   }
-  say(`Wykonuję: ${ex.name}${reps ? ` × ${reps}` : ' (w pętli)'}`);
 }
 
-function goRest() {
-  state.blend = { from: currentPose, t: 0 };
-  state.exercise = null;
-  state.playing = false;
-  state.mistake = null;
-  state.mistakeMix = 0;
-  ui.timeline.querySelectorAll('.seg').forEach((s) => s.remove());
-  ui.exName.textContent = 'Pozycja stojąca';
-  ui.exDesc.textContent = 'Wydaj polecenie, aby rozpocząć ćwiczenie.';
-  ui.exCues.innerHTML = '';
-  ui.breathTip.textContent = 'Spokojny oddech przeponowy: brzuch unosi się przy wdechu.';
-  buildMistakes(null);
-  ui.mistakeCard.hidden = true;
-  ui.chips.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
-  flyCamera([2.4, 1.5, 2.6], [0, 0.85, 0]);
-  say('Odpoczynek – pozycja stojąca');
-}
-
-ui.form.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const cmd = parseCommand(ui.input.value);
-  switch (cmd.type) {
-    case 'exercise': startExercise(cmd.exercise, cmd.reps); break;
-    case 'stop': state.playing = false; say('Zatrzymano'); break;
-    case 'play': if (state.exercise) { state.playing = true; say('Wznawiam'); } break;
-    case 'rest': goRest(); break;
-    case 'speed':
-      setSpeed(Math.min(2, Math.max(0.25, state.speed * cmd.factor)));
-      say(`Tempo: ${state.speed}×`);
-      break;
-    case 'empty': return;
-    default:
-      say('Nie rozumiem polecenia. Spróbuj np. „zrób 5 pompek”, „przysiad”, „uginanie”, „stop”.', 'err');
-  }
-  ui.input.value = '';
-});
-
-function setSpeed(v) {
-  state.speed = v;
-  ui.speed.value = String(v);
-}
 ui.speed.onchange = () => (state.speed = parseFloat(ui.speed.value));
 ui.play.onclick = () => {
-  if (!state.exercise) return startExercise(EXERCISES[0], null);
+  if (!state.exercise) return startExercise(EXERCISES[0]);
   state.playing = !state.playing;
-  if (state.playing && state.repsTarget && state.repsDone >= state.repsTarget) state.repsDone = 0;
 };
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && !ui.root.hidden && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
@@ -218,22 +186,19 @@ ui.timeline.addEventListener('pointerdown', (e) => {
 ui.timeline.addEventListener('pointermove', (e) => state.scrubbing && scrubAt(e.clientX));
 ui.timeline.addEventListener('pointerup', () => (state.scrubbing = false));
 
+function roleText(id) {
+  const peak = state.peakBad ?? state.peakGood;
+  const r = roleOf(peak[id] ?? 0);
+  return r ? `W tym ćwiczeniu ${r.one}` : 'W tym ćwiczeniu prawie nie pracuje';
+}
+
 // ---------- Klatka animacji ----------
-let lastSort = 0;
 export function frame(dt, time) {
   const ex = state.exercise;
 
   if (ex && state.playing && (!state.blend || state.blend.t > 0.6)) {
     state.t += (dt * state.speed) / ex.cycle;
-    if (state.t >= 1) {
-      state.t -= 1;
-      state.repsDone++;
-      if (state.repsTarget && state.repsDone >= state.repsTarget) {
-        state.t = 0;
-        state.playing = false;
-        say(`Gotowe: ${ex.name} × ${state.repsDone}`);
-      }
-    }
+    if (state.t >= 1) { state.t -= 1; state.repsDone++; }
   }
 
   // Przejście poprawna technika ↔ błąd
@@ -245,7 +210,7 @@ export function frame(dt, time) {
 
   let target = standingPose();
   let raw = Object.fromEntries(MUSCLES.map((m) => [m.id, 0.02]));
-  let sample = null, breath;
+  let sample = null;
   if (ex) {
     const params = {};
     if (mistake) for (const [k, v] of Object.entries(mistake.params)) params[k] = v * mix;
@@ -256,11 +221,6 @@ export function frame(dt, time) {
       const bad = computeActivations(ex, sample, mistake.muscles);
       for (const id in raw) raw[id] = lerp(raw[id], bad[id], mix);
     }
-    breath = sample.breath;
-  } else {
-    // spokojny oddech w spoczynku (~4 s cykl)
-    state.idleBreath += dt;
-    breath = 0.5 - 0.5 * Math.cos((state.idleBreath * 2 * Math.PI) / 4);
   }
   if (state.blend) {
     state.blend.t = Math.min(1, state.blend.t + dt / 0.9);
@@ -270,70 +230,53 @@ export function frame(dt, time) {
     currentPose = target;
   }
   body.setPose(currentPose);
-  body.setBreath(breath);
+  body.setBreath(sample ? sample.breath : 0.4);
 
   // Oddech: wskaźnik + obłoczki przy wydechu
-  const breathKind = sample ? sample.phase.breath : (Math.sin((state.idleBreath * 2 * Math.PI) / 4) >= 0 ? 'in' : 'out');
-  const moving = sample ? state.playing : true;
-  ui.breathFill.style.height = breath * 100 + '%';
-  ui.breathLabel.textContent = `${BREATH[breathKind].icon} ${BREATH[breathKind].label}`;
-  ui.breathLabel.className = 'breath-label ' + breathKind;
-  updateBreathPuffs(dt, breathKind === 'out' && moving ? 1 : 0);
+  if (sample) {
+    const kind = sample.phase.breath;
+    ui.breathFill.style.height = sample.breath * 100 + '%';
+    ui.breathLabel.textContent = `${BREATH[kind].icon} ${BREATH[kind].label}`;
+    ui.breathLabel.className = 'breath-label ' + kind;
+    updateBreathPuffs(dt, kind === 'out' && state.playing ? 1 : 0);
+  }
 
   // Wygładzenie aktywacji (mięśnie nie reagują natychmiastowo – opóźnienie elektromechaniczne)
   const k = state.scrubbing || !state.playing ? 1 - Math.exp(-dt / 0.03) : 1 - Math.exp(-dt / 0.09);
-  for (const m of MUSCLES) {
-    state.smoothed[m.id] += (raw[m.id] - state.smoothed[m.id]) * k;
-    const a = state.smoothed[m.id];
-    const r = rows[m.id];
-    r.fill.style.width = a * 100 + '%';
-    r.fill.style.background = cssColor(a);
-    r.val.textContent = Math.round(a * 100) + '%';
-    r.row.classList.toggle('hover', state.hovered === m.id);
-  }
-  // najechanie na mięsień w 3D
-  const hit = pickMuscle();
-  if (hit) state.hovered = hit.id;
-  else if (state.hoverFrom3d) state.hovered = null;
-  state.hoverFrom3d = !!hit;
-  showTooltip(hit, hit ? `Aktywacja: ${Math.round(state.smoothed[hit.id] * 100)}%` : '');
-  paintMuscles(state.smoothed, state.hovered);
+  for (const m of MUSCLES) state.smoothed[m.id] += (raw[m.id] - state.smoothed[m.id]) * k;
 
-  updateStressMarkers(mistake && ex ? mistake.stress : [], mix, time);
+  // Najechanie: na model, na figurę albo na nazwę na liście
+  const hit = pickMuscle() ?? figure.pick();
+  const hovered = hit?.id ?? state.listHover ?? null;
+  showTooltip(hit, hit ? roleText(hit.id) : '');
+  paintMuscles(state.smoothed, hovered);
+  ui.roles.querySelectorAll('.role-item').forEach((el) => el.classList.toggle('hover', el.dataset.id === hovered));
 
-  // Sortowanie listy (co 300 ms, żeby nie skakała)
-  const now = performance.now();
-  if (now - lastSort > 300) {
-    lastSort = now;
-    const byAct = ui.sortMode.value === 'activation';
-    ui.muscleList.classList.toggle('grouped', !byAct);
-    if (byAct) {
-      [...MUSCLES].sort((a, b) => state.smoothed[b.id] - state.smoothed[a.id]).forEach((m, i) => (rows[m.id].row.style.order = i));
-    } else {
-      MUSCLES.forEach((m) => (rows[m.id].row.style.order = rows[m.id].groupIndex * 100 + 1 + rows[m.id].i));
-    }
+  // Figura statyczna: szczytowe zaangażowanie (przy błędzie płynnie przechodzi w mapę z błędem)
+  if (ex) {
+    const fig = {};
+    for (const m of MUSCLES) fig[m.id] = state.peakBad && mistake === state.pendingMistake ? lerp(state.peakGood[m.id], state.peakBad[m.id], mix) : state.peakGood[m.id];
+    figure.set(fig, hovered);
   }
+  figure.render();
+
+  updateStressMarkers(mistake && ex ? mistake.stress : [], mix, time, state.showNotes);
 
   if (sample) {
     ui.phaseName.textContent = sample.phase.name;
-    ui.phaseKind.textContent = 'Faza ' + PHASE_KIND[sample.phase.kind].label;
+    ui.phaseKind.textContent = PHASE_KIND[sample.phase.kind].hint;
+    ui.phaseKind.title = 'Faza ' + PHASE_KIND[sample.phase.kind].label;
     ui.phaseKind.className = 'phase-kind ' + sample.phase.kind;
     ui.playhead.style.left = state.t * 100 + '%';
     ui.playhead.hidden = false;
-    const repNow = state.repsTarget ? Math.min(state.repsDone + 1, state.repsTarget) : state.repsDone + 1;
-    ui.reps.textContent = `Powtórzenie ${repNow}${state.repsTarget ? ' / ' + state.repsTarget : ''}`;
-  } else {
-    ui.phaseName.textContent = '—';
-    ui.phaseKind.textContent = '';
-    ui.playhead.hidden = true;
-    ui.reps.textContent = '';
+    ui.reps.textContent = `Powtórzenie ${state.repsDone + 1}`;
   }
   ui.play.textContent = state.playing ? '❚❚' : '▶';
 }
 
 export function enter() {
-  if (state.exercise) flyCamera(state.exercise.cameraPosition, state.exercise.cameraTarget);
-  else flyCamera([2.4, 1.5, 2.6], [0, 0.85, 0]);
+  if (!state.exercise) startExercise(EXERCISES[0]);
+  else flyCamera(state.exercise.cameraPosition, state.exercise.cameraTarget);
 }
 export function leave() {
   state.playing = false;
@@ -341,15 +284,12 @@ export function leave() {
   showTooltip(null);
 }
 
-// Ułatwienie do testów/demo: ?cmd=zrób%20pompkę&t=0.6&mistake=sag
+// Ułatwienie do testów/demo: ?ex=pushup&t=0.6&mistake=sag
 export function applyUrlParams(params) {
-  const cmd = params.get('cmd');
-  if (cmd) {
-    ui.input.value = cmd;
-    ui.form.requestSubmit();
-  }
+  const ex = EXERCISE_BY_ID[params.get('ex')];
+  if (ex) startExercise(ex);
   const mistake = params.get('mistake');
-  if (mistake && state.exercise) startExercise(state.exercise, null, mistake);
+  if (mistake && state.exercise) startExercise(state.exercise, mistake);
   const fixedT = params.get('t');
   if (fixedT !== null && state.exercise) {
     state.t = parseFloat(fixedT);
@@ -358,7 +298,3 @@ export function applyUrlParams(params) {
     jumpCamera(state.jumpTo ?? state.exercise.cameraPosition, state.exercise.cameraTarget);
   }
 }
-
-buildMistakes(null);
-say('Wpisz polecenie, np. „zrób 5 pompek”, albo wybierz ćwiczenie poniżej.', 'info');
-ui.breathTip.textContent = 'Spokojny oddech przeponowy: brzuch unosi się przy wdechu.';
