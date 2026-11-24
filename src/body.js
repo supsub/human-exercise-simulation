@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DIMS } from './dims.js';
 import { MUSCLES } from './muscles.js';
+import { buildOrganic } from './bodyOrganic.js';
 
 // Stylizowany manekin: hierarchia grup = szkielet (stawy obracają się wokół osi X),
 // segmenty ciała to kapsuły/elipsoidy, a mięśnie to osobne bryły na powierzchni,
@@ -30,6 +31,7 @@ function muscleGeometry(shape) {
 const skinMat = new THREE.MeshStandardMaterial({ color: 0xc3c9d4, roughness: 0.6, metalness: 0.05 });
 const jointMat = new THREE.MeshStandardMaterial({ color: 0xaab1be, roughness: 0.6, metalness: 0.05 });
 const faceMat = new THREE.MeshStandardMaterial({ color: 0x8a93a3, roughness: 0.5 });
+const organicSkin = new THREE.MeshStandardMaterial({ color: 0xc9ced6, roughness: 0.72, metalness: 0.0 });
 const metalMat = new THREE.MeshStandardMaterial({ color: 0x3a3f48, roughness: 0.35, metalness: 0.8 });
 
 function shadowed(mesh) {
@@ -98,12 +100,22 @@ function twistChain(rootG, midG, endG, angle, lateralSign) {
   }
 }
 
-export function createBody() {
+// look: 'classic' (domyślny) albo 'organic' (DEMO nowego wyglądu; w przeglądarce także ?look=organic)
+export function createBody({ look = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('look')) || 'classic' } = {}) {
+  const organic = look === 'organic';
   const joints = {};
   const points = {};
   // Bryły kolizyjne skóry (do testu fizyki: sprzęt i dłonie nie mogą wchodzić w ciało)
   const colliders = [];
-  const collide = (mesh, part, kind, r = 0, half = 0) => { colliders.push({ mesh, part, kind, r, half }); return mesh; };
+  // bryły kolizyjne są niewidoczne i niezależne od wyglądu (te same w obu wariantach)
+  const collideEll = (parent, part, r, pos) => {
+    const o = new THREE.Object3D(); o.scale.set(...r); o.position.set(...pos); parent.add(o);
+    colliders.push({ mesh: o, part, kind: 'ell', r: 0, half: 0 });
+  };
+  const collideCap = (parent, part, r, len, y = -len / 2) => {
+    const o = new THREE.Object3D(); o.position.y = y; parent.add(o);
+    colliders.push({ mesh: o, part, kind: 'cap', r, half: len / 2 });
+  };
   const marker = (name, parent, pos) => {
     const g = new THREE.Group();
     g.position.set(...pos);
@@ -115,7 +127,8 @@ export function createBody() {
   const root = new THREE.Group();
   root.name = 'root';
   bones.pelvis = root;
-  root.add(collide(ellipsoid([0.165, 0.11, 0.11], skinMat, [0, 0.02, 0]), 'pelvis', 'ell'));
+  collideEll(root, 'pelvis', [0.165, 0.11, 0.11], [0, 0.02, 0]);
+  if (!organic) root.add(ellipsoid([0.165, 0.11, 0.11], skinMat, [0, 0.02, 0]));
 
   // Tułów: klatka piersiowa i brzuch to osobne grupy, które "oddychają" (skalują się)
   const torso = joint('lumbar', root, [0, DIMS.lumbarY, 0], joints);
@@ -127,30 +140,43 @@ export function createBody() {
   const belly = new THREE.Group();
   belly.position.y = BELLY_PIVOT;
   torso.add(belly);
-  belly.add(collide(ellipsoid([0.14, 0.15, 0.1], skinMat, [0, 0.12 - BELLY_PIVOT, 0]), 'belly', 'ell'));
-  ribcage.add(collide(ellipsoid([0.17, 0.155, 0.11], skinMat, [0, 0.33 - RIB_PIVOT, 0]), 'chest', 'ell'));
+  collideEll(belly, 'belly', [0.14, 0.15, 0.1], [0, 0.12 - BELLY_PIVOT, 0]);
+  collideEll(ribcage, 'chest', [0.17, 0.155, 0.11], [0, 0.33 - RIB_PIVOT, 0]);
+  if (!organic) {
+    belly.add(ellipsoid([0.14, 0.15, 0.1], skinMat, [0, 0.12 - BELLY_PIVOT, 0]));
+    ribcage.add(ellipsoid([0.17, 0.155, 0.11], skinMat, [0, 0.33 - RIB_PIVOT, 0]));
+  }
 
   // Szyja i głowa
   const neck = joint('neck', torso, [0, DIMS.neckY, 0], joints);
-  const neckMesh = shadowed(new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.06, 4, 12), jointMat));
-  neckMesh.position.y = 0.04;
-  neck.add(collide(neckMesh, 'neck', 'cap', 0.045, 0.03));
-  neck.add(collide(ellipsoid([0.095, 0.115, 0.105], skinMat, [0, 0.17, 0.01]), 'head', 'ell'));
-  const nose = ellipsoid([0.018, 0.028, 0.02], faceMat, [0, 0.16, 0.112]);   // nos – pokazuje kierunek twarzy
-  neck.add(nose);
-  neck.add(ellipsoid([0.06, 0.012, 0.01], faceMat, [0, 0.19, 0.1]).rotateX(-0.2));
+  collideCap(neck, 'neck', 0.045, 0.06, 0.04);
+  collideEll(neck, 'head', [0.095, 0.115, 0.105], [0, 0.17, 0.01]);
+  let nose = null;
+  if (!organic) {
+    const neckMesh = shadowed(new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.06, 4, 12), jointMat));
+    neckMesh.position.y = 0.04;
+    neck.add(neckMesh);
+    neck.add(ellipsoid([0.095, 0.115, 0.105], skinMat, [0, 0.17, 0.01]));
+    nose = ellipsoid([0.018, 0.028, 0.02], faceMat, [0, 0.16, 0.112]);   // nos – pokazuje kierunek twarzy
+    neck.add(nose);
+    neck.add(ellipsoid([0.06, 0.012, 0.01], faceMat, [0, 0.19, 0.1]).rotateX(-0.2));
+  }
 
   const props = { dumbbells: [] };
-  const fingers = [];
+  let fingers = [];
+  const sides = {};
 
   for (const side of ['L', 'R']) {
     const sx = side === 'L' ? 1 : -1;
     const sh = joint('shoulder' + side, torso, [sx * DIMS.shoulderX, DIMS.shoulderY, 0], joints);
-    sh.add(ellipsoid([0.055, 0.055, 0.055], jointMat));
-    sh.add(collide(limb(0.046, DIMS.upperArm), 'upperArm' + side, 'cap', 0.046, DIMS.upperArm / 2));
+    collideCap(sh, 'upperArm' + side, 0.046, DIMS.upperArm);
     const el = joint('elbow' + side, sh, [0, -DIMS.upperArm, 0], joints);
-    el.add(collide(limb(0.038, DIMS.forearm), 'forearm' + side, 'cap', 0.038, DIMS.forearm / 2));
+    collideCap(el, 'forearm' + side, 0.038, DIMS.forearm);
     const wr = joint('wrist' + side, el, [0, -DIMS.forearm, 0], joints);
+    if (!organic) {
+    sh.add(ellipsoid([0.055, 0.055, 0.055], jointMat));
+    sh.add(limb(0.046, DIMS.upperArm));
+    el.add(limb(0.038, DIMS.forearm));
     // Dłoń: śródręcze + dwuczłonowe palce + kciuk. Palce zaciskają się na trzymanym przedmiocie
     // (uchwyt jest w punkcie 'hand', ok. 7 cm pod nadgarstkiem, tuż przed wnętrzem dłoni).
     const palm = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.07, 0.026), jointMat));
@@ -175,19 +201,25 @@ export function createBody() {
     tm.position.y = -0.022;
     thumb.add(tm);
     fingers.push({ f1, f2, thumb, sx });
+    }
     const db = dumbbell();
     wr.add(db);
     props.dumbbells.push(db);
 
     const hip = joint('hip' + side, root, [sx * DIMS.hipX, 0, 0], joints);
-    hip.add(collide(limb(0.07, DIMS.thigh), 'thigh' + side, 'cap', 0.07, DIMS.thigh / 2));
+    collideCap(hip, 'thigh' + side, 0.07, DIMS.thigh);
     const kn = joint('knee' + side, hip, [0, -DIMS.thigh, 0], joints);
-    kn.add(collide(limb(0.052, DIMS.shin), 'shin' + side, 'cap', 0.052, DIMS.shin / 2));
+    collideCap(kn, 'shin' + side, 0.052, DIMS.shin);
     const an = joint('ankle' + side, kn, [0, -DIMS.shin, 0], joints);
-    const footLen = DIMS.footFront - DIMS.footBack;
-    const foot = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, footLen), jointMat));
-    foot.position.set(0, -DIMS.ankleHeight + 0.03, (DIMS.footFront + DIMS.footBack) / 2);
-    an.add(foot);
+    if (!organic) {
+      hip.add(limb(0.07, DIMS.thigh));
+      kn.add(limb(0.052, DIMS.shin));
+      const footLen = DIMS.footFront - DIMS.footBack;
+      const foot = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, footLen), jointMat));
+      foot.position.set(0, -DIMS.ankleHeight + 0.03, (DIMS.footFront + DIMS.footBack) / 2);
+      an.add(foot);
+    }
+    sides[side] = { sh, el, wr, hip, kn, an, sx };
 
     bones[side] = { upperArm: sh, forearm: el, thigh: hip, shin: kn };
     // bark i biodro: zgięcie (X), potem odwiedzenie (Z), na końcu rotacja wzdłuż kości (Y)
@@ -209,11 +241,15 @@ export function createBody() {
   marker('headTop', neck, [0, 0.29, 0.01]);
 
   // Mięśnie – jeden materiał na mięsień (lewa i prawa strona świecą razem)
-  const muscleMeshes = [];
+  let muscleMeshes = [];
   const materials = {};
-  for (const m of MUSCLES) {
-    const mat = new THREE.MeshStandardMaterial({ color: 0x4a5a78, roughness: 0.45, metalness: 0.0, emissive: 0x000000 });
-    materials[m.id] = mat;
+  for (const m of MUSCLES) materials[m.id] = new THREE.MeshStandardMaterial({ color: 0x4a5a78, roughness: 0.5, metalness: 0.0, emissive: 0x000000 });
+  if (organic) {
+    const o = buildOrganic({ root, ribcage, belly, RIB_PIVOT, BELLY_PIVOT, neck, sides, skinMat: organicSkin, jointMat: organicSkin, faceMat, materials, MUSCLES, shadowed });
+    muscleMeshes = o.muscleMeshes; fingers = o.fingers; nose = o.nose;
+  }
+  for (const m of organic ? [] : MUSCLES) {
+    const mat = materials[m.id];
     if (m.deep) continue;
     const parts = m.parts ?? [{ pos: m.pos, r: m.r, rot: m.rot }];
     const sides = m.mirror ? [1, -1] : [1];

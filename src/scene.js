@@ -52,8 +52,10 @@ export const body = createBody();
 scene.add(body.root);
 
 // ---------- Kolory aktywacji ----------
+// Wygląd organiczny (DEMO, ?look=organic): mięśnie w spoczynku w jasnym, stonowanym kolorze bliskim skórze
+const ORGANIC = new URLSearchParams(location.search).get('look') === 'organic';
 const STOPS = [
-  [0.0, new THREE.Color(0x4a5a78)],
+  [0.0, new THREE.Color(ORGANIC ? 0xa9b3c4 : 0x4a5a78)],
   [0.2, new THREE.Color(0x3fa7d6)],
   [0.4, new THREE.Color(0xf2c94c)],
   [0.65, new THREE.Color(0xf2994a)],
@@ -73,7 +75,7 @@ export const cssColor = (a) => '#' + activationColor(a, new THREE.Color()).getHe
 
 // Skala objętości treningowej (plan): szary = brak, żółty = minimum, zielony = optymalnie, pomarańczowy = za dużo.
 // v – serie, th – progi [minimum, optimum, maks., przesada]
-const VSTOPS = [new THREE.Color(0x3a4459), new THREE.Color(0xe0b83c), new THREE.Color(0x4fcf7a), new THREE.Color(0x2fae5e), new THREE.Color(0xf2994a)];
+const VSTOPS = [new THREE.Color(ORGANIC ? 0xa9b3c4 : 0x3a4459), new THREE.Color(0xe0b83c), new THREE.Color(0x4fcf7a), new THREE.Color(0x2fae5e), new THREE.Color(0xf2994a)];
 export const WEEK_THRESHOLDS = [3, 8, 20, 28];
 export const DAY_THRESHOLDS = [1, 3, 8, 12];
 export function volumeColor(v, th = WEEK_THRESHOLDS, target = tmpColor) {

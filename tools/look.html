@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <title>Demo: nowy wygląd człowieka</title>
+  <!-- Porównanie wyglądu: obecny (klasyczny) vs nowy (organiczny), te same ćwiczenia i aktywacje.
+       Otwórz: http://localhost:8000/tools/look.html  (opcjonalnie ?ex=squat&t=0.5 – zatrzymany kadr) -->
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+                   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+  </script>
+  <style>
+    body { margin: 0; background: #0f141c; color: #e6ebf2; font: 14px system-ui, sans-serif; overflow: hidden; }
+    canvas { display: block; position: fixed; inset: 0; }
+    .bar { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 6px; padding: 10px 14px; background: rgba(11,15,22,.85); z-index: 2; flex-wrap: wrap; align-items: center; }
+    .bar b { margin-right: 10px; }
+    button { background: #233047; color: #e6ebf2; border: 1px solid rgba(255,255,255,.08); border-radius: 999px; padding: 5px 12px; cursor: pointer; font: inherit; font-size: 13px; }
+    button.on { background: #4fb3ff; color: #06121f; }
+    .lbl { position: fixed; bottom: 18px; z-index: 2; font-size: 15px; font-weight: 600; background: rgba(11,15,22,.8); padding: 6px 14px; border-radius: 9px; transform: translateX(-50%); }
+    .split { position: fixed; top: 0; bottom: 0; left: 50%; width: 1px; background: rgba(255,255,255,.12); z-index: 1; }
+  </style>
+</head>
+<body>
+  <div class="bar"><b>Demo wyglądu</b><span id="exs"></span></div>
+  <div class="split"></div>
+  <div class="lbl" style="left:25%">Obecny</div>
+  <div class="lbl" style="left:75%">Nowy (propozycja)</div>
+  <canvas id="c"></canvas>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { createBody } from '../src/body.js';
+    import { EXERCISE_BY_ID } from '../src/exercises/index.js';
+    import { sampleExercise, computeActivations } from '../src/exercises/common.js';
+    import { MUSCLES } from '../src/muscles.js';
+
+    const q = new URLSearchParams(location.search);
+    const DEMO = ['squat', 'goblet_squat', 'bench', 'curl', 'lat_pulldown', 'deadlift', 'lunge', 'pushup', 'ohp', 'row'];
+    let ex = EXERCISE_BY_ID[q.get('ex')] ?? EXERCISE_BY_ID.squat;
+    const fixedT = q.has('t') ? parseFloat(q.get('t')) : null;
+
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    renderer.setScissorTest(true);
+
+    // osobna scena na każdy wygląd (rekwizyty dokładane są do sceny swojego ciała)
+    function makeWorld(look) {
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0f141c);
+      scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x1a1f28, 1.1));
+      const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(2.5, 4.5, 3); sun.castShadow = true;
+      sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -2.5, right: 2.5, top: 2.5, bottom: -2.5 });
+      scene.add(sun);
+      const rim = new THREE.DirectionalLight(0x7fa8ff, 0.8); rim.position.set(-3, 2, -3); scene.add(rim);
+      const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 64), new THREE.MeshStandardMaterial({ color: 0x1b2230, roughness: 0.95 }));
+      floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+      const body = createBody({ look });
+      scene.add(body.root);
+      const scenery = new THREE.Group(); scene.add(scenery);
+      return { scene, body, scenery, look };
+    }
+    const worlds = [makeWorld('classic'), makeWorld('organic')];
+
+    // kolory aktywacji – jak w aplikacji (nowy wygląd: jasny kolor mięśni w spoczynku)
+    const stops = (low) => [[0, low], [0.2, 0x3fa7d6], [0.4, 0xf2c94c], [0.65, 0xf2994a], [1, 0xeb3b3b]].map(([a, c]) => [a, new THREE.Color(c)]);
+    const PAL = { classic: stops(0x4a5a78), organic: stops(0xa9b3c4) };
+    function colorOf(look, a, out) {
+      const S = PAL[look];
+      for (let i = 1; i < S.length; i++) if (a <= S[i][0]) return out.copy(S[i - 1][1]).lerp(S[i][1], (a - S[i - 1][0]) / (S[i][0] - S[i - 1][0]));
+      return out.copy(S[S.length - 1][1]);
+    }
+    const COLORS = { pad: 0x343b48, frame: 0x5d6572, metal: 0x9aa1ab, wall: 0x232a36 };
+    function setScenery(group, defs = []) {
+      group.clear();
+      for (const d of defs) {
+        const mat = new THREE.MeshStandardMaterial({ color: COLORS[d.color ?? (d.box ? 'pad' : 'metal')] });
+        let m;
+        if (d.box) { m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat); m.position.set(...d.box); m.scale.set(...d.size); m.rotation.x = d.rx ?? 0; }
+        else {
+          const a = new THREE.Vector3(...d.cyl[0]), b = new THREE.Vector3(...d.cyl[1]);
+          m = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 12), mat);
+          m.position.copy(a).add(b).multiplyScalar(0.5); m.scale.set(d.r ?? 0.02, a.distanceTo(b), d.r ?? 0.02);
+          m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+        }
+        m.castShadow = m.receiveShadow = true;
+        group.add(m);
+      }
+    }
+
+    const camera = new THREE.PerspectiveCamera(36, 1, 0.05, 50);
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    function pick(id) {
+      ex = EXERCISE_BY_ID[id];
+      for (const w of worlds) setScenery(w.scenery, ex.scenery);
+      const tg = new THREE.Vector3(...(ex.cameraTarget ?? [0, 0.85, 0]));
+      camera.position.copy(new THREE.Vector3(...ex.cameraPosition).sub(tg).multiplyScalar(1.05).add(tg));
+      controls.target.copy(tg);
+      document.querySelectorAll('#exs button').forEach((b) => b.classList.toggle('on', b.dataset.id === id));
+    }
+    document.getElementById('exs').innerHTML = DEMO.map((id) => `<button data-id="${id}">${EXERCISE_BY_ID[id].name}</button>`).join(' ');
+    document.querySelectorAll('#exs button').forEach((b) => (b.onclick = () => pick(b.dataset.id)));
+    pick(ex.id);
+
+    let t = fixedT ?? 0, last = performance.now();
+    const smoothed = Object.fromEntries(MUSCLES.map((m) => [m.id, 0.02]));
+    function frame(now) {
+      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      if (fixedT === null) t = (t + dt / ex.cycle) % 1;
+      const s = sampleExercise(ex, t);
+      const act = computeActivations(ex, s);
+      const k = fixedT === null ? 1 - Math.exp(-dt / 0.09) : 1;
+      for (const id in smoothed) smoothed[id] += (act[id] - smoothed[id]) * k;
+      const W = innerWidth, H = innerHeight;
+      renderer.setSize(W, H, false);
+      camera.aspect = W / 2 / H; camera.updateProjectionMatrix();
+      controls.update();
+      worlds.forEach((w, i) => {
+        w.body.setPose(w.body.resolvePose(ex.pose(s.depth, {})));
+        w.body.setBreath(s.breath);
+        for (const m of MUSCLES) {
+          const mat = w.body.materials[m.id];
+          colorOf(w.look, smoothed[m.id], mat.color);
+          mat.emissive.copy(mat.color).multiplyScalar(Math.min(1, smoothed[m.id]) * 0.45);
+        }
+        renderer.setViewport(i * W / 2, 0, W / 2, H); renderer.setScissor(i * W / 2, 0, W / 2, H);
+        renderer.render(w.scene, camera);
+      });
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
