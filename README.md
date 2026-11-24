@@ -16,7 +16,7 @@ Parametry URL przydatne do demo i testów:
 - `?ex=squat` otwiera szczegóły ćwiczenia z katalogu (id z `src/plan/catalog.js`),
 - `&t=0.6` zatrzymuje animację w danym punkcie cyklu (0–1),
 - `&mistake=valgus` pokazuje typowy błąd (id z `mistakes` w pliku ćwiczenia),
-- `?focus=tue` zaznacza dzień, `?picker=wed` otwiera listę ćwiczeń dla dnia, `&preview=row` podświetla mięśnie ćwiczenia z listy.
+- `?focus=A` zaznacza trening (litera wariantu), `?picker=B` otwiera listę ćwiczeń dla treningu, `&preview=row` podświetla mięśnie ćwiczenia z listy.
 
 `node tools/check.mjs` wypisuje kąty stawów i aktywacje bez przeglądarki (szybki test sanity).
 
@@ -35,7 +35,7 @@ Parametry URL przydatne do demo i testów:
 | `src/exercises/build.js`, `library.js` | silnik póz kluczowych i animacje ćwiczeń katalogu |
 | `src/player.js` | odtwarzanie ćwiczenia: oś czasu, przejścia, błędy techniki, wygładzone aktywacje |
 | `src/plan/catalog.js` | katalog ćwiczeń do planu (waga zaangażowania mięśni) |
-| `src/plan/analysis.js` | analiza planu: objętość, ostrzeżenia, rekomendacje (bez UI) |
+| `src/plan/analysis.js` | treningi i plany, automatyczny harmonogram cyklu, analiza: objętość, ostrzeżenia, rekomendacje (bez UI) |
 | `src/plan/planView.js` | jedyny widok: plan, panel ćwiczeń (lista i szczegóły), pasek odtwarzania |
 | `src/main.js` | start aplikacji |
 

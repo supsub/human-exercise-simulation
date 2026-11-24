@@ -6,18 +6,20 @@ import { EXERCISE_BY_ID } from '../exercises/index.js';
 import { createPlayer } from '../player.js';
 import { createFigure } from '../figure.js';
 import { CATALOG, CATALOG_BY_ID, CATEGORIES } from './catalog.js';
-import { DAYS, DAY_BY_ID, analyzePlan, emptyPlan, examplePlan, volumeStatus, OPTIMAL_WEEKLY, newId } from './analysis.js';
+import { DAYS, analyzePlan, emptyPlan, emptyWorkout, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
 
-// Jedyny widok aplikacji: plan treningowy (tydzień Pn–Nd) z modelem 3D.
-// - bez wybranego ćwiczenia model pokazuje mapę obciążenia tygodnia lub dnia,
-// - wybrane ćwiczenie (z planu, listy lub rekomendacji) otwiera szczegóły po prawej:
-//   animacja na modelu, typowe błędy, figura z pracującymi mięśniami, dodanie do wybranego dnia.
+// Jedyny widok aplikacji: plan treningowy z modelem 3D.
+// - treningi (warianty, np. „FBW A”) to bloki ćwiczeń niezależne od dni tygodnia,
+// - plan: ile treningów w tygodniu i które warianty – harmonogram układa się sam (każdy wariant tyle samo razy),
+// - bez wybranego ćwiczenia model pokazuje mapę obciążenia tygodnia albo jednego treningu,
+// - wybrane ćwiczenie otwiera szczegóły po prawej: animacja, typowe błędy, figura, dodanie do wybranego treningu.
 
-const STORAGE_KEY = 'hes.plans.v1';
+const STORAGE_KEY = 'hes.data.v2';
+const STORAGE_V1 = 'hes.plans.v1';
 const PLAN_CAMERA = [[0, 1.25, 3.4], [0, 0.95, 0]];
 const $ = (id) => document.getElementById(id);
 const ui = {
-  select: $('plan-select'), days: $('plan-days'),
+  select: $('plan-select'), days: $('plan-days'), schedule: $('plan-schedule'), workoutNew: $('workout-new'),
   newBtn: $('plan-new'), renameBtn: $('plan-rename'), deleteBtn: $('plan-delete'), exampleBtn: $('plan-example'),
   focus: $('plan-focus'), legend: $('plan-legend'), score: $('plan-score'), groups: $('plan-groups'), warnings: $('plan-warnings'), recs: $('plan-recs'),
   panel: $('picker'), panelTitle: $('picker-title'), panelClose: $('picker-close'),
@@ -32,9 +34,9 @@ const figure = createFigure($('figure'));
 
 let store = load();
 let analysis = null;
-let focusDay = null;        // wybrany dzień (mapa dnia na modelu, cel przycisku "Dodaj")
+let focusId = null;         // wybrany trening (mapa jego mięśni na modelu, cel przycisku "Dodaj do")
 let selected = null;        // { ex: pozycja katalogu, anim: definicja animacji | null, from: 'plan' | 'list' }
-let browseDay = null;       // dzień, dla którego otwarto listę ćwiczeń
+let browseId = null;        // trening, dla którego otwarto listę ćwiczeń
 let browseCat = null;
 let listHover = null;       // ćwiczenie wskazane na liście (podgląd mięśni)
 let muscleHover = null;     // mięsień wskazany w panelu
@@ -47,14 +49,27 @@ function load() {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (s && s.plans?.length) return s;
   } catch {}
-  const p = examplePlan();
-  return { plans: [p], currentId: p.id };
+  // dane w starym formacie (ćwiczenia przypisane do dni) – przenosimy jako treningi
+  try {
+    const old = JSON.parse(localStorage.getItem(STORAGE_V1));
+    if (old?.plans?.length) {
+      const m = migrateV1(old);
+      if (m.workouts.length) return { ...m, currentId: m.plans[0].id };
+    }
+  } catch {}
+  const d = exampleData();
+  return { ...d, currentId: d.plans[0].id };
 }
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }
 const plan = () => store.plans.find((p) => p.id === store.currentId) ?? store.plans[0];
+const workout = (id) => store.workouts.find((w) => w.id === id);
+const wIndex = (id) => store.workouts.findIndex((w) => w.id === id);
+const letter = (id) => LETTERS[wIndex(id)] ?? '?';
+const color = (id) => WORKOUT_COLORS[wIndex(id) % WORKOUT_COLORS.length];
+const badge = (id) => `<i class="wbadge" style="--c:${color(id)}">${letter(id)}</i>`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const clampInt = (v, a, b) => Math.min(b, Math.max(a, parseInt(v, 10) || a));
-const dayTotal = (p, id) => p.days[id].items.reduce((s, it) => s + (it.sets || 0), 0);
+const setsOf = (w) => w.items.reduce((s, it) => s + (it.sets || 0), 0);
 // mięśnie, które ćwiczenie mocno angażuje, a w planie dostają za mało pracy
 const helpsOf = (ex) => Object.entries(ex.muscles).filter(([id, w]) => w >= 0.5 && analysis.weekly[id] < 3).map(([id]) => id);
 
@@ -62,75 +77,129 @@ const helpsOf = (ex) => Object.entries(ex.muscles).filter(([id, w]) => w >= 0.5 
 function render() {
   const p = plan();
   ui.select.innerHTML = store.plans.map((x) => `<option value="${x.id}" ${x.id === p.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
-  analysis = analyzePlan(p);
-  renderDays(p);
+  if (focusId && !workout(focusId)) focusId = null;
+  analysis = analyzePlan(p, store.workouts);
+  renderSchedule(p);
+  renderWorkouts(p);
   renderAnalysis(p);
   if (selected) renderDetailTop();
   if (!ui.browse.hidden && !ui.panel.hidden) renderList();
   save();
 }
 
-function renderDays(p) {
+// ---------- Harmonogram: treningów w tygodniu, warianty, kalendarz cyklu ----------
+function renderSchedule(p) {
+  const sch = analysis.schedule;
+  const inPlan = p.variants.filter((id) => workout(id));
+  const cell = (id) => id
+    ? `<button class="cal-cell on${focusId === id ? ' focused' : ''}" data-id="${id}" style="--c:${color(id)}" title="${esc(workout(id).name)}">${letter(id)}</button>`
+    : '<span class="cal-cell"></span>';
+  ui.schedule.innerHTML = `
+    <div class="sch-row">
+      <span>Treningów w tygodniu</span>
+      <div class="stepper"><button data-d="-1" title="Mniej">−</button><b>${sch.n}</b><button data-d="1" title="Więcej">+</button></div>
+    </div>
+    <div class="cal">
+      <span></span>${DAYS.map((d, i) => `<button class="cal-day${sch.dayIdx.includes(i) ? ' train' : ''}" data-day="${d.id}" title="Kliknij, aby ręcznie włączyć/wyłączyć ten dzień">${d.short}</button>`).join('')}
+      ${sch.calendar.map((week, w) => `<span class="cal-week">${sch.weeks > 1 ? `Tydz. ${w + 1}` : 'Tydzień'}</span>${week.map(cell).join('')}`).join('')}
+    </div>
+    <div class="sch-info">${inPlan.length
+      ? `${sch.weeks > 1 ? `Cykl ${sch.weeks} tyg. – ` : ''}każdy wariant ${sch.perVariant}× ${sch.weeks > 1 ? 'w cyklu' : 'w tygodniu'} · dni ${sch.auto ? 'dobrane automatycznie' : 'wybrane ręcznie <button class="link small" id="sch-auto">↺ dobierz automatycznie</button>'}`
+      : 'Zaznacz poniżej treningi, które mają wejść do planu.'}</div>`;
+  ui.schedule.querySelectorAll('.stepper button').forEach((b) => (b.onclick = () => {
+    p.sessions = Math.min(7, Math.max(1, sch.n + +b.dataset.d));
+    p.days = null;                 // zmiana liczby treningów = nowy dobór dni
+    render();
+  }));
+  ui.schedule.querySelectorAll('.cal-day').forEach((b) => (b.onclick = () => {
+    const days = new Set(p.days ?? sch.dayIdx.map((i) => DAYS[i].id));
+    if (days.has(b.dataset.day)) { if (days.size > 1) days.delete(b.dataset.day); } else days.add(b.dataset.day);
+    p.days = DAYS.map((d) => d.id).filter((id) => days.has(id));
+    p.sessions = p.days.length;
+    render();
+  }));
+  ui.schedule.querySelector('#sch-auto')?.addEventListener('click', () => { p.days = null; render(); });
+  ui.schedule.querySelectorAll('.cal-cell.on').forEach((b) => (b.onclick = () => toggleFocus(b.dataset.id)));
+}
+
+function toggleFocus(id) {
+  focusId = selected ? id : focusId === id ? null : id;
+  if (!selected && !ui.panel.hidden && !ui.browse.hidden) closePanel(); else render();
+}
+
+// ---------- Treningi (warianty) ----------
+function renderWorkouts(p) {
   ui.days.innerHTML = '';
-  for (const d of DAYS) {
-    const day = p.days[d.id];
+  for (const w of store.workouts) {
+    const on = p.variants.includes(w.id);
     const card = document.createElement('div');
-    card.className = 'day-card' + (day.active ? ' active' : '') + (focusDay === d.id ? ' focused' : '');
-    const total = dayTotal(p, d.id);
+    card.className = 'day-card' + (on ? ' active' : '') + (focusId === w.id ? ' focused' : '');
+    const total = setsOf(w);
     card.innerHTML = `
       <div class="day-head">
-        <label class="switch" title="Dzień treningowy"><input type="checkbox" ${day.active ? 'checked' : ''}><span></span></label>
-        <button class="day-name" title="Wybierz dzień – pokaż jego mięśnie na modelu">${d.name}</button>
-        <span class="day-meta">${day.active ? (total ? `${day.items.length} ćw. · ${total} serii` : 'trening') : 'odpoczynek'}</span>
+        <label class="switch" title="${on ? 'W planie – kliknij, aby wyłączyć' : 'Poza planem – kliknij, aby dodać do planu'}"><input type="checkbox" ${on ? 'checked' : ''}><span></span></label>
+        ${badge(w.id)}
+        <button class="day-name">${esc(w.name)}</button>
+        <span class="day-meta">${w.items.length ? `${w.items.length} ćw. · ${total} serii` : 'pusty'}</span>
+        <button class="icon w-rename" title="Zmień nazwę">✎</button>
+        <button class="icon w-del" title="Usuń trening">🗑</button>
       </div>
       <div class="day-items"></div>`;
-    card.querySelector('input').onchange = (e) => { day.active = e.target.checked; render(); };
-    card.querySelector('.switch').addEventListener('click', (e) => e.stopPropagation());
-    // cała karta dnia jest klikalna (wiersze ćwiczeń, pola i przyciski mają własne akcje)
-    card.title = selected ? `Wybierz ${d.name} – potem „Dodaj do”` : `Pokaż na modelu mięśnie z dnia: ${d.name}`;
-    card.onclick = () => {
-      // wybrane ćwiczenie: klik w dzień tylko go zaznacza (cel przycisku "Dodaj do")
-      if (selected) { focusDay = d.id; render(); return; }
-      // bez wybranego ćwiczenia: podgląd dnia na modelu (ponowny klik – cały tydzień)
-      focusDay = focusDay === d.id ? null : d.id;
-      if (!ui.panel.hidden && !ui.browse.hidden) closePanel(); else render();
+    card.querySelector('input').onchange = (e) => {
+      p.variants = e.target.checked ? [...p.variants, w.id] : p.variants.filter((id) => id !== w.id);
+      render();
     };
+    card.querySelector('.switch').addEventListener('click', (e) => e.stopPropagation());
+    card.querySelector('.w-rename').onclick = (e) => {
+      e.stopPropagation();
+      const name = prompt('Nazwa treningu:', w.name);
+      if (name?.trim()) { w.name = name.trim(); render(); }
+    };
+    card.querySelector('.w-del').onclick = (e) => {
+      e.stopPropagation();
+      if (!confirm(`Usunąć trening „${w.name}”? Zniknie ze wszystkich planów.`)) return;
+      store.workouts = store.workouts.filter((x) => x !== w);
+      for (const pl of store.plans) pl.variants = pl.variants.filter((id) => id !== w.id);
+      render();
+    };
+    card.title = selected ? `Wybierz „${w.name}” – potem „Dodaj do”` : `Pokaż na modelu mięśnie z treningu „${w.name}”`;
+    card.onclick = () => toggleFocus(w.id);
     const list = card.querySelector('.day-items');
-    if (day.active) {
-      day.items.forEach((it, idx) => {
-        const ex = CATALOG_BY_ID[it.exId];
-        const row = document.createElement('div');
-        row.className = 'item' + (selected?.ex === ex ? ' selected' : '');
-        row.title = 'Kliknij, aby zobaczyć ćwiczenie';
-        row.innerHTML = `
-          <span class="item-name">${esc(ex.name)}</span>
-          <input type="number" min="1" max="10" value="${it.sets}" title="Serie"> <span class="x">×</span>
-          <input type="number" min="1" max="50" value="${it.reps}" title="Powtórzenia">
-          <button class="icon del" title="Usuń z planu">✕</button>`;
-        const [setsIn, repsIn] = row.querySelectorAll('input');
-        setsIn.onchange = () => { it.sets = clampInt(setsIn.value, 1, 10); render(); };
-        repsIn.onchange = () => { it.reps = clampInt(repsIn.value, 1, 50); render(); };
-        row.querySelectorAll('input, .del').forEach((el) => el.addEventListener('click', (e) => e.stopPropagation()));
-        row.querySelector('.del').onclick = (e) => { e.stopPropagation(); day.items.splice(idx, 1); render(); };
-        row.onclick = (e) => { e.stopPropagation(); selected?.ex === ex ? closePanel() : selectExercise(ex, 'plan'); };
-        list.appendChild(row);
-      });
-      const add = document.createElement('button');
-      add.className = 'add-ex';
-      add.textContent = '+ Dodaj ćwiczenie';
-      add.onclick = (e) => { e.stopPropagation(); openBrowse(d.id); };
-      list.appendChild(add);
-    }
+    w.items.forEach((it, idx) => {
+      const ex = CATALOG_BY_ID[it.exId];
+      if (!ex) return;
+      const row = document.createElement('div');
+      row.className = 'item' + (selected?.ex === ex ? ' selected' : '');
+      row.title = 'Kliknij, aby zobaczyć ćwiczenie';
+      row.innerHTML = `
+        <span class="item-name">${esc(ex.name)}</span>
+        <input type="number" min="1" max="10" value="${it.sets}" title="Serie"> <span class="x">×</span>
+        <input type="number" min="1" max="50" value="${it.reps}" title="Powtórzenia">
+        <button class="icon del" title="Usuń z treningu">✕</button>`;
+      const [setsIn, repsIn] = row.querySelectorAll('input');
+      setsIn.onchange = () => { it.sets = clampInt(setsIn.value, 1, 10); render(); };
+      repsIn.onchange = () => { it.reps = clampInt(repsIn.value, 1, 50); render(); };
+      row.querySelectorAll('input, .del').forEach((el) => el.addEventListener('click', (e) => e.stopPropagation()));
+      row.querySelector('.del').onclick = (e) => { e.stopPropagation(); w.items.splice(idx, 1); render(); };
+      row.onclick = (e) => { e.stopPropagation(); selected?.ex === ex ? closePanel() : selectExercise(ex, 'plan'); };
+      list.appendChild(row);
+    });
+    const add = document.createElement('button');
+    add.className = 'add-ex';
+    add.textContent = '+ Dodaj ćwiczenie';
+    add.onclick = (e) => { e.stopPropagation(); openBrowse(w.id); };
+    list.appendChild(add);
     ui.days.appendChild(card);
   }
+  if (!store.workouts.length) ui.days.innerHTML = '<div class="muted small">Brak treningów. Utwórz pierwszy: „+ Nowy trening”.</div>';
 }
 
 function renderAnalysis(p) {
   const a = analysis;
-  ui.focus.innerHTML = focusDay
-    ? `Pokazuję: <b>${DAY_BY_ID[focusDay].name}</b> <button id="focus-week" class="link">pokaż cały tydzień</button>`
-    : 'Pokazuję: <b>cały tydzień</b> <span class="muted">(kliknij dzień, aby zobaczyć mięśnie z jednego treningu)</span>';
-  ui.focus.querySelector('#focus-week')?.addEventListener('click', () => { focusDay = null; if (!ui.panel.hidden) closePanel(); else render(); });
+  ui.focus.innerHTML = focusId
+    ? `Pokazuję: ${badge(focusId)} <b>${esc(workout(focusId).name)}</b> <button id="focus-week" class="link">pokaż cały tydzień</button>`
+    : `Pokazuję: <b>cały tydzień</b>${analysis.schedule.weeks > 1 ? ' (średnio w cyklu)' : ''} <span class="muted">– kliknij trening, aby zobaczyć jego mięśnie</span>`;
+  ui.focus.querySelector('#focus-week')?.addEventListener('click', () => { focusId = null; if (!ui.panel.hidden) closePanel(); else render(); });
 
   const pct = Math.round((a.trained / MUSCLES.length) * 100);
   ui.score.innerHTML = `
@@ -148,7 +217,8 @@ function renderAnalysis(p) {
     </div>`;
   }).join('');
 
-  ui.warnings.innerHTML = a.warnings.map((w) => `<div class="warn ${w.level}">${w.level === 'warn' ? '⚠' : w.level === 'ok' ? '✓' : 'ℹ'} ${w.text}</div>`).join('');
+  ui.warnings.innerHTML = a.warnings.length ? a.warnings.map((w) => `<div class="warn ${w.level}">${w.level === 'warn' ? '⚠' : w.level === 'ok' ? '✓' : 'ℹ'} ${w.text}</div>`).join('')
+    : '<div class="warn info">ℹ Brak poważnych uwag. Sprawdź partie oznaczone jako „za mało” i rekomendacje poniżej.</div>';
 
   ui.recs.innerHTML = a.recommendations.length
     ? a.recommendations.map((r, i) => {
@@ -156,32 +226,31 @@ function renderAnalysis(p) {
         return `<div class="rec">
           <div><button class="link rec-name" data-i="${i}" title="Zobacz ćwiczenie">${ex.name}</button> <span class="muted">· ${ex.equipment}</span><br>
           <small>Uzupełnia: ${r.fixes.map((id) => MUSCLE_BY_ID[id].name).join(', ')}</small></div>
-          ${r.day ? `<button class="rec-add" data-i="${i}">+ ${DAY_BY_ID[r.day].short}</button>` : ''}
+          ${r.workout ? `<button class="rec-add" data-i="${i}" title="Dodaj do: ${esc(workout(r.workout).name)}">+ ${badge(r.workout)}</button>` : ''}
         </div>`;
       }).join('')
     : '<div class="muted">Brak – wszystkie mięśnie dostają minimum bodźca.</div>';
   ui.recs.querySelectorAll('.rec-name').forEach((b) => (b.onclick = () => {
     const r = a.recommendations[+b.dataset.i];
-    if (r.day) focusDay = r.day;
+    if (r.workout) focusId = r.workout;
     selectExercise(CATALOG_BY_ID[r.exId], 'plan');
   }));
   ui.recs.querySelectorAll('.rec-add').forEach((b) => (b.onclick = () => {
     const r = a.recommendations[+b.dataset.i];
-    p.days[r.day].items.push({ exId: r.exId, sets: 3, reps: 10 });
-    render();
+    addToWorkout(CATALOG_BY_ID[r.exId], r.workout);
   }));
 }
 
 // ---------- Panel: lista ćwiczeń ----------
-function openBrowse(dayId) {
-  browseDay = dayId;
-  focusDay = dayId;
+function openBrowse(id) {
+  browseId = id;
+  focusId = id;
   deselect();
   ui.search.value = '';
   ui.panel.hidden = false;
   ui.browse.hidden = false;
   ui.detail.hidden = true;
-  ui.panelTitle.textContent = `Dodaj ćwiczenie – ${DAY_BY_ID[dayId].name}`;
+  ui.panelTitle.textContent = `Dodaj ćwiczenie – ${workout(id).name}`;
   flyCamera(...PLAN_CAMERA);
   render();
   ui.search.focus();
@@ -190,7 +259,7 @@ function backToList() {
   deselect();
   ui.browse.hidden = false;
   ui.detail.hidden = true;
-  ui.panelTitle.textContent = `Dodaj ćwiczenie – ${DAY_BY_ID[browseDay].name}`;
+  ui.panelTitle.textContent = `Dodaj ćwiczenie – ${workout(browseId).name}`;
   flyCamera(...PLAN_CAMERA);
   render();
 }
@@ -213,19 +282,19 @@ function renderList() {
   const items = CATALOG.filter((ex) => (!browseCat || ex.category === browseCat) &&
     (!q || ex.name.toLowerCase().includes(q) || Object.keys(ex.muscles).some((id) => MUSCLE_BY_ID[id].name.toLowerCase().includes(q))));
   // uzupełniające braki na górze, ćwiczenia już obecne w tym dniu na końcu (bez możliwości dodania)
-  items.sort((a, b) => !!inDay(a.id, browseDay) - !!inDay(b.id, browseDay) || helpsOf(b).length - helpsOf(a).length);
+  items.sort((a, b) => !!inWorkout(a.id, browseId) - !!inWorkout(b.id, browseId) || helpsOf(b).length - helpsOf(a).length);
   ui.list.innerHTML = items.map((ex) => {
     const helps = helpsOf(ex).length;
     const tags = Object.entries(ex.muscles).sort((a, b) => b[1] - a[1]).slice(0, 3)
       .map(([id, w]) => `<span class="mtag" style="border-color:${cssColor(w * 0.9)}">${MUSCLE_BY_ID[id].name}</span>`).join('');
-    const here = inDay(ex.id, browseDay);
+    const here = inWorkout(ex.id, browseId);
     return `<div class="pick${here ? ' present' : ''}" data-id="${ex.id}" tabindex="0">
       <div class="pick-body">
         <div class="pick-head"><b>${ex.name}</b>${helps ? `<span class="helps">uzupełnia ${helps} ${helps === 1 ? 'brak' : 'braki'}</span>` : ''}</div>
         <div class="pick-meta">${ex.category} · ${ex.equipment}</div><div class="mtags">${tags}</div>
       </div>
-      ${here ? `<span class="present-tag">już w tym dniu<br>${here.sets} × ${here.reps}</span>`
-        : `<button class="quick-add" title="Dodaj od razu do: ${DAY_BY_ID[browseDay].name} (3 × 10)">+</button>`}
+      ${here ? `<span class="present-tag">już w tym treningu<br>${here.sets} × ${here.reps}</span>`
+        : `<button class="quick-add" title="Dodaj od razu do: ${esc(workout(browseId).name)} (3 × 10)">+</button>`}
     </div>`;
   }).join('') || '<div class="muted">Brak ćwiczeń pasujących do wyszukiwania.</div>';
   ui.list.querySelectorAll('.pick').forEach((el) => {
@@ -234,20 +303,21 @@ function renderList() {
     el.onkeydown = (e) => { if (e.key === 'Enter') selectExercise(ex, 'list'); };
     el.querySelector('.quick-add')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      addToDay(ex, browseDay);
+      addToWorkout(ex, browseId);
     });
     el.onmouseenter = () => (listHover = ex);
     el.onmouseleave = () => (listHover = null);
   });
 }
 
-// Jedno ćwiczenie raz w danym dniu – więcej pracy = więcej serii, nie drugi wpis
-const inDay = (exId, dayId) => plan().days[dayId].items.find((it) => it.exId === exId);
-function addToDay(ex, dayId) {
-  const day = plan().days[dayId];
-  if (inDay(ex.id, dayId)) return;
-  day.active = true;
-  day.items.push({ exId: ex.id, sets: 3, reps: 10 });
+// Jedno ćwiczenie raz w danym treningu – więcej pracy = więcej serii, nie drugi wpis
+const inWorkout = (exId, id) => workout(id)?.items.find((it) => it.exId === exId);
+function addToWorkout(ex, id) {
+  const w = workout(id);
+  if (!w || inWorkout(ex.id, id)) return;
+  w.items.push({ exId: ex.id, sets: 3, reps: 10 });
+  const p = plan();
+  if (!p.variants.includes(id)) p.variants.push(id);
   render();
 }
 
@@ -270,7 +340,7 @@ function selectExercise(ex, from, { t = null, mistake = null } = {}) {
   ui.browse.hidden = true;
   ui.detail.hidden = false;
   ui.detail.scrollTop = 0;
-  ui.panelTitle.textContent = from === 'list' ? `Dodaj ćwiczenie – ${DAY_BY_ID[browseDay].name}` : 'Ćwiczenie';
+  ui.panelTitle.textContent = from === 'list' ? `Dodaj ćwiczenie – ${workout(browseId).name}` : 'Ćwiczenie';
   controls.autoRotate = !anim; // bez animacji model się obraca, żeby było widać też mięśnie z tyłu
   if (anim) (t !== null ? jumpCamera : flyCamera)(...cameraFor(anim));
   else flyCamera(...PLAN_CAMERA);
@@ -298,13 +368,12 @@ function deselect() {
 function renderDetailTop() {
   const { ex, from } = selected;
   const p = plan();
-  const inPlan = DAYS.flatMap((d) => p.days[d.id].active ? p.days[d.id].items.filter((it) => it.exId === ex.id).map((it) => `${d.short} ${it.sets}×${it.reps}`) : []);
+  const inPlan = store.workouts.flatMap((w) => w.items.filter((it) => it.exId === ex.id).map((it) => `${badge(w.id)} ${esc(w.name)} ${it.sets}×${it.reps}`));
   let impact = '';
-  if (focusDay) {
-    const trial = JSON.parse(JSON.stringify(p));
-    trial.days[focusDay].active = true;
-    trial.days[focusDay].items.push({ exId: ex.id, sets: 3, reps: 10 });
-    const after = analyzePlan(trial);
+  if (focusId) {
+    const trialW = store.workouts.map((w) => (w.id === focusId ? { ...w, items: [...w.items, { exId: ex.id, sets: 3, reps: 10 }] } : w));
+    const trialP = p.variants.includes(focusId) ? p : { ...p, variants: [...p.variants, focusId] };
+    const after = analyzePlan(trialP, trialW);
     impact = after.trained > analysis.trained
       ? `Po dodaniu: <b>${analysis.trained} → ${after.trained}</b> mięśni z wystarczającym bodźcem.`
       : helpsOf(ex).length ? 'Wzmocni słabiej trenowane partie.' : 'Te mięśnie już są trenowane w planie.';
@@ -314,17 +383,17 @@ function renderDetailTop() {
     <div class="d-title"><h2>${esc(ex.name)}</h2>
       <div class="muted small">${ex.category} · ${ex.equipment}${selected.anim ? '' : ' · bez animacji – model pokazuje mapę mięśni'}</div></div>
     <div class="d-add">
-      ${focusDay
-        ? inDay(ex.id, focusDay)
-          ? `<div class="d-impact">✓ Już jest w: <b>${DAY_BY_ID[focusDay].name}</b> (${inDay(ex.id, focusDay).sets} × ${inDay(ex.id, focusDay).reps}). Chcesz więcej pracy? Zwiększ liczbę serii w planie.</div>`
-          : `<button class="d-add-btn">+ Dodaj do: ${DAY_BY_ID[focusDay].name}</button><div class="d-impact">${impact}</div>`
-        : '<div class="d-impact">Aby dodać, kliknij dzień w planie po lewej.</div>'}
-      ${inPlan.length ? `<div class="d-impact muted">Już w planie: ${inPlan.join(', ')}</div>` : ''}
+      ${focusId
+        ? inWorkout(ex.id, focusId)
+          ? `<div class="d-impact">✓ Już jest w: <b>${esc(workout(focusId).name)}</b> (${inWorkout(ex.id, focusId).sets} × ${inWorkout(ex.id, focusId).reps}). Chcesz więcej pracy? Zwiększ liczbę serii.</div>`
+          : `<button class="d-add-btn">+ Dodaj do: ${esc(workout(focusId).name)}</button><div class="d-impact">${impact}</div>`
+        : '<div class="d-impact">Aby dodać, kliknij trening po lewej.</div>'}
+      ${inPlan.length ? `<div class="d-impact muted">Już w treningach: ${inPlan.join(', ')}</div>` : ''}
     </div>
     <p class="d-text">${ex.how}</p>
     <p class="d-tip">💡 ${ex.tip}</p>`;
   ui.dTop.querySelector('.back')?.addEventListener('click', backToList);
-  ui.dTop.querySelector('.d-add-btn')?.addEventListener('click', () => addToDay(ex, focusDay));
+  ui.dTop.querySelector('.d-add-btn')?.addEventListener('click', () => addToWorkout(ex, focusId));
   renderMuscleSummary();
 }
 
@@ -353,10 +422,7 @@ function renderTechnique() {
   if (!anim) { ui.dTech.innerHTML = ''; return; }
   const cur = player.state.pending;
   const hasMistakes = anim.mistakes.length > 0;
-  ui.dTech.innerHTML = !hasMistakes ? `
-    <details class="cues-box"><summary>Wskazówki techniczne i oddech</summary>
-      <ul class="cues">${anim.cues.map((c) => `<li>${c}</li>`).join('')}</ul>
-      ${anim.breathingTip ? `<p class="breath-tip">🫁 ${anim.breathingTip}</p>` : ''}</details>` : `
+  ui.dTech.innerHTML = !hasMistakes ? '' : `
     <div class="mistakes-head">
       <h3>Technika – porównaj</h3>
       <label class="mini-toggle" title="Pokazuj opis błędu i etykiety przeciążeń na modelu"><input type="checkbox" ${showNotes ? 'checked' : ''}> opisy</label>
@@ -365,10 +431,7 @@ function renderTechnique() {
       <button class="mistake-btn good ${cur ? '' : 'active'}" data-id="">✓ Poprawna technika</button>
       ${anim.mistakes.map((m) => `<button class="mistake-btn bad ${cur === m ? 'active' : ''}" data-id="${m.id}">✗ ${m.name}</button>`).join('')}
     </div>
-    ${cur && showNotes ? `<div class="mistake-info"><p>${cur.what}</p><p><b>Dlaczego to problem:</b> ${cur.why}</p><p class="fix"><b>Jak poprawić:</b> ${cur.fix}</p></div>` : ''}
-    <details class="cues-box"><summary>Wskazówki techniczne i oddech</summary>
-      <ul class="cues">${anim.cues.map((c) => `<li>${c}</li>`).join('')}</ul>
-      ${anim.breathingTip ? `<p class="breath-tip">🫁 ${anim.breathingTip}</p>` : ''}</details>`;
+    ${cur && showNotes ? `<div class="mistake-info"><p>${cur.what}</p><p><b>Dlaczego to problem:</b> ${cur.why}</p><p class="fix"><b>Jak poprawić:</b> ${cur.fix}</p></div>` : ''}`;
   ui.dTech.querySelectorAll('.mistake-btn').forEach((b) => (b.onclick = () => setMistake(anim.mistakes.find((m) => m.id === b.dataset.id) ?? null)));
   ui.dTech.querySelector('.mini-toggle input')?.addEventListener('change', (e) => {
     showNotes = e.target.checked;
@@ -419,15 +482,15 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// ---------- Zarządzanie planami ----------
-ui.select.onchange = () => { store.currentId = ui.select.value; focusDay = null; render(); };
+// ---------- Zarządzanie planami i treningami ----------
+ui.select.onchange = () => { store.currentId = ui.select.value; focusId = null; render(); };
 ui.newBtn.onclick = () => {
   const name = prompt('Nazwa nowego planu:', 'Mój plan');
   if (!name) return;
   const p = emptyPlan(name.trim());
   store.plans.push(p);
   store.currentId = p.id;
-  focusDay = null;
+  focusId = null;
   render();
 };
 ui.renameBtn.onclick = () => {
@@ -435,17 +498,27 @@ ui.renameBtn.onclick = () => {
   if (name) { plan().name = name.trim(); render(); }
 };
 ui.deleteBtn.onclick = () => {
-  if (!confirm(`Usunąć plan „${plan().name}”?`)) return;
+  if (!confirm(`Usunąć plan „${plan().name}”? Treningi zostaną (można ich użyć w innych planach).`)) return;
   store.plans = store.plans.filter((p) => p.id !== store.currentId);
   if (!store.plans.length) store.plans.push(emptyPlan('Mój plan'));
   store.currentId = store.plans[0].id;
   render();
 };
 ui.exampleBtn.onclick = () => {
-  const p = examplePlan();
-  p.id = newId();
-  store.plans.push(p);
-  store.currentId = p.id;
+  const d = exampleData();
+  store.workouts.push(...d.workouts);
+  store.plans.push(...d.plans);
+  store.currentId = d.plans[0].id;
+  focusId = null;
+  render();
+};
+ui.workoutNew.onclick = () => {
+  const name = prompt('Nazwa treningu (np. „FBW A”, „Push”, „Nogi”):', `Trening ${LETTERS[store.workouts.length] ?? ''}`.trim());
+  if (!name?.trim()) return;
+  const w = emptyWorkout(name.trim());
+  store.workouts.push(w);
+  plan().variants.push(w.id);
+  focusId = w.id;
   render();
 };
 
@@ -468,8 +541,8 @@ export function frame(dt, time) {
   } else if (staticEx) {
     target = Object.fromEntries(MUSCLES.map((m) => [m.id, (staticEx.muscles[m.id] ?? 0) * 0.9]));
     mode = 'preview';
-  } else if (focusDay) {
-    target = analysis.perDay[focusDay];
+  } else if (focusId) {
+    target = analysis.perWorkout[focusId];
     colorFn = (v, c) => volumeColor(v, DAY_THRESHOLDS, c); glowFn = (v) => v / 8;
     mode = 'day';
   } else {
@@ -493,7 +566,7 @@ export function frame(dt, time) {
     showTooltip(hit, `${esc(listHover.name)}: ${r ? r.one : 'prawie nie pracuje'}`);
   } else if (hit) {
     const w = analysis.weekly[hit.id];
-    const dayTxt = focusDay ? `<br>${DAY_BY_ID[focusDay].name}: ${analysis.perDay[focusDay][hit.id].toFixed(1)} serii` : '';
+    const dayTxt = focusId ? `<br>${esc(workout(focusId).name)}: ${analysis.perWorkout[focusId][hit.id].toFixed(1)} serii` : '';
     showTooltip(hit, `Tydzień: <b>${w.toFixed(1)}</b> efektywnych serii – ${volumeStatus(w).label}${dayTxt}`);
   } else showTooltip(null);
   paintMuscles(display, hovered, colorFn, glowFn);
@@ -529,26 +602,27 @@ function renderLegend(m) {
   }
   const th = m === 'day' ? DAY_THRESHOLDS : WEEK_THRESHOLDS;
   const box = (v, t) => `<span class="lg"><i style="background:${cssVolumeColor(v, th)}"></i>${t}</span>`;
-  ui.legend.innerHTML = (m === 'day' ? '<b>Serie w tym dniu:</b> ' : '<b>Serie tygodniowo:</b> ') +
+  ui.legend.innerHTML = (m === 'day' ? '<b>Serie w tym treningu:</b> ' : '<b>Serie tygodniowo:</b> ') +
     box(0, '0') + box(th[0] * 0.8, `&lt; ${th[0]}`) + box((th[0] + th[1]) / 2, `${th[0]}–${th[1]}`) + box(th[2] * 0.75, `${th[1]}–${th[2]}`) + box(th[3] + 2, `&gt; ${th[2]}`);
 }
 
 // Start. Parametry do demo/testów:
-//   ?focus=tue – wybrany dzień, ?picker=wed – lista ćwiczeń dla dnia, &preview=row – podgląd z listy,
+//   ?focus=A – wybrany trening (litera), ?picker=B – lista ćwiczeń dla treningu, &preview=row – podgląd z listy,
 //   ?ex=squat – szczegóły ćwiczenia, &t=0.5 – zatrzymanie animacji, &mistake=valgus – typowy błąd
 export function start() {
   flyCamera(...PLAN_CAMERA);
   controls.autoRotate = true;
   const q = new URLSearchParams(location.search);
-  if (DAY_BY_ID[q.get('focus')]) focusDay = q.get('focus');
+  const byLetter = (l) => store.workouts[LETTERS.indexOf(l ?? '-')]?.id;
+  if (byLetter(q.get('focus'))) focusId = byLetter(q.get('focus'));
   render();
-  if (DAY_BY_ID[q.get('picker')]) {
-    openBrowse(q.get('picker'));
+  if (byLetter(q.get('picker'))) {
+    openBrowse(byLetter(q.get('picker')));
     if (CATALOG_BY_ID[q.get('preview')]) listHover = CATALOG_BY_ID[q.get('preview')];
   }
   const ex = CATALOG_BY_ID[q.get('ex')];
   if (ex) {
-    if (DAY_BY_ID[q.get('focus')]) focusDay = q.get('focus');
+    if (byLetter(q.get('focus'))) focusId = byLetter(q.get('focus'));
     selectExercise(ex, q.get('picker') ? 'list' : 'plan', { t: q.has('t') ? parseFloat(q.get('t')) : null, mistake: q.get('mistake') });
   }
 }

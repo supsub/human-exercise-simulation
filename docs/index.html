@@ -67,7 +67,7 @@
 
 <header class="hero">
   <div class="wrap">
-    <span class="tag">MVP · wersja 0.7.1</span>
+    <span class="tag">MVP · wersja 0.8</span>
     <h1>Ułóż plan treningowy i <span>zobacz, które mięśnie pracują</span></h1>
     <p class="lead">
       Human Exercise Simulation to aplikacja dla osób, które chcą ułożyć sensowny plan treningowy i zrozumieć,
@@ -96,7 +96,7 @@
       </div>
     </div>
     <div class="shots" style="margin-top:14px">
-      <figure><img src="img/plan.png" alt="Plan treningowy"><figcaption>Plan treningowy: tydzień Pn–Nd, mapa obciążenia mięśni na modelu, ocena planu, ostrzeżenia i rekomendacje.</figcaption></figure>
+      <figure><img src="img/plan.png" alt="Plan treningowy"><figcaption>Plan: treningi FBW A/B/C, 4 treningi w tygodniu → automatyczny 3-tygodniowy cykl, w którym każdy wariant wypada 4 razy. Model pokazuje średnie tygodniowe obciążenie mięśni.</figcaption></figure>
       <div class="col">
         <figure><img src="img/picker.png" alt="Wybór ćwiczeń"><figcaption>Dodawanie ćwiczeń: na górze listy są te, które uzupełniają braki w planie; najechanie pokazuje mięśnie na modelu.</figcaption></figure>
       </div>
@@ -168,7 +168,7 @@
         <tr><td><span class="status s-ok">GOTOWE</span></td><td>Łatwe wskazywanie mięśni</td><td>Najechanie kursorem na mięsień (na modelu lub na figurze) pokazuje jego nazwę i rolę w ćwiczeniu. Mięśnie nachodzące na siebie (np. głowy czworogłowego) są rozróżniane po tym, który jest najbliżej kursora.</td></tr>
         <tr><td><span class="status s-ok">GOTOWE</span></td><td>Oddech</td><td>Klatka piersiowa i brzuch rozszerzają się przy wdechu, przy wydechu widać obłoczki. Oddech jest zsynchronizowany z fazami ruchu (np. wydech przy wypychaniu), a pasek odtwarzania pokazuje bieżący wdech / wydech.</td></tr>
         <tr><td><span class="status s-ok">GOTOWE</span></td><td>Typowe błędy techniki</td><td><b>93 błędy we wszystkich 47 ćwiczeniach</b> (np. okrągłe plecy w martwym ciągu, łokcie szeroko przy wyciskaniu, ściąganie za kark, przeprost w hip thruście, opadające biodra w desce). Płynne przejście między techniką poprawną i błędną, zmiana aktywacji mięśni, czerwone znaczniki przeciążonych struktur oraz opis: co się dzieje, dlaczego to problem i jak poprawić. Błąd wybiera się jednym kliknięciem w panelu ćwiczenia, a opis można wyłączyć.</td></tr>
-        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Plan treningowy</td><td><b>Jeden ekran</b>: plan, model i szczegóły ćwiczenia. Wiele planów, tydzień Pn–Nd, ćwiczenia z serii × powtórzeniami, zapis lokalny. Kliknięcie ćwiczenia w planie, na liście lub w rekomendacjach otwiera jego szczegóły obok planu. Dodawanie jest naturalne: wybierasz ćwiczenie, klikasz dzień w planie, potem „Dodaj do: Wtorek” – z podglądem wpływu na plan („13 → 15 mięśni”).</td></tr>
+        <tr><td><span class="status s-ok">GOTOWE</span></td><td>Plan treningowy: treningi + harmonogram</td><td>Treningi to bloki ćwiczeń niezależne od dni (np. „FBW A”, „FBW B”, „FBW C”). W planie wybierasz, które warianty biorą udział i ile treningów chcesz w tygodniu – aplikacja sama układa cykl tak, by <b>każdy wariant wypadał tyle samo razy</b> (np. 4 treningi i 3 warianty → cykl 3 tygodni, każdy wariant 4×), dobierając dni i kolejność tak, by treningi dzień po dniu jak najmniej obciążały te same mięśnie. Dni można też ustawić ręcznie. Jeden ekran: plan, model i szczegóły ćwiczenia.</td></tr>
         <tr><td><span class="status s-ok">GOTOWE</span></td><td>Katalog 48 ćwiczeń</td><td>Ćwiczenia z wagą zaangażowania każdego mięśnia i krótkim opisem dla laika. Wyszukiwanie po nazwie i mięśniu, filtr kategorii, podgląd mięśni na modelu, szybkie dodawanie przyciskiem +.</td></tr>
         <tr><td><span class="status s-ok">GOTOWE</span></td><td>Analiza planu offline</td><td>Tygodniowa objętość (efektywne serie) na mięsień i partię, mapa na modelu 3D (tydzień lub pojedynczy dzień) i ocena pokrycia. Ostrzeżenia: proporcje pchanie/przyciąganie i przód/tył uda, regeneracja dzień po dniu, brak dnia wolnego, za długi trening.</td></tr>
         <tr><td><span class="status s-ok">GOTOWE</span></td><td>Rekomendacje ćwiczeń</td><td>Algorytm dobiera ćwiczenia pokrywające zaniedbane mięśnie i proponuje dzień, który najmniej koliduje z regeneracją. Dodanie jednym kliknięciem.</td></tr>
@@ -229,6 +229,7 @@
     <table>
       <thead><tr><th style="width:150px">Data</th><th style="width:90px">Wersja</th><th>Zmiany</th></tr></thead>
       <tbody>
+        <tr><td>24.11.2026</td><td>0.8</td><td>Nowy model planu: treningi (warianty) zamiast ćwiczeń przypisanych do dni. Plan = wybrane warianty + liczba treningów w tygodniu; harmonogram (cykl wielotygodniowy) układa się automatycznie – każdy wariant tyle samo razy, dni i kolejność dobrane pod regenerację. Ręczna zmiana dni, analiza ze średniej cyklu, rekomendacje z podpowiedzią wariantu. Stare plany przenoszone automatycznie. Usunięte rozwijane „Wskazówki techniczne i oddech” (oddech jest na pasku faz).</td></tr>
         <tr><td>24.11.2026</td><td>0.7.1</td><td>Stały chwyt na drążku: kinematyka odwrotna ramion – w wyciskaniu leżąc, ściąganiu drążka i face pullu zadajemy tor drążka i szerokość chwytu, a łokcie i barki dopasowują się same (koniec z „ślizganiem się” dłoni). Lina w face pullu rozkłada się razem z dłońmi. Nowe ćwiczenie: rumuński martwy ciąg z hantlami (48 ćwiczeń).</td></tr>
         <tr><td>24.11.2026</td><td>0.7</td><td>Podstawowa fizyka ciała: bryły kolizyjne (głowa, szyja, klatka, brzuch, miednica, kończyny), solver odsuwający sztangę/uchwyt od ciała w każdej klatce (barki, łokcie, lekkie odchylenie tułowia – tak jak robi to ćwiczący) i automatyczny test całego katalogu: sprzęt nie wchodzi w ciało, dłonie nie wchodzą w tułów, nogi nie nachodzą na siebie, nic nie przechodzi przez podłogę. Przysiady z rozstawem na szerokość barków. Kliknięcie dnia pokazuje jego mięśnie na modelu, a „+ Dodaj ćwiczenie” otwiera listę ćwiczeń dla tego dnia.</td></tr>
         <tr><td>24.11.2026</td><td>0.6.1</td><td>Dłonie obracają się tak, by drążek leżał w zgiętych palcach (koniec z drążkiem „przebijającym” dłonie). Tor drążka omija głowę (poza pośrednia w ściąganiu), a sztanga w przysiadzie frontowym leży na barkach. Automatyczny test kolizji drążka z głową dla wszystkich ćwiczeń i błędów (tools/sheet.html?check). Ściąganie drążka zgodne z klasyczną techniką. To samo ćwiczenie nie może trafić dwa razy do jednego dnia. Pasek faz bez ucinania tekstu.</td></tr>
