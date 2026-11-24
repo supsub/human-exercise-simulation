@@ -330,16 +330,16 @@ export const MISTAKES = {
       fix: 'Zrób dłuższy krok i opuszczaj się pionowo w dół.', shift: { glute_max: -0.25, vastus_medialis: 0.2 }, stress: [{ joint: 'knee', label: 'Ścięgno rzepki' }] },
   ],
   leg_press: [
-    { id: 'deep', name: 'Za głęboko – biodra się odrywają', B: { rx: -22, thigh: -192, shin: -70 },
+    { id: 'deep', name: 'Za głęboko – biodra się odrywają', B: { rx: -72, trunk: -50 },   // głębokość: library.js legPressPose
       what: 'Na dole kolana dochodzą do klatki, a miednica podwija się i odrywa od oparcia.', why: 'Dolny odcinek pleców zgina się pod dużym ciężarem.',
       fix: 'Schodź tylko do momentu, gdy biodra zostają przyklejone do oparcia.', shift: { erector_spinae: 0.2 },
       stress: [{ joint: 'lumbar', label: 'Odcinek lędźwiowy' }] },
-    { id: 'valgus', name: 'Kolana do środka', both: { legIn: 2.5 },
+    { id: 'valgus', name: 'Kolana do środka', B: { legIn: 8 },
       what: 'Przy wypychaniu kolana schodzą się do środka.', why: 'Więzadła kolana pracują pod skrętem.',
       fix: 'Kolana w linii stóp przez cały ruch.', shift: { glute_med: -0.2, adductors: 0.2 }, stress: [{ joint: 'knee', label: 'Więzadła kolana' }] },
   ],
   leg_ext: [
-    { id: 'kick', name: 'Wyrzucanie nóg i odrywanie bioder', B: { rx: -10, trunk: -11 },   // plecy zostają na oparciu (oparcie ~11° w tył)
+    { id: 'kick', name: 'Wyrzucanie nóg i odrywanie bioder', B: { root: { y: 0.6, z: 0.04 }, rx: -24, trunk: -14, head: -8 },   // biodra unoszą się z siedziska, górne plecy przy oparciu
       what: 'Nogi są wyrzucane w górę, a biodra unoszą się z siedziska.', why: 'Pęd zastępuje pracę mięśni, a kolano dostaje szarpnięcia w pełnym wyproście.',
       fix: 'Wolny, kontrolowany ruch, trzymaj się uchwytów, biodra na siedzisku.', shift: { rectus_femoris: 0.2 }, stress: [{ joint: 'knee', label: 'Kolano – szarpnięcie' }] },
     ROM('Nogi nie prostują się do końca.', 'Czworogłowy nie dochodzi do pełnego skurczu.', 'Prostuj nogi prawie do końca i zatrzymaj na chwilę.', { vastus_medialis: -0.3 }),

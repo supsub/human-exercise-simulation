@@ -60,6 +60,10 @@ Automatycznie – `tools/sheet.html?check` musi zwrócić „OK – brak narusze
 - [ ] chwyt zgodny ze specyfikacją z `grips.js` (wnętrze dłoni i kciuk we właściwą stronę)
 - [ ] chwyt nie zmienia się w trakcie ruchu (nachwyt ↔ podchwyt), dłonie nie przesuwają się po drążku
 - [ ] zaciśnięta dłoń zawsze coś trzyma (drążek, poręcz, uchwyt maszyny) – nie zaciska się w powietrzu
+- [ ] stawy w anatomicznym zakresie: biodro zgięte ≤ 135° (dalej udo wchodzi w brzuch), odgięte ≤ 35°, kolano 0–160° (bez przeprostu), lędźwia zgięte ≤ 60°, odgięte ≤ 40° – **kąty w pozach są bezwzględne**: zmiana `rx` (miednica) bez `trunk` przechyla cały tułów
+- [ ] w poprawnej technice plecy leżą na oparciu – oparcie oznaczamy `rest: ['chest']`
+- [ ] platforma suwnicy jedzie po prowadnicach (`rail: true`) – stopy poruszają się po prostej, nie po łuku (IK nogi zamiast interpolacji kątów)
+- [ ] każdy błąd jest **widoczny**: ciało (punkty i stawy) różni się od poprawnej techniki o ≥ 4 cm; błąd opisany samym tekstem i zmianą mięśni to za mało
 
 Wzrokowo – arkusze zbliżeń (`tools/sheet.html?ts=0.01,0.5&focus=handL&dist=0.5`, `&focus=feet`, `?mistakes`):
 

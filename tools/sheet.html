@@ -52,7 +52,7 @@
     scene.add(body.root);
     // ?check – test fizyki (src/physics.js) dla każdego ćwiczenia i każdego błędu, 60 chwil cyklu
     if (q.has('check')) {
-      const { checkPose, checkScenery, handOrientation } = await import('../src/physics.js');
+      const { checkPose, checkScenery, checkRanges, checkRest, handOrientation } = await import('../src/physics.js');
       const { gripMismatch } = await import('../src/exercises/grips.js');
       const out = [];
       for (const ex of list) {
@@ -60,10 +60,13 @@
         body.setPose(body.resolvePose(ex.pose(sampleExercise(ex, 0.01).depth, { cycleT: 0.01 })));
         const gm = gripMismatch(ex.id, handOrientation(body, 'L'));
         if (gm) out.push(`${ex.id} chwyt: ${gm}`);
+        let railRef = null;
+        const okPts = [];   // punkty ciała w poprawnej technice (do porównania z błędami)   // odległość płyty od prowadnicy w pozycji wyjściowej poprawnej techniki
         const variants = [{ id: 'ok', params: {} }, ...ex.mistakes.map((m) => ({ id: m.id, params: m.params }))];
         for (const v of variants) {
           const found = new Map();
           const thumbs = new Set(), widths = [];
+          let maxMove = 0;
           for (let i = 0; i < 60; i++) {
             const t = i / 60;
             const pose = body.resolvePose(ex.pose(sampleExercise(ex, t, v.params.rom ?? 0).depth, { ...v.params, cycleT: t }));
@@ -82,14 +85,30 @@
               const y = body.points[n].getWorldPosition(new THREE.Vector3()).y;
               if (y < 0.1) hangIssues.push({ what: 'w zwisie stopy dotykają podłogi', part: n, depth: 0.1 - y });
             }
-            for (const is of [...checkPose(body, pose), ...checkScenery(body, ex.scenery, pose), ...hangIssues]) {
+            // platforma suwnicy jeździ po prowadnicach (scenery cyl z rail: true) – stała odległość środka płyty od osi prowadnicy
+            const railIssues = [];
+            const rail = ex.scenery?.find((d) => d.rail);
+            if (rail && pose.props?.plate && body.plateShape?.c) {
+              const a = new THREE.Vector3(...rail.cyl[0]), b = new THREE.Vector3(...rail.cyl[1]), c = body.plateShape.c.clone();
+              c.x = a.x;   // odległość w płaszczyźnie prowadnicy (y–z)
+              const ab = b.clone().sub(a).normalize(), dist = c.clone().sub(a).sub(ab.clone().multiplyScalar(c.clone().sub(a).dot(ab))).length();
+              railRef ??= dist;
+              if (Math.abs(dist - railRef) > 0.02) railIssues.push({ what: 'platforma suwnicy zjeżdża z prowadnic', part: 'plate', depth: Math.abs(dist - railRef) });
+            }
+            // błąd musi być widoczny: porównujemy położenie punktów ciała z poprawną techniką w tej samej chwili
+            const P = Object.fromEntries([...Object.entries(body.points), ...Object.entries(body.joints)].map(([n, o]) => [n, o.getWorldPosition(new THREE.Vector3())]));   // punkty + stawy (łokcie, kolana)
+            if (v.id === 'ok') okPts[i] = P;
+            else for (const n in P) if (okPts[i]?.[n]) maxMove = Math.max(maxMove, P[n].distanceTo(okPts[i][n]));
+            for (const is of [...checkPose(body, pose), ...checkScenery(body, ex.scenery, pose), ...checkRanges(pose), ...hangIssues, ...railIssues,
+              ...(v.id === 'ok' ? checkRest(body, ex.scenery) : [])]) {
               const prev = found.get(is.what);
               if (!prev || is.depth > prev.depth) found.set(is.what, { ...is, t });
             }
           }
+          if (v.id !== 'ok' && maxMove < 0.04) out.push(`${ex.id} [${v.id}] błąd prawie niewidoczny – ciało różni się od poprawnej techniki najwyżej o ${(maxMove * 100).toFixed(1)} cm`);
           if (thumbs.size > 1) out.push(`${ex.id} [${v.id}] chwyt zmienia się w trakcie ruchu (nachwyt ↔ podchwyt)`);
           if (widths.length && Math.max(...widths) - Math.min(...widths) > 0.01) out.push(`${ex.id} [${v.id}] dłonie przesuwają się po drążku: ${((Math.max(...widths) - Math.min(...widths)) * 100).toFixed(1)} cm`);
-          for (const is of found.values()) out.push(`${ex.id} [${v.id}] ${is.what}: ${(is.depth * 100).toFixed(1)} cm (t=${is.t.toFixed(2)})`);
+          for (const is of found.values()) out.push(`${ex.id} [${v.id}] ${is.what}: ${is.deg ? `+${is.depth.toFixed(0)}° ponad zakres` : `${(is.depth * 100).toFixed(1)} cm`} (t=${is.t.toFixed(2)})`);
         }
       }
       const pre = document.createElement('pre'); pre.id = 'check';

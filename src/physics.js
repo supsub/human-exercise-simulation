@@ -3,7 +3,8 @@ import * as THREE from 'three';
 // Test podstawowej fizyki pozy (narzędzie deweloperskie, tools/sheet.html?check):
 //  1. sprzęt (drążek/sztanga, hantle, hantel oburącz) nie wchodzi w ciało – poza trzymającymi go dłońmi/przedramionami,
 //  2. dłonie nie wchodzą w tułów, głowę, miednicę ani uda,
-//  3. nic nie przechodzi przez podłogę (stopy, kolana, dłonie, talerze sztangi).
+//  3. nic nie przechodzi przez podłogę (stopy, kolana, dłonie, talerze sztangi),
+//  5. ciało nie wchodzi w sprzęt, 6. stawy w anatomicznym zakresie, 7. plecy na oparciu (rest).
 // Ciało = bryły kolizyjne skóry z body.js (elipsoidy i kapsuły). Zwraca listę naruszeń { what, part, depth }.
 
 const _inv = new THREE.Matrix4(), _p = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3();
@@ -139,7 +140,8 @@ export function checkPose(body, pose, tol = 0.012) {
     // sztanga z przodu na barkach leży na mięśniach barków – dopuszczamy kontakt z ramionami
     const w = deepest(body, pts, (p) => holding(p) || (front && /^upperArm/.test(p)), 0.014 + 0.01);   // + zapas na mięśnie
     if (w && w.depth > tol) issues.push({ what: `drążek wchodzi w ${partName(w.part)}`, ...w });
-    if (props.bar.plates !== false && mid.y < 0.2 - 0.01) issues.push({ what: 'talerze sztangi w podłodze', part: 'floor', depth: 0.2 - mid.y });
+    const pr = typeof props.bar.plates === 'number' ? props.bar.plates : 0.2;
+    if (props.bar.plates !== false && mid.y < pr - 0.01) issues.push({ what: 'talerze sztangi w podłodze', part: 'floor', depth: pr - mid.y });
   }
   // hantel oburącz (goblet): górny talerz między dłońmi, rączka i dolny talerz pod nim – jak w body.js
   if (props.goblet && body.gobletShape?.base) {
@@ -183,6 +185,42 @@ export function checkPose(body, pose, tol = 0.012) {
   for (const name of ['toeL', 'toeR', 'heelL', 'heelR', 'handL', 'handR', 'kneeOutL', 'kneeOutR', 'headTop']) {
     const y = pt(name).y;
     if (y < -0.02) { issues.push({ what: `${name} pod podłogą`, part: 'floor', depth: -y }); break; }
+  }
+  return issues;
+}
+
+// 6. zakresy ruchu w stawach (anatomiczne maksimum dorosłego, z małym zapasem) – kąty z pozy po IK.
+//    Biodro: zgięcie ≤ 135° (dalej udo wchodzi w brzuch), wyprost ≤ 35°; kolano: 0…160° (−5° przeprost);
+//    odcinek lędźwiowy: zgięcie ≤ 60°, wyprost ≤ 40°.
+const DEGR = 180 / Math.PI;
+export function checkRanges(pose) {
+  const issues = [], j = pose.joints;
+  const bad = (what, part, over) => issues.push({ what, part, depth: over, deg: true });   // depth = stopnie ponad zakres
+  for (const S of ['L', 'R']) {
+    const h = j['hip' + S];
+    const flex = -(Array.isArray(h) ? h[0] : h ?? 0) * DEGR, knee = (j['knee' + S] ?? 0) * DEGR;
+    if (flex > 135) bad(`biodro ${S} zgięte ponad zakres`, 'thigh' + S, flex - 135);
+    if (flex < -35) bad(`biodro ${S} odgięte ponad zakres`, 'thigh' + S, -flex - 35);
+    if (knee > 160) bad(`kolano ${S} zgięte ponad zakres`, 'shin' + S, knee - 160);
+    if (knee < -5) bad(`kolano ${S} w przeproście`, 'shin' + S, -knee - 5);
+  }
+  const lum = (j.lumbar ?? 0) * DEGR;
+  if (lum > 60) bad(`kręgosłup lędźwiowy zgięty ponad zakres`, 'belly', lum - 60);
+  if (lum < -40) bad(`kręgosłup lędźwiowy odgięty ponad zakres`, 'belly', -lum - 40);
+  return issues;
+}
+
+// 7. oparcie (scenery box z rest: ['chest', …]) – w poprawnej technice te części leżą na oparciu (≤ 3 cm od niego)
+export function checkRest(body, scenery = []) {
+  const issues = [];
+  body.root.updateWorldMatrix(true, true);
+  for (const d of scenery.filter((x) => x.box && x.rest)) for (const part of d.rest) {
+    let best = Infinity;
+    for (const c of body.colliders.filter((c) => c.part === part)) {
+      if (c.kind === 'ell') { const s = c.mesh.scale; best = Math.min(best, boxDist(d, c.mesh.localToWorld(new THREE.Vector3())) - Math.min(s.x, s.y, s.z)); }
+      else for (let y = -c.half; y <= c.half + 1e-6; y += c.half / 4) best = Math.min(best, boxDist(d, c.mesh.localToWorld(new THREE.Vector3(0, y, 0))) - c.r);
+    }
+    if (best > 0.03) issues.push({ what: `${partName(part)} odrywa się od oparcia`, part, depth: best });
   }
   return issues;
 }

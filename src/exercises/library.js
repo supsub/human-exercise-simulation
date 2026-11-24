@@ -203,13 +203,13 @@ const reverse_curl = animated({
   steps: ['Sztanga opuszczona, nachwyt', 'Uginanie', 'Szczytowe napięcie', 'Opuszczanie'],
   pose: (d, p = {}) => {
     const out = curlPose(d, p);
-    const w = (p.wrist ?? 0) * d * 0.6;   // opadające nadgarstki
+    const w = (p.wrist ?? 0) * (0.35 + 0.7 * d);   // opadające nadgarstki: ~20° na dole, ~60° na górze – wyraźnie widoczne
     const fwd = -0.3 * (1 - d);           // na dole sztanga przed udami, nie w nich
     const j = { ...out.joints, wristL: out.joints.wristL + w, wristR: out.joints.wristR + w };
     j.shoulderL = [j.shoulderL[0] + fwd, 0, 0.05]; j.shoulderR = [j.shoulderR[0] + fwd, 0, -0.05];
-    return { ...out, joints: j, props: { bar: { len: 1.2, plates: true, width: 0.42 } } };
+    return { ...out, joints: j, props: { bar: { len: 1.2, plates: 0.13, width: 0.42 } } };   // lekka sztanga, małe talerze
   },
-  cameraPosition: [1.5, 1.45, 2.7], cameraTarget: [0, 1.0, 0],
+  cameraPosition: [2.5, 1.4, 1.7], cameraTarget: [0, 1.05, 0.1],   // bardziej z boku: widać zgięcie nadgarstków
 });
 const triceps_oh = animated({
   id: 'triceps_oh', type: 'lower',
@@ -305,17 +305,58 @@ function lungePose(d, prm = {}) {
   });
 }
 const lunge = animated({ id: 'lunge', steps: ['Rozkrok, pozycja wysoka', 'Opuszczanie tylnego kolana', 'Dolna pozycja', 'Wstawanie'], pose: lungePose, cameraTarget: [0, 0.75, 0] });
+// Suwnica: platforma jeździ po prowadnicach, więc stopy (kostki) poruszają się po prostej równoległej do nich.
+// Kąty uda i goleni liczy IK nogi w płaszczyźnie bocznej (biodro = root) – zamiast interpolacji kątów,
+// która prowadziłaby stopy po łuku (płyta „zjeżdżałaby” z prowadnic).
+// Błąd „za głęboko”: platforma schodzi o 30% niżej, a dodatkowy zakres bierze się z podwinięcia miednicy
+// (miednica rx −50° → −72°, górne plecy zostają na oparciu) – udo nie wychodzi poza zakres zgięcia biodra.
+const LP_ROLL = -1;   // znak kompensacji (sprawdzony testem: stopy płasko na płycie)
+const LP_RAIL = [Math.SQRT1_2, Math.SQRT1_2];                   // kierunek prowadnic (y, z) – jak w scenerii
+const lpKeys = keyframes({ root: { y: 0.55, z: 0 }, rx: -50, trunk: -50, head: -40, foot: -135, abd: 16, hipAbd: 8, props: { plate: true } },   // stopy na szerokość barków
+  { thigh: -128, shin: -124 }, { thigh: -172, shin: -78 });
+const yz = (a) => [-Math.cos(a * Math.PI / 180), -Math.sin(a * Math.PI / 180)];   // kierunek segmentu o kącie a (0 = w dół, −90 = w przód)
+const ankleAt = (thigh, shin) => { const t = yz(thigh), k = yz(shin); return [DIMS.thigh * t[0] + DIMS.shin * k[0], DIMS.thigh * t[1] + DIMS.shin * k[1]]; };
+const LP_A = ankleAt(-128, -124), LP_B = ankleAt(-172, -78);
+const LP_TRAVEL = (LP_B[0] - LP_A[0]) * LP_RAIL[0] + (LP_B[1] - LP_A[1]) * LP_RAIL[1];
+const near = (a, ref) => a + 360 * Math.round((ref - a) / 360);
+function legIK2D([ty, tz], thighRef) {
+  const L1 = DIMS.thigh, L2 = DIMS.shin, D = Math.min(L1 + L2 - 1e-4, Math.hypot(ty, tz));
+  const at = Math.atan2(-tz, -ty) * 180 / Math.PI;
+  const al = Math.acos((L1 * L1 + D * D - L2 * L2) / (2 * L1 * D)) * 180 / Math.PI;
+  for (const sg of [1, -1]) {
+    const thigh = near(at + sg * al, thighRef), d = yz(thigh);
+    const shin = near(Math.atan2(-(tz - L1 * d[1]), -(ty - L1 * d[0])) * 180 / Math.PI, thigh);
+    if (shin - thigh >= -1e-6) return { thigh, shin };          // kolano zgina się w przód (nie w przeprost)
+  }
+  return { thigh: thighRef, shin: thighRef };
+}
+function legPressPose(d, params = {}, mistakes = []) {
+  const p = lpKeys(d, params, mistakes);
+  const deep = params.deep ?? 0, R = Math.PI / 180;
+  // podwinięta miednica odjeżdża od oparcia wzdłuż prowadnic (biodra „wjeżdżają” pod platformę)
+  const sh = 0.06 * deep * d;
+  const s = LP_TRAVEL * d * (1 + 0.3 * deep) - sh;
+  const { thigh, shin } = legIK2D([LP_A[0] + LP_RAIL[0] * s, LP_A[1] + LP_RAIL[1] * s], -128 - 44 * d);
+  const root = { ...p.root, y: p.root.y + LP_RAIL[0] * sh, z: p.root.z + LP_RAIL[1] * sh };
+  const rx = p.root.rx / R, j = { ...p.joints };
+  for (const S of ['L', 'R']) {
+    j['hip' + S] = [(thigh - rx) * R, j['hip' + S][1], j['hip' + S][2]];
+    j['knee' + S] = (shin - thigh) * R;
+    // stopa płasko na płycie mimo odwiedzenia uda (kolana nad stopami): kompensacja w stawie skokowym
+    j['ankle' + S] = [(-135 - shin) * R, 0, LP_ROLL * (S === 'L' ? 1 : -1) * j['hip' + S][2]];
+  }
+  return { ...p, root, joints: j };
+}
 const leg_press = animated({
   id: 'leg_press', camera: 'seat',
-  scenery: [{ box: [0, 0.45, 0.02], size: [0.45, 0.08, 0.4], rx: -0.3 }, { box: [0, 0.66, -0.33], size: [0.45, 0.8, 0.08], rx: -50 * Math.PI / 180 },
-    { cyl: [[0.28, 0.25, 0.3], [0.28, 1.45, 1.5]], r: 0.03 }, { cyl: [[-0.28, 0.25, 0.3], [-0.28, 1.45, 1.5]], r: 0.03 },
+  scenery: [{ box: [0, 0.45, 0.02], size: [0.45, 0.08, 0.4], rx: -0.3 }, { box: [0, 0.66, -0.33], size: [0.45, 0.8, 0.08], rx: -50 * Math.PI / 180, rest: ['chest'] },
+    { cyl: [[0.28, 0.25, 0.3], [0.28, 1.45, 1.5]], r: 0.03, rail: true }, { cyl: [[-0.28, 0.25, 0.3], [-0.28, 1.45, 1.5]], r: 0.03 },
     { box: [0, 0.2, 0], size: [0.3, 0.4, 0.3], color: 'frame' }, ...handles(0.388, 0.482, 0.082)],
   steps: ['Nogi wyprostowane, platforma w górze', 'Opuszczanie platformy', 'Kolana przy klatce', 'Wypychanie'],
-  pose: keyframes({ root: { y: 0.55, z: 0 }, rx: -50, head: -40, foot: -135, abd: 16, props: { plate: true } },
-    { thigh: -128, shin: -138 }, { thigh: -172, shin: -78 }),
+  pose: legPressPose,
   cameraPosition: [2.6, 1.6, 2.4], cameraTarget: [0, 0.8, 0.4],
 });
-const machineSeat = [seat(0.48, 0.02, 0.5), { box: [0, 0.85, -0.27], size: [0.45, 0.7, 0.08], rx: -0.2 }];
+const machineSeat = [seat(0.48, 0.02, 0.5), { box: [0, 0.85, -0.22], size: [0.38, 0.7, 0.08], rx: -0.2, rest: ['chest'] }];   // rest: plecy na oparciu (test)
 const leg_ext = animated({
   id: 'leg_ext', type: 'lift', camera: 'seat', scenery: [...machineSeat, { box: [0.32, 0.28, 0.42], size: [0.06, 0.56, 0.06], color: 'frame' }, ...handles(0.215, 0.462, 0)],
   steps: ['Kolana zgięte', 'Prostowanie nóg', 'Pełny wyprost', 'Opuszczanie'],
@@ -375,8 +416,8 @@ function hipThrustPose(d, prm = {}) {
   const knee = twoBoneIK(hip, ankle, DIMS.thigh, DIMS.shin, +1);
   const g = (a, b) => downAngle(a, b) * D;
   const arch = 22 * (prm.arch ?? 0) * d;  // przeprost: tułów odgina się względem miednicy
-  return makePose({ root: hip, rx: T + arch, trunk: T, head: T + 45 - arch, thigh: g(hip, knee), shin: g(knee, ankle), foot: 0, el: -70,
-    legIn: 3 * (prm.valgus ?? 0) * d, props: { bar: { len: 1.6 } } });
+  return makePose({ root: hip, rx: T + arch, trunk: T, head: T + 45 - arch, thigh: g(hip, knee), shin: g(knee, ankle), foot: 0, el: -70, hipAbd: 8,   // stopy na szerokość barków, kolana nad stopami
+    legIn: 8 * (prm.valgus ?? 0) * d, props: { bar: { len: 1.6 } } });
 }
 const hip_thrust = animated({
   id: 'hip_thrust', type: 'lift', camera: 'floor', scenery: [{ box: [0, 0.21, -0.46], size: [1.1, 0.42, 0.35] }],
@@ -388,7 +429,7 @@ const band_walk = animated({
   id: 'band_walk', type: 'walk',
   steps: ['Krok w bok', 'Dostawienie nogi'],
   pose: (d, prm = {}) => {
-    const p = squat.pose(0.32 * (1 - 0.85 * (prm.tall ?? 0)), { valgus: 0.35 * (prm.valgus ?? 0) });
+    const p = squat.pose(0.32 * (1 - 0.85 * (prm.tall ?? 0)), { valgus: 0.8 * (prm.valgus ?? 0) });
     const step = Math.sin(Math.PI * Math.min(d, 1)), follow = Math.sin(Math.PI * Math.max(0, d - 1));
     const aL = 4 + 14 * step, aR = 4 + 14 * follow;
     const j = { ...p.joints };

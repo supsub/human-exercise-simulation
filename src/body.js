@@ -533,7 +533,7 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
         if (_u.lengthSq() < 0.5) _u.set(1, 0, 0);
         for (const s of [1, -1]) {
           const c = mid.clone().addScaledVector(_u, s * (len / 2 - 0.12));
-          cyl(c.clone().addScaledVector(_u, -0.03), c.clone().addScaledVector(_u, 0.03), 0.2, plateMat);
+          cyl(c.clone().addScaledVector(_u, -0.03), c.clone().addScaledVector(_u, 0.03), typeof plates === 'number' ? plates : 0.2, plateMat);   // plates: liczba = promień talerza
         }
       }
     }
