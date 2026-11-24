@@ -44,11 +44,23 @@ export function emptyPlan(name = 'Nowy plan', variants = []) {
 }
 const items = (list) => list.map(([exId, sets, reps]) => ({ exId, sets, reps }));
 export function exampleData() {
+  const r = (ids) => ids.map((id) => [id, 3, 10]);
+  const JA = { id: newId(), name: 'julo A', items: items(r(['db_bench', 'goblet_squat', 'cable_row', 'db_rdl', 'plank', 'tib_raise', 'lat_pulldown'])) };
+  const JB = { id: newId(), name: 'julo B', items: items(r(['db_ohp', 'incline_db', 'leg_press', 'lat_pulldown_wide', 'calf_raise', 'reverse_curl', 'leg_raise'])) };
   const A = { id: newId(), name: 'FBW A', items: items([['squat', 4, 8], ['bench', 4, 8], ['row', 3, 10], ['plank', 3, 30]]) };
   const B = { id: newId(), name: 'FBW B', items: items([['deadlift', 3, 5], ['ohp', 3, 8], ['pullup', 3, 8], ['lunge', 3, 10]]) };
   const C = { id: newId(), name: 'FBW C', items: items([['goblet_squat', 3, 10], ['incline_db', 3, 10], ['lat_pulldown', 3, 10], ['rdl', 3, 10], ['face_pull', 3, 15]]) };
-  const plan = { ...emptyPlan('FBW – 3 warianty', [A.id, B.id, C.id]), sessions: 4 };
-  return { workouts: [A, B, C], plans: [plan] };
+  const julo = { ...emptyPlan('julo – A/B', [JA.id, JB.id]), sessions: 3 };
+  const fbw = { ...emptyPlan('FBW – 3 warianty', [A.id, B.id, C.id]), sessions: 4 };
+  return { workouts: [JA, JB, A, B, C], plans: [julo, fbw] };
+}
+// Dokłada przykładowe plany, których jeszcze nie ma (po nazwie) – bez duplikatów; zwraca id pierwszego dodanego
+export function addExamples(store) {
+  const d = exampleData();
+  const fresh = d.plans.filter((p) => !store.plans.some((q) => q.name === p.name));
+  for (const p of fresh) store.workouts.push(...d.workouts.filter((w) => p.variants.includes(w.id)));
+  store.plans.push(...fresh);
+  return fresh[0]?.id ?? store.plans.find((q) => q.name === d.plans[0].name)?.id;
 }
 // Stary format (ćwiczenia przypisane do dni tygodnia) → treningi + plan z tymi samymi dniami
 export function migrateV1(old) {

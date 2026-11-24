@@ -6,7 +6,7 @@ import { EXERCISE_BY_ID } from '../exercises/index.js';
 import { createPlayer } from '../player.js';
 import { createFigure } from '../figure.js';
 import { CATALOG, CATALOG_BY_ID, CATEGORIES } from './catalog.js';
-import { DAYS, analyzePlan, emptyPlan, emptyWorkout, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
+import { DAYS, analyzePlan, emptyPlan, emptyWorkout, addExamples, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
 
 // Jedyny widok aplikacji: plan treningowy z modelem 3D.
 // - treningi (warianty, np. „FBW A”) to bloki ćwiczeń niezależne od dni tygodnia,
@@ -525,10 +525,7 @@ ui.deleteBtn.onclick = () => {
   render();
 };
 ui.exampleBtn.onclick = () => {
-  const d = exampleData();
-  store.workouts.push(...d.workouts);
-  store.plans.push(...d.plans);
-  store.currentId = d.plans[0].id;
+  store.currentId = addExamples(store) ?? store.currentId;
   focusId = null;
   render();
 };
