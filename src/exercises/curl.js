@@ -1,5 +1,6 @@
 import { defineExercise } from './common.js';
 import { DIMS } from '../dims.js';
+import { momentumSwing } from './build.js';
 
 // Uginanie przedramion z hantlami: ruch tylko w stawie łokciowym,
 // ramię nieruchomo przy tułowiu (lekko przesuwa się w przód na górze).
@@ -8,19 +9,16 @@ import { DIMS } from '../dims.js';
 function pose(depth, p = {}) {
   const elbow = -(0.12 + 2.25 * depth);
   const shoulder = -(0.12 + (p.elbowsFwd ?? 0)) * depth;
-  // Bujanie: tułów odchyla się w tył najmocniej w środkowej części unoszenia
-  const swing = (p.swing ?? 0) * Math.sin(Math.PI * Math.min(1, depth * 1.1));
-  return {
-    root: { y: DIMS.hipHeight, z: 0.05 * swing, rx: -0.35 * swing },
+  // Bujanie: ruch z pędem w czasie (przysiad tułowiem, wyrzut z odchyleniem, odbicie) – build.js momentumSwing.
+  // p.swing: 0.35 w definicji błędu = pełna siła; inne ćwiczenia (młotkowe, nachwytem) podają wagę 0..1.
+  return momentumSwing({
+    root: { y: DIMS.hipHeight, z: 0, rx: 0 },
     joints: {
-      lumbar: -0.65 * swing,
-      neck: swing,
-      kneeL: 0.15 * swing, kneeR: 0.15 * swing, hipL: 0.2 * swing, hipR: 0.2 * swing,
       shoulderL: [shoulder, 0, 0.16], shoulderR: [shoulder, 0, -0.16], elbowL: elbow, elbowR: elbow,   // ręce lekko od ud – hantle ich nie dotykają
       wristL: -0.15 * depth, wristR: -0.15 * depth,
     },
     props: { dumbbells: true },
-  };
+  }, Math.min(1, (p.swing ?? 0) / 0.35), p.cycleT ?? 0);
 }
 
 export default defineExercise({

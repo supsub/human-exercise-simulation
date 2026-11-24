@@ -1,4 +1,4 @@
-import { animated, keyframes, makePose } from './build.js';
+import { animated, keyframes, makePose, momentumSwing, kipSwing } from './build.js';
 import { DIMS } from '../dims.js';
 import { twoBoneIK, downAngle } from '../kinematics.js';
 import squat from './squat.js';
@@ -86,11 +86,12 @@ const cable_fly = animated({
 });
 
 // ---------- Plecy ----------
+const pullupKeys = keyframes({ anchor: { pt: 'handL', at: { y: BAR_H, z: 0 } }, thigh: -10, shin: 30, grip: 1 },
+  { arm: 180, fore: 180, rx: 0, trunk: 0 }, { arm: 350, fore: 200, rx: -8, trunk: -14, head: -5 });   // łokcie za drążkiem, klatka tuż za nim, broda nad nim
 const pullup = animated({
   id: 'pullup', type: 'lift', camera: 'hang', scenery: pullBar(), hang: true,
   steps: ['Zwis na drążku', 'Podciąganie', 'Broda nad drążkiem', 'Opuszczanie'],
-  pose: keyframes({ anchor: { pt: 'handL', at: { y: BAR_H, z: 0 } }, thigh: -10, shin: 30, grip: 1 },
-    { arm: 180, fore: 180, rx: 0, trunk: 0 }, { arm: 350, fore: 200, rx: -8, trunk: -14, head: -5 }),   // łokcie za drążkiem, klatka tuż za nim, broda nad nim
+  pose: (d, p = {}, m) => kipSwing(pullupKeys(d, p, m), p.kip ?? 0, p.cycleT),   // błąd „bujanie”: wahadło w czasie (build.js)
 });
 // Wyciąg górny: siedzisko, wałek na uda, kolumna z obciążeniem PRZED ćwiczącym, bloczek nad drążkiem
 const pulldownMachine = [{ box: [0, 0.245, -0.2], size: [0.34, 0.49, 0.8] }, { cyl: [[-0.25, 0.68, 0.32], [0.25, 0.68, 0.32]], r: 0.05, color: 'pad' },
@@ -177,10 +178,11 @@ const db_ohp = animated({
   steps: ['Hantle na wysokości barków', 'Wyciskanie nad głowę', 'Ręce wyprostowane', 'Opuszczanie do barków'],
   pose: keyframes({ ...FEET, props: { dumbbells: true } }, { shX: -10, abd: 84, rot: 90, el: -98 }, { shX: -10, abd: 168, rot: 90, el: -8 }),
 });
+const lateralKeys = keyframes({ ...FEET, props: { dumbbells: true } }, { shX: -8, abd: 12, el: -14 }, { shX: -12, abd: 86, el: -16 });
 const lateral_raise = animated({
   id: 'lateral_raise', type: 'lift',
   steps: ['Ręce wzdłuż ciała', 'Unoszenie bokiem', 'Ręce na wysokości barków', 'Opuszczanie'],
-  pose: keyframes({ ...FEET, props: { dumbbells: true } }, { shX: -8, abd: 12, el: -14 }, { shX: -12, abd: 86, el: -16 }),
+  pose: (d, p = {}, m) => momentumSwing(lateralKeys(d, p, m), p.swing ?? 0, p.cycleT),   // „bujanie”: pęd tułowia w czasie
   cameraPosition: [0.9, 1.4, 2.8],
 });
 const reverse_fly = animated({

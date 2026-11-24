@@ -78,7 +78,7 @@ export const MISTAKES = {
 
   // ---------- Plecy ----------
   pullup: [
-    { id: 'kip', name: 'Bujanie nogami', A: { thigh: -45, shin: 70, trunk: -18 },
+    { id: 'kip', name: 'Bujanie nogami',   // ruch w czasie: build.js kipSwing
       what: 'Ciało buja się, a nogi wyrzucane są w przód, żeby pomóc w podciągnięciu.',
       why: 'Pęd zastępuje pracę pleców, a barki dostają szarpnięcia na dole ruchu.',
       fix: 'Napnij brzuch i pośladki, zacznij od ściągnięcia łopatek, podciągaj się bez wymachu.',
@@ -214,7 +214,7 @@ export const MISTAKES = {
       why: 'Pracę przejmuje górna część czworobocznego, a w barku może dochodzić do ściskania ścięgien.',
       fix: 'Unoś hantle do wysokości barków, barki nisko.',
       shift: { trap_upper: 0.5, delt_lat: -0.15 }, stress: [{ joint: 'shoulder', label: 'Bark – ściskanie ścięgien' }] },
-    { id: 'swing', name: 'Bujanie tułowiem', A: { rx: 12, trunk: 15 }, B: { rx: -10, trunk: -14 },
+    { id: 'swing', name: 'Bujanie tułowiem',   // ruch w czasie: build.js momentumSwing
       what: 'Hantle wyrzucane są ruchem tułowia.',
       why: 'Pęd wykonuje pracę za barki, a lędźwia dostają szarpnięcia.',
       fix: 'Zmniejsz ciężar, tułów nieruchomy.',

@@ -180,3 +180,40 @@ export function animated({ id, type = 'lower', steps, pose, camera = 'stand', sc
     ...rest,
   });
 }
+
+// ---------- Błędy „bujanie” z pędem (zależne od czasu w cyklu, params.cycleT) ----------
+// Krzywe czasowe dla ćwiczeń typu 'lift' (faza koncentryczna ok. t = 0,13–0,46). Dzwony okresowe (zawinięte w cyklu).
+const bell = (t, c, s) => { const d = ((t - c + 1.5) % 1) - 0.5; return Math.exp(-((d / s) ** 2)); };
+// Tułów stojąc: przysiad przed wyrzutem (pochylenie w przód), wyrzut z odchyleniem w tył, odbicie, uspokojenie (stopnie; + = w przód)
+export const torsoSwingCurve = (t) => 10 * bell(t, 0.11, 0.05) - 22 * bell(t, 0.3, 0.08) + 7 * bell(t, 0.52, 0.06) - 2 * bell(t, 0.7, 0.08);
+// Bujanie tułowiem stojąc: miednica (40%) i odcinek lędźwiowy (60%) – nogi zostają pionowo, stopy w miejscu, głowa patrzy przed siebie.
+// Działa na gotowej pozie ({ root, joints }); w = siła błędu 0..1, t = chwila cyklu.
+export function momentumSwing(pose, w, t = 0) {
+  if (!w) return pose;
+  const lean = torsoSwingCurve(t) * w, pel = 0.4 * lean * R, lum = 0.6 * lean * R;
+  const j = { ...pose.joints };
+  j.lumbar = (j.lumbar ?? 0) + lum;
+  j.neck = (j.neck ?? 0) - 0.6 * lean * R;
+  for (const S of ['L', 'R']) {
+    const h = j['hip' + S];
+    j['hip' + S] = Array.isArray(h) ? [h[0] - pel, h[1], h[2]] : (h ?? 0) - pel;
+  }
+  return { ...pose, root: { ...pose.root, rx: (pose.root.rx ?? 0) + pel }, joints: j };
+}
+// Zwis (podciąganie): ciało jest wahadłem na dłoniach. Na dole nogi w tył i wygięcie, tuż przed podciągnięciem
+// wyrzut nóg w przód ze zgięciem kolan (pęd pomaga wjechać w górę), potem nogi opadają.
+export function kipSwing(pose, w, t = 0) {
+  if (!w) return pose;
+  const body = -9 * Math.sin(2 * Math.PI * t + 3.46) * w;                         // + = głowa w przód, stopy w tył
+  const legs = (18 * bell(t, 0.02, 0.07) - 50 * bell(t, 0.2, 0.07)) * w;          // + = nogi w tył
+  const knees = 45 * bell(t, 0.21, 0.07) * w;
+  const arch = (-14 * bell(t, 0.02, 0.08) + 10 * bell(t, 0.2, 0.07)) * w;        // − = wygięcie, + = zgięcie
+  const j = { ...pose.joints };
+  for (const S of ['L', 'R']) {
+    const h = j['hip' + S];
+    j['hip' + S] = Array.isArray(h) ? [h[0] + legs * R, h[1], h[2]] : (h ?? 0) + legs * R;
+    j['knee' + S] = (j['knee' + S] ?? 0) + knees * R;
+  }
+  j.lumbar = (j.lumbar ?? 0) + arch * R;
+  return { ...pose, root: { ...pose.root, rx: (pose.root.rx ?? 0) + body * R }, joints: j };
+}
