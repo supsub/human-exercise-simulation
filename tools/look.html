@@ -125,7 +125,7 @@
       const n = worlds.length; camera.aspect = W / n / H; camera.updateProjectionMatrix();
       controls.update();
       worlds.forEach((w, i) => {
-        w.body.setPose(w.body.resolvePose(ex.pose(s.depth, {})));
+        w.body.setPose(w.body.resolvePose(ex.pose(s.depth, { cycleT: s.t })));
         w.body.setBreath(s.breath);
         for (const m of MUSCLES) {
           const mat = w.body.materials[m.id];

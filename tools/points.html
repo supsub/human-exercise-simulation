@@ -17,7 +17,7 @@
   const rows = [];
   for (const t of (q.get('t') ?? '0').split(',').map(Number)) {
     const prm = mistake?.params ?? {};
-    body.setPose(body.resolvePose(ex.pose(sampleExercise(ex, t, prm.rom ?? 0).depth, prm)));
+    body.setPose(body.resolvePose(ex.pose(sampleExercise(ex, t, prm.rom ?? 0).depth, { ...prm, cycleT: t })));
     for (const n of (q.get('pts') ?? 'handL,handR').split(',')) {
       const v = (body.points[n] ?? body.joints[n]).getWorldPosition(new THREE.Vector3());
       rows.push(`t=${t} ${n.padEnd(10)} x=${v.x.toFixed(3)} y=${v.y.toFixed(3)} z=${v.z.toFixed(3)}`);

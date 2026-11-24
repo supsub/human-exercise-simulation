@@ -68,6 +68,7 @@ export function createPlayer(resolve = (p) => p) {
         const params = {};
         if (s.mistake) for (const [k, v] of Object.entries(s.mistake.params)) params[k] = v * mix;
         sample = sampleExercise(ex, s.t, params.rom ?? 0);
+        params.cycleT = sample.t;   // czas w cyklu – dla ruchów zależnych od czasu (np. bujanie wahadłem)
         target = resolve(ex.pose(sample.depth, params));
         raw = computeActivations(ex, sample);
         if (s.mistake && mix > 0) {

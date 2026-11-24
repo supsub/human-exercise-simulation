@@ -419,7 +419,7 @@ export const MISTAKES = {
       stress: [{ joint: 'lumbar', label: 'Odcinek lędźwiowy' }] },
   ],
   leg_raise: [
-    { id: 'swing', name: 'Bujanie ciałem', A: { thigh: 30, shin: 35, rx: 10 },
+    { id: 'swing', name: 'Bujanie ciałem', A: { thigh: 14, shin: 20 },   // + wahadło całego ciała w czasie (library.js)
       what: 'Nogi wyrzucane są wymachem, ciało buja się na drążku.', why: 'Pęd zastępuje pracę brzucha, a barki dostają szarpnięcia.',
       fix: 'Zatrzymaj bujanie przed każdym powtórzeniem, unoś nogi powoli.', shift: { rectus_abdominis: -0.3 }, stress: [{ joint: 'shoulder', label: 'Bark – szarpnięcie' }] },
     ROM('Nogi unoszą się tylko trochę.', 'Brzuch prawie nie pracuje – głównie zginacze bioder.', 'Unoś nogi co najmniej do poziomu, podwijając miednicę.', { rectus_abdominis: -0.3 }),

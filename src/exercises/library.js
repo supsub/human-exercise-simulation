@@ -16,11 +16,13 @@ const flatBench = [
   { box: [0, 0.05, 0.3], size: [0.5, 0.1, 0.08], color: 'frame' },
   { box: [0, 0.05, -0.7], size: [0.5, 0.1, 0.08], color: 'frame' },
 ];
-const pullBar = (y = 2.12) => [
+const pullBar = (y = BAR_H) => [
   { cyl: [[-0.75, y, 0], [0.75, y, 0]], r: 0.018 },
   { cyl: [[0.75, 0, 0], [0.75, y + 0.05, 0]], r: 0.035, color: 'frame' },
   { cyl: [[-0.75, 0, 0], [-0.75, y + 0.05, 0]], r: 0.035, color: 'frame' },
 ];
+// wysokość drążka do zwisu: stopy wiszącego ćwiczącego ~20 cm nad podłogą
+const BAR_H = 2.35;
 const seat = (y = 0.45, z = 0, d = 0.42) => ({ box: [0, y / 2, z], size: [0.4, y, d] });
 // uchwyt maszyny przy siedzisku: pręt w dłoni (oś z, środek w punkcie chwytu) na pionowym słupku
 const handles = (x, y, z) => [1, -1].flatMap((s) => [
@@ -85,9 +87,9 @@ const cable_fly = animated({
 
 // ---------- Plecy ----------
 const pullup = animated({
-  id: 'pullup', type: 'lift', camera: 'hang', scenery: pullBar(),
+  id: 'pullup', type: 'lift', camera: 'hang', scenery: pullBar(), hang: true,
   steps: ['Zwis na drążku', 'Podciąganie', 'Broda nad drążkiem', 'Opuszczanie'],
-  pose: keyframes({ anchor: { pt: 'handL', at: { y: 2.12, z: 0 } }, thigh: -10, shin: 30, grip: 1 },
+  pose: keyframes({ anchor: { pt: 'handL', at: { y: BAR_H, z: 0 } }, thigh: -10, shin: 30, grip: 1 },
     { arm: 180, fore: 180, rx: 0, trunk: 0 }, { arm: 350, fore: 200, rx: -8, trunk: -14, head: -5 }),   // łokcie za drążkiem, klatka tuż za nim, broda nad nim
 });
 // Wyciąg górny: siedzisko, wałek na uda, kolumna z obciążeniem PRZED ćwiczącym, bloczek nad drążkiem
@@ -415,11 +417,28 @@ const crunch = animated({
   pose: keyframes({ root: { y: 0.125, z: 0 }, rx: -90, thigh: -140, shin: -25, foot: 0 },
     { trunk: -90, head: -88 }, { trunk: -58, head: -35 }),
 });
+const legRaiseKeys = keyframes({ anchor: { pt: 'handL', at: { y: BAR_H, z: 0 } }, arm: 180, fore: 180, trunk: 0, grip: 1 },
+  { rx: 0, thigh: 0, shin: 4 }, { rx: -16, thigh: -96, shin: -92 });
 const leg_raise = animated({
-  id: 'leg_raise', type: 'lift', camera: 'hang', scenery: pullBar(),
+  id: 'leg_raise', type: 'lift', camera: 'hang', scenery: pullBar(), hang: true,
   steps: ['Zwis na drążku', 'Unoszenie nóg', 'Nogi w poziomie', 'Opuszczanie nóg'],
-  pose: keyframes({ anchor: { pt: 'handL', at: { y: 2.12, z: 0 } }, arm: 180, fore: 180, trunk: 0, grip: 1 },
-    { rx: 0, thigh: 0, shin: 4 }, { rx: -16, thigh: -96, shin: -92 }),
+  pose: (d, params = {}, mistakes) => {
+    const p = legRaiseKeys(d, params, mistakes);
+    // błąd „bujanie”: ciało jest wahadłem zawieszonym na dłoniach – kołysze się w rytmie powtórzeń
+    // (okres ≈ cykl ćwiczenia, jak naturalne wahadło długości ciała), a nogi z opóźnieniem dają „bicz”
+    const w = params.swing ?? 0;
+    if (!w) return p;
+    const t = params.cycleT ?? 0, R = Math.PI / 180, TAU = Math.PI * 2;
+    const body = 17 * Math.sin(TAU * t + 0.9);          // + = stopy w tył, głowa w przód
+    const whip = 24 * Math.sin(TAU * t + 0.2);          // nogi spóźnione względem tułowia
+    const j = { ...p.joints };
+    for (const S of ['L', 'R']) {
+      j['hip' + S] = [j['hip' + S][0] + w * whip * R, j['hip' + S][1], j['hip' + S][2]];
+      j['knee' + S] += w * Math.max(0, whip) * 0.6 * R;
+    }
+    j.lumbar += w * -0.35 * body * R;                    // wygięcie przy zamachu, zgięcie przy wymachu
+    return { ...p, root: { ...p.root, rx: p.root.rx + w * body * R }, joints: j };
+  },
 });
 const farmer = animated({
   id: 'farmer', type: 'walk',

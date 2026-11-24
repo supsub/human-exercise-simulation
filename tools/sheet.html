@@ -32,7 +32,7 @@
     // &ts=0,0.25,0.5 – własne chwile cyklu (zamiast A/B)
     const TS = q.get('ts')?.split(',').map(Number);
     const cells = showMistakes ? list.flatMap((ex) => ex.mistakes.map((m) => [ex, 1, m]))
-      : TS ? list.flatMap((ex) => TS.map((t) => [ex, t]))
+      : TS ? list.flatMap((ex) => TS.map((t) => [ex, t, ex.mistakes.find((m) => m.id === q.get('mistake'))]))   // &mistake=id – błąd w kolejnych chwilach
       : list.flatMap((ex) => [[ex, 0], [ex, 1]]);
     const rows = Math.ceil(cells.length / COLS);
     const canvas = document.getElementById('c');
@@ -57,7 +57,7 @@
       const out = [];
       for (const ex of list) {
         // chwyt zgodny ze specyfikacją (grips.js) w pozycji wyjściowej
-        body.setPose(body.resolvePose(ex.pose(sampleExercise(ex, 0.01).depth, {})));
+        body.setPose(body.resolvePose(ex.pose(sampleExercise(ex, 0.01).depth, { cycleT: 0.01 })));
         const gm = gripMismatch(ex.id, handOrientation(body, 'L'));
         if (gm) out.push(`${ex.id} chwyt: ${gm}`);
         const variants = [{ id: 'ok', params: {} }, ...ex.mistakes.map((m) => ({ id: m.id, params: m.params }))];
@@ -66,7 +66,7 @@
           const thumbs = new Set(), widths = [];
           for (let i = 0; i < 60; i++) {
             const t = i / 60;
-            const pose = body.resolvePose(ex.pose(sampleExercise(ex, t, v.params.rom ?? 0).depth, v.params));
+            const pose = body.resolvePose(ex.pose(sampleExercise(ex, t, v.params.rom ?? 0).depth, { ...v.params, cycleT: t }));
             body.setPose(pose);
             // chwyt na drążku: stały typ (kciuki do środka / na zewnątrz) i stały rozstaw dłoni
             const bar = pose.props?.bar;
@@ -76,7 +76,13 @@
               thumbs.add(Math.sign(new THREE.Vector3(e[0], e[1], e[2]).dot(hR.clone().sub(hL))));
               if (bar.len !== 'fit') widths.push(hL.distanceTo(hR));
             }
-            for (const is of [...checkPose(body, pose), ...checkScenery(body, ex.scenery, pose)]) {
+            // zwis (ex.hang): stopy cały czas w powietrzu, co najmniej 10 cm nad podłogą
+            const hangIssues = [];
+            if (ex.hang) for (const n of ['toeL', 'toeR', 'heelL', 'heelR']) {
+              const y = body.points[n].getWorldPosition(new THREE.Vector3()).y;
+              if (y < 0.1) hangIssues.push({ what: 'w zwisie stopy dotykają podłogi', part: n, depth: 0.1 - y });
+            }
+            for (const is of [...checkPose(body, pose), ...checkScenery(body, ex.scenery, pose), ...hangIssues]) {
               const prev = found.get(is.what);
               if (!prev || is.depth > prev.depth) found.set(is.what, { ...is, t });
             }
@@ -97,7 +103,7 @@
       const rows = [];
       for (const ex of list) {
         const cell = (t) => {
-          body.setPose(body.resolvePose(ex.pose(sampleExercise(ex, t).depth, {})));
+          body.setPose(body.resolvePose(ex.pose(sampleExercise(ex, t).depth, { cycleT: t })));
           const L = handOrientation(body, 'L'), R = handOrientation(body, 'R');
           return `${L.palm.label}/${L.thumb.label}` + (L.palm.label !== R.palm.label || L.thumb.label !== R.thumb.label ? ` (P: ${R.palm.label}/${R.thumb.label})` : '') + (t < 0.05 && gripMismatch(ex.id, L) ? '  ✗ ' + gripMismatch(ex.id, L) : '');
         };
@@ -130,7 +136,7 @@
       // A = pozycja na początku cyklu, B = najgłębszy / najwyższy punkt (koniec drugiej fazy)
       const t = TS ? which : which === 0 ? 0.01 : (ex.phases[1]?.end ?? 0.5) - 0.01;
       const prm = mistake ? mistake.params : {};
-      const pose = body.resolvePose(ex.pose(sampleExercise(ex, t, prm.rom ?? 0).depth, prm));
+      const pose = body.resolvePose(ex.pose(sampleExercise(ex, t, prm.rom ?? 0).depth, { ...prm, cycleT: t }));
       body.setPose(pose);
       body.setBreath(0.4);
       setScenery(ex.scenery);
@@ -153,7 +159,7 @@
       renderer.render(scene, camera);
       const l = document.createElement('div');
       l.className = 'lbl'; l.style.left = cx + 'px'; l.style.top = cy + 'px';
-      l.textContent = mistake ? `${ex.id}: ${mistake.name}` : TS ? `${ex.id} t=${which}` : `${ex.id} ${which ? 'B' : 'A'}`;
+      l.textContent = mistake && TS ? `${ex.id}: ${mistake.name} t=${which}` : mistake ? `${ex.id}: ${mistake.name}` : TS ? `${ex.id} t=${which}` : `${ex.id} ${which ? 'B' : 'A'}`;
       grid.appendChild(l);
     });
   </script>

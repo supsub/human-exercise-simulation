@@ -139,7 +139,7 @@ const BREATHING = {
 export const CAMERAS = {
   stand: { cameraPosition: [2.3, 1.35, 2.3], cameraTarget: [0, 0.95, 0] },
   lie: { cameraPosition: [2.5, 1.85, 1.9], cameraTarget: [0, 0.6, -0.1] },
-  hang: { cameraPosition: [2.6, 1.8, 2.6], cameraTarget: [0, 1.4, 0] },
+  hang: { cameraPosition: [2.6, 1.95, 2.6], cameraTarget: [0, 1.5, 0] },
   floor: { cameraPosition: [2.3, 1.05, 1.9], cameraTarget: [0, 0.3, 0.1] },
   seat: { cameraPosition: [2.3, 1.3, 2.2], cameraTarget: [0, 0.8, 0.1] },
 };

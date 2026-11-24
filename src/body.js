@@ -512,7 +512,7 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     if (_u.lengthSq() < 0.5) _u.set(1, 0, 0);
     return cyl(_l.copy(_c).addScaledVector(_u, len / 2), _r.copy(_c).addScaledVector(_u, -len / 2), r, mat);
   }
-  const gobletShape = { base: null, r: 0 };
+  const gobletShape = { base: null, r: 0 }, plateShape = { c: null, n: null };
   function updateWorldProps(props = {}) {
     if (!worldProps.parent && root.parent) root.parent.add(worldProps);
     used = 0;
@@ -570,8 +570,11 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
       const tL = pointWorld('toeL', new THREE.Vector3()), tR = pointWorld('toeR', new THREE.Vector3());
       const eL = pointWorld('heelL', new THREE.Vector3()), eR = pointWorld('heelR', new THREE.Vector3());
       const c = new THREE.Vector3().add(tL).add(tR).add(eL).add(eR).multiplyScalar(0.25);
-      const n = new THREE.Vector3().subVectors(c, pointWorld('kneeL', new THREE.Vector3())).normalize();
-      cyl(c.clone().addScaledVector(n, 0.01), c.clone().addScaledVector(n, 0.05), 0.32, plateMat);
+      // płyta leży płasko pod podeszwami: jej normalna = kierunek „w dół stopy” (oś −Y kostki), nie linia kolano→stopa
+      const e = joints.ankleL.matrixWorld.elements;
+      const n = new THREE.Vector3(-e[4], -e[5], -e[6]).normalize();
+      plateShape.c = c.clone(); plateShape.n = n.clone();
+      cyl(c.clone().addScaledVector(n, 0.002), c.clone().addScaledVector(n, 0.042), 0.32, plateMat);
     }
     for (const pad of props.rollers ?? []) {
       // wałki maszyn: 'shin' (przód goleni) albo 'calf' (tył goleni)
@@ -652,5 +655,5 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     belly.scale.set(1 + 0.015 * b, 1, 1 + 0.1 * b);
   }
 
-  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, materials, muscleMeshes, nose, setPose, setBreath, resolvePose };
+  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, plateShape, materials, muscleMeshes, nose, setPose, setBreath, resolvePose };
 }

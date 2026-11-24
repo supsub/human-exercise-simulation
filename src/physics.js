@@ -152,6 +152,14 @@ export function checkPose(body, pose, tol = 0.012) {
     const w = deepest(body, pts, (p) => holding(p) || /^upperArm/.test(p), 0.01);
     if (w && w.depth > tol + 0.01) issues.push({ what: `hantel wchodzi w ${partName(w.part)}`, ...w });
   }
+  // płyta suwnicy: pięta, śródstopie i palce obu stóp na powierzchni płyty (±1 cm), nic nie wchodzi w płytę
+  if (props.plate && body.plateShape?.c) {
+    const { c, n } = body.plateShape;
+    for (const S of ['L', 'R']) for (const nm of ['toe', 'heel']) {
+      const d = pt(nm + S).sub(c).dot(n) - 0.002;   // > 0: punkt za powierzchnią płyty
+      if (Math.abs(d) > 0.01) issues.push({ what: d > 0 ? `stopa ${S} wchodzi w płytę suwnicy` : `stopa ${S} odstaje od płyty suwnicy`, part: 'foot' + S, depth: Math.abs(d) });
+    }
+  }
   // hantle: uchwyt i oba talerze
   for (const [i, d] of body.dumbbells.entries()) {
     if (!d.visible) continue;

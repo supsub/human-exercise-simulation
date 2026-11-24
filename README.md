@@ -54,6 +54,7 @@ Automatycznie – `tools/sheet.html?check` musi zwrócić „OK – brak narusze
 
 - [ ] sprzęt (sztanga, hantle, hantel oburącz) nie wchodzi w ciało, dłonie nie wchodzą w tułów, głowę ani uda
 - [ ] nogi nie nachodzą na siebie, nic nie przechodzi przez podłogę
+- [ ] podeszwy leżą płasko na płycie suwnicy (pięta i palce ±1 cm); w zwisie (`hang: true`) stopy cały czas ≥ 10 cm nad podłogą
 - [ ] ciało, dłonie i stopy (cała podeszwa i śródstopie) nie wchodzą w sprzęt: ławki, siedziska, podnóżki, oparcia
 - [ ] ciało nie wchodzi w drążki, poręcze, wałki i słupki sprzętu (z zapasem na mięśnie wyglądu organicznego); elementy, które mają dociskać ciało (wałek na kostki), oznaczamy `contact: true`
 - [ ] chwyt zgodny ze specyfikacją z `grips.js` (wnętrze dłoni i kciuk we właściwą stronę)
@@ -66,5 +67,6 @@ Wzrokowo – arkusze zbliżeń (`tools/sheet.html?ts=0.01,0.5&focus=handL&dist=0
 - [ ] dłonie bez rekwizytu wyglądają naturalnie (zwisają wnętrzem do ud, leżą płasko na udach, pięści w desce)
 - [ ] stopy stoją płasko tam, gdzie powinny (podłoga, platforma, podnóżek), sprzęt ma sensowne wymiary
 - [ ] przy przełączeniu na błąd technika różni się tylko tym błędem (kamera zostaje w miejscu – porównanie 1:1)
+- [ ] błędy „dynamiczne” (bujanie, szarpanie) naprawdę się ruszają w czasie – poza dostaje `params.cycleT` (czas w cyklu 0–1); podgląd: `tools/sheet.html?only=leg_raise&mistake=swing&ts=0,0.125,…`
 
 Narzędzia: `tools/points.html?ex=db_row&t=0,0.5&pts=handR,toeL` – pozycje punktów ciała (do ustawiania sprzętu i podparć), `tools/sheet.html?grips` – tabela chwytu wszystkich ćwiczeń, `tools/look.html` – porównanie wyglądów (domyślny: realistyczny, `?look=classic` – dawny ludzik z brył).
