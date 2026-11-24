@@ -87,13 +87,13 @@ function renderDays(p) {
     card.querySelector('input').onchange = (e) => { day.active = e.target.checked; render(); };
     card.querySelector('.switch').addEventListener('click', (e) => e.stopPropagation());
     // cała karta dnia jest klikalna (wiersze ćwiczeń, pola i przyciski mają własne akcje)
-    card.title = selected ? `Wybierz ${d.name} – potem „Dodaj do”` : `Dodaj ćwiczenia na ${d.name} i zobacz mięśnie z tego dnia`;
+    card.title = selected ? `Wybierz ${d.name} – potem „Dodaj do”` : `Pokaż na modelu mięśnie z dnia: ${d.name}`;
     card.onclick = () => {
       // wybrane ćwiczenie: klik w dzień tylko go zaznacza (cel przycisku "Dodaj do")
       if (selected) { focusDay = d.id; render(); return; }
-      // ponowny klik w dzień z otwartą listą – zamknij listę
-      if (!ui.panel.hidden && !ui.browse.hidden && browseDay === d.id) { focusDay = null; closePanel(); return; }
-      openBrowse(d.id);
+      // bez wybranego ćwiczenia: podgląd dnia na modelu (ponowny klik – cały tydzień)
+      focusDay = focusDay === d.id ? null : d.id;
+      if (!ui.panel.hidden && !ui.browse.hidden) closePanel(); else render();
     };
     const list = card.querySelector('.day-items');
     if (day.active) {
@@ -115,7 +115,11 @@ function renderDays(p) {
         row.onclick = (e) => { e.stopPropagation(); selected?.ex === ex ? closePanel() : selectExercise(ex, 'plan'); };
         list.appendChild(row);
       });
-      if (!day.items.length) list.innerHTML = '<div class="day-empty">Kliknij, aby dodać ćwiczenia</div>';
+      const add = document.createElement('button');
+      add.className = 'add-ex';
+      add.textContent = '+ Dodaj ćwiczenie';
+      add.onclick = (e) => { e.stopPropagation(); openBrowse(d.id); };
+      list.appendChild(add);
     }
     ui.days.appendChild(card);
   }
@@ -125,7 +129,7 @@ function renderAnalysis(p) {
   const a = analysis;
   ui.focus.innerHTML = focusDay
     ? `Pokazuję: <b>${DAY_BY_ID[focusDay].name}</b> <button id="focus-week" class="link">pokaż cały tydzień</button>`
-    : 'Pokazuję: <b>cały tydzień</b> <span class="muted">(kliknij dzień, aby dodać ćwiczenia i zobaczyć jego mięśnie)</span>';
+    : 'Pokazuję: <b>cały tydzień</b> <span class="muted">(kliknij dzień, aby zobaczyć mięśnie z jednego treningu)</span>';
   ui.focus.querySelector('#focus-week')?.addEventListener('click', () => { focusDay = null; if (!ui.panel.hidden) closePanel(); else render(); });
 
   const pct = Math.round((a.trained / MUSCLES.length) * 100);
