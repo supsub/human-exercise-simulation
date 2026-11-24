@@ -550,13 +550,16 @@ ui.workoutNew.onclick = () => {
 };
 
 // ---------- Klatka animacji ----------
-let mode = null, lastMode = null;
+let mode = null, lastMode = null, mouthOpen = 0;
 export function frame(dt, time) {
   if (!analysis) return;
   const out = player.frame(dt, false);
   body.setPose(out.pose);
   body.setBreath(out.sample ? out.sample.breath : 0.4);
-  updateBreathPuffs(dt, out.sample?.phase.breath === 'out' && player.state.playing ? 1 : 0);
+  const exhale = out.sample?.phase.breath === 'out' && player.state.playing ? 1 : 0;
+  updateBreathPuffs(dt, exhale);
+  mouthOpen += (exhale - mouthOpen) * (1 - Math.exp(-dt / 0.12));   // usta otwierają się i zamykają płynnie
+  body.setMouth(mouthOpen);
   updateStressMarkers(out.mistake ? out.mistake.stress : [], out.mix, time, showNotes);
 
   // Co pokazuje model: animację, udział mięśni w ćwiczeniu, jeden dzień albo cały tydzień

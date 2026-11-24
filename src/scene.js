@@ -195,8 +195,8 @@ export function updateBreathPuffs(dt, exhaling) {
     p.position.addScaledVector(p.userData.vel, dt);
     p.userData.vel.multiplyScalar(1 - 1.2 * dt);            // powietrze hamuje, obłoczek rozpływa się
     const l = p.userData.life;
-    p.scale.setScalar(0.03 + 0.09 * (1 - l));
-    p.material.opacity = 0.8 * Math.min(1, l * 1.6) * (0.4 + 0.6 * l);
+    p.scale.setScalar(0.02 + 0.07 * (1 - l));
+    p.material.opacity = 0.55 * Math.min(1, l * 1.6) * (0.4 + 0.6 * l);
   }
 }
 

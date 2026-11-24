@@ -19,7 +19,7 @@ const PELVIS = [
   { y: 0.12, w: 0.124, d: 0.08, db: 0.082 },
 ];
 const NECK = [{ y: -0.02, w: 0.06, d: 0.055 }, { y: 0.05, w: 0.052, d: 0.05 }, { y: 0.11, w: 0.05, d: 0.048 }];
-const HEAD = [
+export const HEAD = [
   { y: 0.06, w: 0.02, d: 0.02, z0: 0.03 }, { y: 0.075, w: 0.045, d: 0.05, z0: 0.035 }, { y: 0.1, w: 0.065, d: 0.07, z0: 0.025 },
   { y: 0.14, w: 0.078, d: 0.09, z0: 0.01 }, { y: 0.19, w: 0.087, d: 0.098, z0: 0.005 }, { y: 0.24, w: 0.085, d: 0.095 },
   { y: 0.272, w: 0.07, d: 0.078 }, { y: 0.288, w: 0.053, d: 0.059 }, { y: 0.298, w: 0.031, d: 0.035 }, { y: 0.3035, w: 0.008, d: 0.009 },
@@ -108,7 +108,7 @@ export const ORGANIC_MUSCLES = {
   tibialis_ant: [{ seg: 'shin', a: [38, 84], y: [-0.03, -0.3], T: 0.009, peak: 0.3 }],
 };
 
-// ctx: grupy szkieletu z body.js; zwraca { muscleMeshes, fingers, nose }
+// ctx: grupy szkieletu z body.js; zwraca { muscleMeshes, fingers, nose, faceParts }
 export function buildOrganic(ctx) {
   const { root, ribcage, belly, RIB_PIVOT, BELLY_PIVOT, neck, sides, skinMat, jointMat, faceMat, materials, MUSCLES, shadowed } = ctx;
   const mesh = (geo, mat) => shadowed(new THREE.Mesh(geo, mat));
@@ -133,12 +133,16 @@ export function buildOrganic(ctx) {
   neck.add(mesh(new Loft(HEAD, { seg: 40, steps: 40 }).geometry(), skinMat));
   const nose = ell([0.014, 0.024, 0.018], [0, 0.155, 0.103], skinMat);
   neck.add(nose);
+  const faceParts = [nose];   // rysy twarzy – chowane, gdy na głowę nałożona jest twarz ze zdjęcia (src/face.js)
   for (const sx of [1, -1]) {
     neck.add(ell([0.01, 0.028, 0.018], [sx * 0.087, 0.17, -0.005], skinMat));            // uszy
-    neck.add(ell([0.016, 0.006, 0.006], [sx * 0.03, 0.188, 0.094], faceMat));             // brwi
-    neck.add(ell([0.011, 0.007, 0.004], [sx * 0.031, 0.172, 0.094], faceMat));            // oczy
+    faceParts.push(neck.add(ell([0.016, 0.006, 0.006], [sx * 0.03, 0.188, 0.094], faceMat)).children.at(-1));   // brwi
+    faceParts.push(neck.add(ell([0.011, 0.007, 0.004], [sx * 0.031, 0.172, 0.094], faceMat)).children.at(-1));  // oczy
   }
-  neck.add(ell([0.022, 0.004, 0.004], [0, 0.118, 0.098], faceMat));                        // usta
+  // usta – własny materiał: przy wydechu otwierają się i ciemnieją (body.setMouth)
+  const mouth = ell([0.022, 0.004, 0.004], [0, 0.118, 0.098], faceMat.clone());
+  neck.add(mouth);
+  faceParts.push(mouth);
 
   const fingers = [];
   for (const S of ['L', 'R']) {
@@ -206,5 +210,5 @@ export function buildOrganic(ctx) {
       }
     }
   }
-  return { muscleMeshes, fingers, nose };
+  return { muscleMeshes, fingers, nose, faceParts, mouth };
 }

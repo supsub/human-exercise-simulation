@@ -153,7 +153,7 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
   const neck = joint('neck', torso, [0, DIMS.neckY, 0], joints);
   collideCap(neck, 'neck', 0.045, 0.06, 0.04);
   collideEll(neck, 'head', [0.095, 0.115, 0.105], [0, 0.17, 0.01]);
-  let nose = null;
+  let nose = null, faceParts = null, mouth = null;
   if (!organic) {
     const neckMesh = shadowed(new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.06, 4, 12), jointMat));
     neckMesh.position.y = 0.04;
@@ -249,7 +249,7 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
   for (const m of MUSCLES) materials[m.id] = new THREE.MeshStandardMaterial({ color: 0x4a5a78, roughness: 0.5, metalness: 0.0, emissive: 0x000000 });
   if (organic) {
     const o = buildOrganic({ root, ribcage, belly, RIB_PIVOT, BELLY_PIVOT, neck, sides, skinMat: organicSkin, jointMat: organicSkin, faceMat, materials, MUSCLES, shadowed });
-    muscleMeshes = o.muscleMeshes; fingers = o.fingers; nose = o.nose;
+    muscleMeshes = o.muscleMeshes; fingers = o.fingers; nose = o.nose; faceParts = o.faceParts; mouth = o.mouth;
   }
   for (const m of organic ? [] : MUSCLES) {
     const mat = materials[m.id];
@@ -650,10 +650,17 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
   }
 
   // b: 0 = pełny wydech, 1 = pełny wdech
+  // usta przy wydechu: 0 = zamknięte (kreska), 1 = lekko otwarte w „o” (wydmuchiwanie powietrza)
+  const MOUTH_SHUT = new THREE.Color(0x8a93a3), MOUTH_OPEN = new THREE.Color(0x2a2f38);
+  function setMouth(v) {
+    if (!mouth) return;
+    mouth.scale.set(0.022 - 0.008 * v, 0.004 + 0.0055 * v, 0.004 + 0.002 * v);
+    mouth.material.color.lerpColors(MOUTH_SHUT, MOUTH_OPEN, v);
+  }
   function setBreath(b) {
     ribcage.scale.set(1 + 0.03 * b, 1 + 0.015 * b, 1 + 0.07 * b);
     belly.scale.set(1 + 0.015 * b, 1, 1 + 0.1 * b);
   }
 
-  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, plateShape, materials, muscleMeshes, nose, setPose, setBreath, resolvePose };
+  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, plateShape, materials, muscleMeshes, nose, faceParts, setPose, setBreath, setMouth, resolvePose };
 }
