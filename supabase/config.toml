@@ -1,0 +1,9 @@
+# Lokalny Supabase do testów (supabase start). Brakujące ustawienia CLI uzupełnia domyślnymi.
+project_id = "human-exercise-simulation"
+
+[auth]
+site_url = "http://localhost:8765"
+additional_redirect_urls = ["http://localhost:8765/**", "http://127.0.0.1:8765/**"]
+
+[auth.email]
+enable_confirmations = false

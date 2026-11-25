@@ -61,7 +61,24 @@ function load() {
   const d = exampleData();
   return { ...d, currentId: d.plans[0].id };
 }
-function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }
+const saveListeners = [];
+function save() {
+  const json = JSON.stringify(store);
+  if (json === localStorage.getItem(STORAGE_KEY)) return;
+  localStorage.setItem(STORAGE_KEY, json);
+  for (const fn of saveListeners) fn(store);
+}
+// Synchronizacja z kontem (src/sync.js): odczyt, podmiana danych i powiadomienie o każdej zmianie
+export const getData = () => store;
+export function setData(data) {
+  const cur = store.currentId;
+  store = { ...data, currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  if (!store.plans.length) { store.plans.push(emptyPlan('Mój plan')); store.currentId = store.plans[0].id; }
+  if (focusId && !workout(focusId)) focusId = null;
+  render();
+}
+export const onSave = (fn) => saveListeners.push(fn);
 const plan = () => store.plans.find((p) => p.id === store.currentId) ?? store.plans[0];
 const workout = (id) => store.workouts.find((w) => w.id === id);
 const wIndex = (id) => store.workouts.findIndex((w) => w.id === id);

@@ -20,6 +20,15 @@ Parametry URL przydatne do demo i testów:
 
 `node tools/check.mjs` wypisuje kąty stawów i aktywacje bez przeglądarki (szybki test sanity).
 
+## Konto i baza danych (Supabase)
+
+Logowanie (Google / link w mailu) i synchronizacja planów: `src/sync.js`, wybór bazy: `src/config.js`, schemat: `supabase/migrations/`.
+
+- **localhost** → lokalny Supabase w Dockerze, **GitHub Pages i telefon w sieci domowej** → produkcja. Ręcznie: `?db=local` / `?db=prod` / `?db=auto`. Lokalna baza: przerywana żółta obwódka wokół przycisku konta.
+- Lokalnie: zainstaluj [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), potem w katalogu projektu `supabase start` (pierwszy raz pobiera obrazy Dockera; migracje wgrywa sam). Maile z linkami logowania: http://127.0.0.1:54324. Reset danych: `supabase db reset`. Stop: `supabase stop`.
+- Produkcja: nową migrację wgraj w panelu Supabase → SQL Editor (albo `supabase link` + `supabase db push`).
+- Klucz publishable w `src/config.js` jest jawny z założenia – dane chronią reguły RLS. Kluczy `secret`/`service_role` ani Google client secret nie trzymamy w repozytorium.
+
 ## Struktura
 
 | Plik | Rola |

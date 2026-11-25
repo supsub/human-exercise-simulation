@@ -321,3 +321,27 @@ input:focus { border-color: var(--accent); }
 .face-photo { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: flex-start; }
 .face-photo canvas { touch-action: none; border-radius: 8px; cursor: crosshair; }
 .face-open ~ .tab.about { margin-left: 0; }
+
+/* Konto (src/sync.js) */
+.auth-open { margin-right: 10px; padding: 5px 11px; font-size: 13px; border-radius: 999px; position: relative; }
+.auth-open::after { content: ''; position: absolute; right: 1px; top: 1px; width: 8px; height: 8px; border-radius: 50%; display: none; }
+.auth-open[data-state="ok"]::after { display: block; background: #4cd28a; }
+.auth-open[data-state="wait"]::after, .auth-open[data-state="sync"]::after { display: block; background: #f0c04a; }
+.auth-open[data-state="err"]::after { display: block; background: #f06a5a; }
+.auth-open.dev-db { outline: 2px dashed #f0c04a; outline-offset: 1px; }   /* lokalna baza testowa */
+.auth-dialog { top: calc(var(--nav) + 8px); right: 12px; width: min(330px, calc(100vw - 24px)); padding: 12px 14px; z-index: 60;
+  display: flex; flex-direction: column; gap: 9px; }
+.auth-dialog[hidden] { display: none; }
+.auth-dialog #auth-out, .auth-dialog #auth-in { display: flex; flex-direction: column; gap: 9px; }
+.auth-dialog [hidden] { display: none !important; }
+.auth-dialog p { margin: 0; }
+.auth-google { background: #fff; color: #1f1f1f; font-weight: 600; padding: 9px; border-radius: 9px; }
+.auth-mail { display: flex; gap: 6px; }
+.auth-mail input { flex: 1; min-width: 0; }
+.auth-who { font-weight: 600; word-break: break-all; }
+.auth-status { font-size: 13px; color: var(--muted); }
+.auth-status.ok { color: #4cd28a; } .auth-status.err { color: #f06a5a; }
+@media (max-width: 760px) {
+  .auth-open .lbl { display: none; }
+  .auth-open { margin-right: 6px; padding: 4px 9px; }
+}

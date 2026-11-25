@@ -4,12 +4,17 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Human Exercise Simulation – demo</title>
+  <meta name="theme-color" content="#1b2433" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="docs/img/icon-192.png" />
+  <link rel="apple-touch-icon" href="docs/img/icon-192.png" />
   <link rel="stylesheet" href="src/style.css" />
   <script type="importmap">
     {
       "imports": {
         "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+        "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/+esm"
       }
     }
   </script>
@@ -22,6 +27,7 @@
     <span class="logo">Human Exercise Simulation</span>
     <span class="nav-sub">Plan treningowy</span>
     <button id="face-open" class="face-open" title="Twoja twarz na modelu">🙂<span class="lbl"> Twarz</span></button>
+    <button id="auth-open" class="auth-open" data-state="off">👤<span class="lbl"> Zaloguj</span></button>
     <a class="tab about" href="docs/index.html">O projekcie →</a>
   </nav>
 
@@ -118,6 +124,25 @@
       <div id="face-step" class="face-step">Zdjęcie twarzy na wprost. Zostaje tylko na tym urządzeniu.</div>
       <div class="face-photo"><canvas id="face-photo"></canvas></div>
     </div>
+  </div>
+
+  <!-- Konto: plany na każdym urządzeniu (src/sync.js) -->
+  <div id="auth-dialog" class="auth-dialog panel" hidden>
+    <div class="modal-head"><h2>Konto</h2><button id="auth-close" class="icon" title="Zamknij">✕</button></div>
+    <div id="auth-out">
+      <p class="small muted">Zaloguj się, a plany będą na telefonie i komputerze.</p>
+      <button id="auth-google" class="auth-google">Zaloguj przez Google</button>
+      <form id="auth-mail" class="auth-mail">
+        <input id="auth-email" type="email" required placeholder="albo e-mail – wyślemy link" autocomplete="email" />
+        <button type="submit">Wyślij</button>
+      </form>
+    </div>
+    <div id="auth-in" hidden>
+      <div id="auth-who" class="auth-who"></div>
+      <div id="auth-status" class="auth-status"></div>
+      <button id="auth-logout">Wyloguj</button>
+    </div>
+    <div id="auth-msg" class="small muted"></div>
   </div>
 
   <div id="tooltip" class="tooltip" hidden></div>
