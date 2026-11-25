@@ -110,6 +110,9 @@ input:focus { border-color: var(--accent); }
 .tooltip { position: fixed; pointer-events: none; background: rgba(8,12,18,.95); border: 1px solid var(--border);
   border-radius: 8px; padding: 7px 10px; font-size: 12px; z-index: 10; max-width: 320px; }
 .tooltip i { color: var(--muted); }
+/* dotyk: opis mięśnia przypięty u góry ekranu, nie pod palcem */
+.tooltip.docked { left: 50%; top: calc(var(--nav) + 10px); transform: translateX(-50%); width: max-content; max-width: calc(100vw - 24px);
+  font-size: 13px; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
 
 /* ---------- Plan treningowy ---------- */
 .plan-left { top: calc(var(--nav) + 14px); left: 16px; bottom: 16px; width: 470px; display: flex; flex-direction: column; }
@@ -175,6 +178,11 @@ input:focus { border-color: var(--accent); }
 .warn.warn { background: rgba(242,153,74,.1); border-left: 3px solid var(--con); }
 .warn.ok { background: rgba(95,211,138,.1); border-left: 3px solid var(--good); }
 .warn.info { border-left: 3px solid var(--muted); }
+.fixes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.fix { font-size: 12.5px; padding: 5px 10px; border-radius: 999px; background: rgba(79,179,255,.14); border: 1px solid rgba(79,179,255,.45);
+  color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.fix:hover { background: rgba(79,179,255,.26); }
+.fix .wbadge { font-size: 10px; }
 .plan-recs { display: flex; flex-direction: column; gap: 6px; }
 .rec { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 9px; background: rgba(79,179,255,.06); border: 1px solid rgba(79,179,255,.15); font-size: 13px; }
 .rec small { color: var(--muted); }

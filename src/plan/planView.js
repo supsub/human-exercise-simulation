@@ -259,8 +259,10 @@ function renderAnalysis(p) {
     </div>`;
   }).join('');
 
-  ui.warnings.innerHTML = a.warnings.length ? a.warnings.map((w) => `<div class="warn ${w.level}">${w.level === 'warn' ? '⚠' : w.level === 'ok' ? '✓' : 'ℹ'} ${w.text}</div>`).join('')
+  ui.warnings.innerHTML = a.warnings.length ? a.warnings.map((w, i) => `<div class="warn ${w.level}">${w.level === 'warn' ? '⚠' : w.level === 'ok' ? '✓' : 'ℹ'} ${w.text}
+      ${w.fix?.length ? `<div class="fixes">${w.fix.map((f, j) => `<button class="fix" data-w="${i}" data-f="${j}">${fixLabel(f)}</button>`).join('')}</div>` : ''}</div>`).join('')
     : '<div class="warn info">ℹ Brak poważnych uwag. Sprawdź partie oznaczone jako „za mało” i rekomendacje poniżej.</div>';
+  ui.warnings.querySelectorAll('.fix').forEach((b) => (b.onclick = () => applyFix(a.warnings[+b.dataset.w].fix[+b.dataset.f], p)));
 
   ui.recs.innerHTML = a.recommendations.length
     ? a.recommendations.map((r, i) => {
@@ -281,6 +283,28 @@ function renderAnalysis(p) {
     const r = a.recommendations[+b.dataset.i];
     addToWorkout(CATALOG_BY_ID[r.exId], r.workout);
   }));
+}
+
+// ---------- Propozycje do uwag (analysis.js: fix) – jedno kliknięcie naprawia uwagę ----------
+const plural = (n, one, few, many) => (n === 1 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many);
+function fixLabel(f) {
+  if (f.kind === 'add') return `+ ${esc(CATALOG_BY_ID[f.exId].name)} → ${badge(f.workout)}`;
+  if (f.kind === 'sessions') return `Ustaw ${f.value} ${plural(f.value, 'trening', 'treningi', 'treningów')} w tygodniu`;
+  if (f.kind === 'autoDays') return '↺ Dobierz dni z przerwami';
+  if (f.kind === 'sets') return `− ${esc(f.label)}`;
+  if (f.kind === 'browse') return '+ Dodaj ćwiczenia';
+  if (f.kind === 'newWorkout') return '+ Nowy trening';
+  return '';
+}
+function applyFix(f, p) {
+  if (f.kind === 'add') return addToWorkout(CATALOG_BY_ID[f.exId], f.workout);
+  if (f.kind === 'sessions') { p.sessions = f.value; p.days = null; }
+  else if (f.kind === 'autoDays') p.days = null;
+  else if (f.kind === 'sets') {
+    for (const [wId, exId] of f.items) { const it = workout(wId)?.items.find((x) => x.exId === exId); if (it && it.sets > 2) it.sets -= 1; }
+  } else if (f.kind === 'browse') return openBrowse(f.workout);
+  else if (f.kind === 'newWorkout') return ui.workoutNew.onclick();
+  render();
 }
 
 // ---------- Panel: lista ćwiczeń ----------

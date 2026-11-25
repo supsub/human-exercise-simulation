@@ -296,9 +296,19 @@ export function pickMuscleAt(clientX, clientY, canvasEl, cam, meshes) {
   return best ? { id: best, x: clientX, y: clientY } : null;
 }
 
-let pointerEvent = null;
-canvas.addEventListener('pointermove', (e) => (pointerEvent = e));
-canvas.addEventListener('pointerleave', () => (pointerEvent = null));
+// Mysz: mięsień pod kursorem. Dotyk: stuknięty mięsień zostaje wskazany po zdjęciu palca (opis przypięty u góry
+// ekranu, żeby palec go nie zasłaniał); przeciągnięcie (obrót kamery) albo stuknięcie obok – opis znika.
+let pointerEvent = null, downAt = null, touch = false;
+canvas.addEventListener('pointerdown', (e) => {
+  touch = e.pointerType !== 'mouse';
+  downAt = [e.clientX, e.clientY];
+  if (touch) pointerEvent = e;
+});
+canvas.addEventListener('pointermove', (e) => { touch = e.pointerType !== 'mouse'; pointerEvent = e; });
+canvas.addEventListener('pointerup', (e) => {
+  if (touch && downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 10) pointerEvent = null;
+});
+canvas.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') pointerEvent = null; });
 // Zwraca { id, x, y } mięśnia pod kursorem na głównej scenie albo null
 export function pickMuscle() {
   if (!pointerEvent) return null;
@@ -310,8 +320,9 @@ export function showTooltip(hit, extraHtml) {
   if (!hit) { tooltip.hidden = true; return; }
   const m = MUSCLE_BY_ID[hit.id];
   tooltip.hidden = false;
-  tooltip.style.left = hit.x + 14 + 'px';
-  tooltip.style.top = hit.y + 14 + 'px';
+  tooltip.classList.toggle('docked', touch);
+  tooltip.style.left = touch ? '' : hit.x + 14 + 'px';
+  tooltip.style.top = touch ? '' : hit.y + 14 + 'px';
   tooltip.innerHTML = `<b>${m.name}</b><br><i>${m.latin}</i>${extraHtml ? '<br>' + extraHtml : ''}`;
 }
 

@@ -154,6 +154,44 @@ export function buildSchedule(plan, workouts) {
   return out;
 }
 
+// ---------- Propozycje naprawy uwag ----------
+// Każda uwaga może mieć listę akcji (fix), które aplikacja wykonuje jednym kliknięciem (planView.applyFix):
+//   { kind: 'add', exId, workout }        – dodaj ćwiczenie (3 × 10) do treningu
+//   { kind: 'sessions', value }           – ustaw liczbę treningów w tygodniu
+//   { kind: 'autoDays' }                  – dni dobierane automatycznie (z przerwami)
+//   { kind: 'sets', items: [[wId, exId]] } – o 1 serię mniej w tych ćwiczeniach (min. 2)
+//   { kind: 'browse', workout }           – otwórz listę ćwiczeń dla treningu
+//   { kind: 'newWorkout' }                – nowy trening
+// trening, do którego najlepiej dołożyć ćwiczenie: najmniej obciążony tymi samymi mięśniami i najkrótszy
+function pickWorkout(ex, inPlan, perWorkout) {
+  let target = null;
+  for (const w of inPlan) {
+    let cost = w.items.reduce((s, it) => s + it.sets, 0) * 0.05 + (w.items.length ? 0 : 1);   // pusty trening na końcu
+    for (const [id, wt] of Object.entries(ex.muscles)) if (wt >= 0.5) cost += wt * perWorkout[w.id][id] * 0.3;
+    if (!target || cost < target.cost) target = { id: w.id, cost };
+  }
+  return target?.id ?? null;
+}
+// najlepsze ćwiczenie spoza planu na podane mięśnie (bez dokładania tym, których już jest za dużo)
+function bestExercise(targets, inPlan, weekly, avoid = []) {
+  const used = new Set(inPlan.flatMap((w) => w.items.map((it) => it.exId)));
+  let best = null;
+  for (const ex of CATALOG) {
+    if (used.has(ex.id)) continue;
+    let score = 0;
+    for (const id of targets) score += ex.muscles[id] ?? 0;
+    for (const id of avoid) score -= 0.8 * (ex.muscles[id] ?? 0);
+    for (const [id, w] of Object.entries(ex.muscles)) if (weekly[id] > 20) score -= 0.3 * w;
+    if (score > 0.5 && (!best || score > best.score)) best = { ex, score };
+  }
+  return best?.ex ?? null;
+}
+function addFix(targets, inPlan, weekly, perWorkout, avoid) {
+  const ex = bestExercise(targets, inPlan, weekly, avoid);
+  const workout = ex && pickWorkout(ex, inPlan, perWorkout);
+  return workout ? [{ kind: 'add', exId: ex.id, workout }] : [];
+}
+
 // ---------- Analiza ----------
 export function analyzePlan(plan, workouts) {
   const inPlan = plan.variants.map((id) => workouts.find((w) => w.id === id)).filter(Boolean);
@@ -171,27 +209,34 @@ export function analyzePlan(plan, workouts) {
   const optimal = MUSCLES.filter((m) => weekly[m.id] >= 8 && weekly[m.id] <= 20).length;
 
   const warnings = [];
-  if (!inPlan.length) warnings.push({ level: 'info', text: 'Zaznacz treningi, które mają wejść do planu (lub utwórz nowy trening).' });
-  if (schedule.n === 7) warnings.push({ level: 'warn', text: 'Brak dnia odpoczynku. Mięśnie rosną podczas regeneracji, zaplanuj przynajmniej 1–2 dni wolne.' });
+  if (!inPlan.length) warnings.push({ level: 'info', text: workouts.length ? 'Zaznacz treningi, które mają wejść do planu (lub utwórz nowy trening).' : 'Plan nie ma jeszcze treningów.',
+    fix: [{ kind: 'newWorkout' }] });
+  if (schedule.n === 7) warnings.push({ level: 'warn', text: 'Brak dnia odpoczynku. Mięśnie rosną podczas regeneracji, zaplanuj przynajmniej 1–2 dni wolne.',
+    fix: [{ kind: 'sessions', value: 5 }] });
   for (const w of inPlan) {
-    if (!w.items.length) warnings.push({ level: 'info', text: `${w.name}: trening bez ćwiczeń.` });
+    if (!w.items.length) warnings.push({ level: 'info', text: `${w.name}: trening bez ćwiczeń.`, fix: [{ kind: 'browse', workout: w.id }] });
     const sets = w.items.reduce((s, it) => s + (it.sets || 0), 0);
-    if (sets > 30) warnings.push({ level: 'warn', text: `${w.name}: ${sets} serii to bardzo długi trening. Rozważ podział na więcej wariantów.` });
+    if (sets > 30) warnings.push({ level: 'warn', text: `${w.name}: ${sets} serii to bardzo długi trening. Rozważ podział na więcej wariantów.`,
+      fix: [{ kind: 'sets', items: w.items.filter((it) => it.sets > 2).map((it) => [w.id, it.exId]), label: `o 1 serię mniej w każdym ćwiczeniu (${w.name})` }, { kind: 'newWorkout' }] });
   }
-  if (inPlan.length > schedule.n) warnings.push({ level: 'info', text: `Wariantów (${inPlan.length}) jest więcej niż treningów w tygodniu (${schedule.n}) – każdy wariant wypadnie rzadziej niż raz w tygodniu.` });
+  if (inPlan.length > schedule.n) warnings.push({ level: 'info', text: `Wariantów (${inPlan.length}) jest więcej niż treningów w tygodniu (${schedule.n}) – każdy wariant wypadnie rzadziej niż raz w tygodniu.`,
+    fix: inPlan.length <= 6 ? [{ kind: 'sessions', value: inPlan.length }] : [] });
 
   if (inPlan.some((w) => w.items.length)) {
     const push = mean(['pec_stern', 'pec_clav', 'delt_ant', 'triceps_lat', 'triceps_long'], weekly);
     const pull = mean(['latissimus', 'trap_mid', 'delt_post', 'biceps', 'brachialis', 'trap_low'], weekly);
     if (push > 4 && push > 1.6 * pull) {
-      warnings.push({ level: 'warn', text: `Przewaga ćwiczeń pchających nad przyciągającymi (${push.toFixed(0)} vs ${pull.toFixed(0)} serii średnio). Długofalowo sprzyja to wysuniętym barkom i problemom ze stawem barkowym. Dodaj wiosłowanie lub podciąganie.` });
+      warnings.push({ level: 'warn', text: `Przewaga ćwiczeń pchających nad przyciągającymi (${push.toFixed(0)} vs ${pull.toFixed(0)} serii średnio). Długofalowo sprzyja to wysuniętym barkom i problemom ze stawem barkowym. Dodaj wiosłowanie lub podciąganie.`,
+        fix: addFix(['latissimus', 'trap_mid', 'delt_post', 'trap_low'], inPlan, weekly, perWorkout, ['pec_stern', 'delt_ant']) });
     } else if (pull > 4 && pull > 2 * push) {
-      warnings.push({ level: 'info', text: 'Przewaga ćwiczeń przyciągających. Rozważ więcej pracy na klatkę i triceps.' });
+      warnings.push({ level: 'info', text: 'Przewaga ćwiczeń przyciągających. Rozważ więcej pracy na klatkę i triceps.',
+        fix: addFix(['pec_stern', 'pec_clav', 'triceps_lat', 'triceps_long'], inPlan, weekly, perWorkout, ['latissimus']) });
     }
     const quads = mean(['rectus_femoris', 'vastus_lateralis', 'vastus_medialis', 'vastus_intermedius'], weekly);
     const hams = mean(['biceps_femoris', 'semitendinosus'], weekly);
     if (quads > 4 && quads > 2 * hams) {
-      warnings.push({ level: 'warn', text: `Tył uda jest dużo słabiej trenowany niż czworogłowy (${hams.toFixed(0)} vs ${quads.toFixed(0)} serii). Taka dysproporcja to czynnik ryzyka urazów kolana i naderwań mięśni kulszowo-goleniowych.` });
+      warnings.push({ level: 'warn', text: `Tył uda jest dużo słabiej trenowany niż czworogłowy (${hams.toFixed(0)} vs ${quads.toFixed(0)} serii). Taka dysproporcja to czynnik ryzyka urazów kolana i naderwań mięśni kulszowo-goleniowych.`,
+        fix: addFix(['biceps_femoris', 'semitendinosus'], inPlan, weekly, perWorkout, ['rectus_femoris', 'vastus_lateralis']) });
     }
     // regeneracja: ta sama partia mocno trenowana dzień po dniu (w którymkolwiek tygodniu cyklu)
     const flat = schedule.calendar.flat();
@@ -204,12 +249,18 @@ export function analyzePlan(plan, workouts) {
         if (mean(GROUP_MEMBERS[g], perWorkout[a]) >= 4 && mean(GROUP_MEMBERS[g], perWorkout[b]) >= 4) {
           flagged.add(g);
           const d1 = DAYS[i % 7], d2 = DAYS[(i + 1) % 7];
-          warnings.push({ level: 'warn', text: `${g}: mocny trening dzień po dniu (${d1.short} → ${d2.short}). Duże partie potrzebują ok. 48 h regeneracji – rozważ inne rozłożenie dni lub lżejszy wariant.` });
+          warnings.push({ level: 'warn', text: `${g}: mocny trening dzień po dniu (${d1.short} → ${d2.short}). Duże partie potrzebują ok. 48 h regeneracji – rozważ inne rozłożenie dni lub lżejszy wariant.`,
+            fix: !schedule.auto ? [{ kind: 'autoDays' }] : schedule.n > 3 ? [{ kind: 'sessions', value: schedule.n - 1 }] : [] });
         }
       }
     }
     const over = MUSCLES.filter((m) => weekly[m.id] > 25);
-    if (over.length) warnings.push({ level: 'info', text: `Bardzo duża objętość: ${names(over.map((m) => m.id))}. Więcej nie zawsze znaczy lepiej.` });
+    if (over.length) {
+      const ids = over.map((m) => m.id);
+      const items = inPlan.flatMap((w) => w.items.filter((it) => it.sets > 2 && ids.some((id) => (CATALOG_BY_ID[it.exId]?.muscles[id] ?? 0) >= 0.5)).map((it) => [w.id, it.exId]));
+      warnings.push({ level: 'info', text: `Bardzo duża objętość: ${names(ids)}. Więcej nie zawsze znaczy lepiej.`,
+        fix: items.length ? [{ kind: 'sets', items, label: 'o 1 serię mniej w ćwiczeniach na te mięśnie' }] : [] });
+    }
     if (!warnings.some((w) => w.level === 'warn') && trained >= MUSCLES.length * 0.85) {
       warnings.push({ level: 'ok', text: 'Plan jest dobrze zbalansowany. Prawie wszystkie mięśnie dostają odpowiedni bodziec.' });
     }
@@ -238,14 +289,7 @@ function recommend(inPlan, weekly, perWorkout) {
     }
     if (!best) break;
     for (const id of best.fixes) deficient.delete(id);
-    // wariant: najmniej obciążony tymi samymi mięśniami i najkrótszy
-    let target = null;
-    for (const w of inPlan) {
-      let cost = w.items.reduce((s, it) => s + it.sets, 0) * 0.05;
-      for (const [id, wt] of Object.entries(best.ex.muscles)) if (wt >= 0.5) cost += wt * perWorkout[w.id][id] * 0.3;
-      if (!target || cost < target.cost) target = { id: w.id, cost };
-    }
-    out.push({ exId: best.ex.id, fixes: best.fixes, workout: target.id });
+    out.push({ exId: best.ex.id, fixes: best.fixes, workout: pickWorkout(best.ex, inPlan, perWorkout) });
   }
   return out;
 }
