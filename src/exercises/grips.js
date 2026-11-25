@@ -47,6 +47,7 @@ export const GRIPS = {
   leg_ext: { expect: 'środek/przód', pron: 90, grip: 1 },
   leg_curl: { expect: '*', grip: 1 },                            // uchwyty z przodu ławki
   adductor: { expect: 'środek/przód', pron: 0, grip: 1 },
+  abductor: { expect: 'środek/przód', pron: 0, grip: 1 },
   calf_raise: { expect: 'środek/przód', pron: 90 },
   seated_calf: { expect: 'stopy/*', pron: 180 },                // dłonie oparte płasko na udach
   tib_raise: { expect: 'środek/przód', pron: 90 },

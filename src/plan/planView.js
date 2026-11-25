@@ -6,7 +6,7 @@ import { EXERCISE_BY_ID } from '../exercises/index.js';
 import { createPlayer } from '../player.js';
 import { createFigure } from '../figure.js';
 import { CATALOG, CATALOG_BY_ID, CATEGORIES } from './catalog.js';
-import { DAYS, analyzePlan, emptyPlan, emptyWorkout, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
+import { DAYS, worse, analyzePlan, emptyPlan, emptyWorkout, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
 
 // Jedyny widok aplikacji: plan treningowy z modelem 3D.
 // - treningi (warianty, np. „FBW A”) to bloki ćwiczeń niezależne od dni tygodnia,
@@ -247,7 +247,12 @@ function renderAnalysis(p) {
   const sessionStatus = (x) => (x < 1 ? { id: 'low', label: 'prawie nic' } : x < 2 ? { id: 'min', label: 'lekko' }
     : x <= 6 ? { id: 'ok', label: 'solidnie' } : { id: 'high', label: 'bardzo dużo' });
   const groups = per
-    ? a.groups.map((g) => { const sets = g.members.reduce((t, id) => t + per[id], 0) / g.members.length; return { ...g, sets, status: sessionStatus(sets) }; })
+    ? a.groups.map((g) => {
+        const sets = g.members.reduce((t, id) => t + per[id], 0) / g.members.length;
+        const weakId = g.members.reduce((x, y) => (per[y] < per[x] ? y : x));
+        const avg = sessionStatus(sets);
+        return { ...g, sets, avg, status: worse(sessionStatus(per[weakId]), avg), weak: { id: weakId, sets: per[weakId] } };
+      })
     : a.groups;
   document.getElementById('groups-title').innerHTML = per
     ? 'Partie w tym treningu <span class="muted small">(efektywne serie)</span>'
@@ -259,6 +264,8 @@ function renderAnalysis(p) {
       <div class="g-bar"><div class="g-zone"${per ? ' style="left:25%;width:50%"' : ''}></div><div class="g-fill" style="width:${w}%;background:${cssVolumeColor(per ? g.sets * 2.5 : g.sets)}"></div></div>
       <span class="g-val">${g.sets.toFixed(1)}</span>
       <span class="g-status ${g.status.id}">${g.status.label}</span>
+      ${g.status.id !== g.avg.id
+        ? `<span class="g-weak">najsłabiej: ${MUSCLE_BY_ID[g.weak.id].name} – ${g.weak.sets.toFixed(1)}</span>` : ''}
     </div>`;
   }).join('');
 
@@ -349,7 +356,7 @@ function renderList() {
   const q = ui.search.value.toLowerCase().trim();
   ui.cats.querySelectorAll('button').forEach((b) => b.classList.toggle('active', (b.dataset.c === 'Wszystkie' && !browseCat) || b.dataset.c === browseCat));
   const items = CATALOG.filter((ex) => (!browseCat || ex.category === browseCat) &&
-    (!q || ex.name.toLowerCase().includes(q) || Object.keys(ex.muscles).some((id) => MUSCLE_BY_ID[id].name.toLowerCase().includes(q))));
+    (!q || ex.name.toLowerCase().includes(q) || ex.tags?.includes(q) || Object.keys(ex.muscles).some((id) => MUSCLE_BY_ID[id].name.toLowerCase().includes(q))));
   // uzupełniające braki na górze, ćwiczenia już obecne w tym dniu na końcu (bez możliwości dodania)
   items.sort((a, b) => !!inWorkout(a.id, browseId) - !!inWorkout(b.id, browseId) || helpsOf(b).length - helpsOf(a).length);
   ui.list.innerHTML = items.map((ex) => {

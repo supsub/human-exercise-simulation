@@ -26,6 +26,10 @@ export function volumeStatus(sets) {
   return { id: 'high', label: 'bardzo dużo' };
 }
 
+// gorszy z dwóch statusów, przy czym braki (za mało, minimum) są ważniejsze niż nadmiar
+const RANK = { low: 0, min: 1, ok: 3, high: 2 };
+export const worse = (a, b) => (RANK[a.id] <= RANK[b.id] ? a : b);
+
 export function newId() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -201,9 +205,12 @@ export function analyzePlan(plan, workouts) {
   const weekly = zero();
   for (const week of schedule.calendar) for (const id of week) if (id) for (const m in weekly) weekly[m] += perWorkout[id][m] / schedule.weeks;
 
+  // status partii: średnia, ale jeśli któryś mięsień ma za mało / tylko minimum – decyduje najsłabszy (nie chowamy słabych ogniw)
   const groups = MUSCLE_GROUPS.map((g) => {
     const sets = mean(GROUP_MEMBERS[g], weekly);
-    return { group: g, sets, status: volumeStatus(sets), members: GROUP_MEMBERS[g] };
+    const weakId = GROUP_MEMBERS[g].reduce((a, b) => (weekly[b] < weekly[a] ? b : a));
+    const avg = volumeStatus(sets);
+    return { group: g, sets, avg, status: worse(volumeStatus(weekly[weakId]), avg), weak: { id: weakId, sets: weekly[weakId] }, members: GROUP_MEMBERS[g] };
   });
   const trained = MUSCLES.filter((m) => weekly[m.id] >= 3).length;
   const optimal = MUSCLES.filter((m) => weekly[m.id] >= 8 && weekly[m.id] <= 20).length;
@@ -261,6 +268,10 @@ export function analyzePlan(plan, workouts) {
       warnings.push({ level: 'info', text: `Bardzo duża objętość: ${names(ids)}. Więcej nie zawsze znaczy lepiej.`,
         fix: items.length ? [{ kind: 'sets', items, label: 'o 1 serię mniej w ćwiczeniach na te mięśnie' }] : [] });
     }
+    // mięśnie bez minimum bodźca – zawsze na widoku (nawet gdy reszta partii jest w porządku)
+    const low = MUSCLES.filter((m) => weekly[m.id] < 3).map((m) => m.id);
+    if (low.length) warnings.push({ level: 'warn', text: `Za mało pracy (< 3 serie tygodniowo): ${names(low.slice(0, 4))}${low.length > 4 ? ` i ${low.length - 4} inne` : ''}.`,
+      fix: addFix(low, inPlan, weekly, perWorkout) });
     if (!warnings.some((w) => w.level === 'warn') && trained >= MUSCLES.length * 0.85) {
       warnings.push({ level: 'ok', text: 'Plan jest dobrze zbalansowany. Prawie wszystkie mięśnie dostają odpowiedni bodziec.' });
     }

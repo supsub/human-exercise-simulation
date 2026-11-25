@@ -358,6 +358,12 @@ export const MISTAKES = {
       what: 'Tułów pochyla się do przodu przy każdym powtórzeniu.', why: 'Ruch wspomaga tułów, a przywodziciele pracują słabiej.',
       fix: 'Plecy oparte o oparcie, trzymaj się uchwytów.', shift: { adductors: -0.2 }, stress: [] },
   ],
+  abductor: [
+    { id: 'lean', name: 'Odrywanie pleców od oparcia', both: { rx: 15, trunk: 30 },
+      what: 'Tułów odrywa się od oparcia i pochyla przy każdym powtórzeniu.', why: 'Ruch wspomaga tułów i rozpęd, a pośladkowy średni pracuje słabiej.',
+      fix: 'Plecy oparte, trzymaj się uchwytów – ruch tylko w biodrach.', shift: { glute_med: -0.2 }, stress: [] },
+    ROM('Kolana rozchylają się tylko trochę.', 'Pośladkowy średni nie pracuje w pełnym skurczu, bodziec jest słabszy.', 'Zmniejsz ciężar i rozpychaj kolana szeroko, potem powoli wracaj.', { glute_med: -0.3 }),
+  ],
   calf_raise: [
     ROM('Pięty unoszą się tylko trochę.', 'Łydki nie pracują w pełnym zakresie – od rozciągnięcia do pełnego wspięcia.', 'Wspinaj się wysoko na palce i powoli opuszczaj.', { gastroc_med: -0.3, gastroc_lat: -0.3 }),
     { id: 'knees', name: 'Uginanie kolan (odbijanie)', B: { thigh: -12, shin: 18 },

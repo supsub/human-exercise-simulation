@@ -383,6 +383,15 @@ const adductor = animated({
     { hipAbd: 38 }, { hipAbd: 4 }),
   cameraPosition: [0.6, 1.5, 2.6], cameraTarget: [0, 0.6, 0.2],
 });
+// Odwodzenie: ta sama maszyna co przywodzenie, ruch odwrotny – kolana rozpychane na boki
+const abductor = animated({
+  id: 'abductor', type: 'lift', camera: 'seat', scenery: [...machineSeat, ...handles(0.53, 0.559, 0.088)],
+  steps: ['Kolana razem', 'Rozpychanie kolan na boki', 'Nogi rozchylone', 'Powolny powrót'],
+  pose: keyframes({ root: { y: 0.55, z: 0 }, rx: -6, trunk: -10, thigh: -86, shin: 0, foot: 0, arm: 10, fore: -40, abd: 30,
+    handL: { at: [0.53, 0.559, 0.088], pole: [1, -0.5, -0.5] }, handR: { at: [-0.53, 0.559, 0.088], pole: [-1, -0.5, -0.5] } },   // dłonie na uchwytach
+    { hipAbd: 4 }, { hipAbd: 38 }),
+  cameraPosition: [0.6, 1.5, 2.6], cameraTarget: [0, 0.6, 0.2],
+});
 const calf_raise = animated({
   id: 'calf_raise', type: 'lift',
   steps: ['Stopy płasko', 'Wspięcie na palce', 'Szczytowe napięcie', 'Opuszczanie pięt'],
@@ -505,7 +514,7 @@ export const LIBRARY = [
   pullup, lat_pulldown, lat_pulldown_wide, row, db_row, cable_row, incline_row, face_pull, shrug, back_ext,
   ohp, db_ohp, lateral_raise, reverse_fly,
   hammer, triceps_oh, pushdown, wrist_curl, reverse_curl,
-  front_squat, goblet_squat, deadlift, rdl, db_rdl, lunge, leg_press, leg_ext, leg_curl, adductor, calf_raise, seated_calf, tib_raise,
+  front_squat, goblet_squat, deadlift, rdl, db_rdl, lunge, leg_press, leg_ext, leg_curl, adductor, abductor, calf_raise, seated_calf, tib_raise,
   hip_thrust, band_walk,
   plank, side_plank, crunch, leg_raise, farmer,
 ];

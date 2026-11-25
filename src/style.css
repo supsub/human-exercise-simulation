@@ -168,6 +168,7 @@ input:focus { border-color: var(--accent); }
 .g-zone { position: absolute; left: 40%; width: 60%; top: 0; bottom: 0; background: rgba(95,211,138,.08); border-left: 1px dashed rgba(95,211,138,.35); }
 .g-fill { position: relative; height: 100%; border-radius: 4px; }
 .g-val { text-align: right; font-variant-numeric: tabular-nums; }
+.g-weak { grid-column: 1 / -1; margin: -5px 0 2px; font-size: 11px; color: var(--muted); }
 .g-status { font-size: 11px; padding: 1px 6px; border-radius: 999px; text-align: center; }
 .g-status.low { background: rgba(255,107,107,.15); color: #ff9b9b; }
 .g-status.min { background: rgba(242,201,76,.15); color: #f2c94c; }

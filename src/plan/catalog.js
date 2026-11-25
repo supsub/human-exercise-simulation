@@ -90,7 +90,9 @@ export const CATALOG = [
   { id: 'leg_curl', name: 'Uginanie nóg na maszynie leżąc', category: 'Nogi', equipment: 'maszyna',
     muscles: { biceps_femoris: 1, semitendinosus: 1, gastroc_med: 0.5, gastroc_lat: 0.5 } },
   { id: 'adductor', name: 'Przywodzenie nóg na maszynie', category: 'Nogi', equipment: 'maszyna',
-    muscles: { adductors: 1 } },
+    muscles: { adductors: 1 }, tags: 'przywodziciele biodro biodra hip adduction' },
+  { id: 'abductor', name: 'Odwodzenie nóg na maszynie', category: 'Pośladki', equipment: 'maszyna',
+    muscles: { glute_med: 1, glute_max: 0.5 }, tags: 'odwodziciele abduktory biodro biodra hip abduction' },
   { id: 'calf_raise', name: 'Wspięcia na palce stojąc', category: 'Nogi', equipment: 'masa ciała',
     muscles: { gastroc_med: 1, gastroc_lat: 1, soleus: 0.75 } },
   { id: 'seated_calf', name: 'Wspięcia na palce siedząc', category: 'Nogi', equipment: 'maszyna',
@@ -102,7 +104,7 @@ export const CATALOG = [
   { id: 'hip_thrust', name: 'Hip thrust (wypychanie bioder)', category: 'Pośladki', equipment: 'sztanga',
     muscles: { glute_max: 1, glute_med: 0.5, biceps_femoris: 0.5, semitendinosus: 0.5, adductors: 0.25 } },
   { id: 'band_walk', name: 'Chodzenie bokiem z gumą', category: 'Pośladki', equipment: 'guma',
-    muscles: { glute_med: 1, glute_max: 0.25 } },
+    muscles: { glute_med: 1, glute_max: 0.25 }, tags: 'odwodziciele abduktory biodro biodra hip abduction' },
 
   // --- Core ---
   { id: 'plank', name: 'Deska (plank)', category: 'Core', equipment: 'masa ciała',
@@ -159,6 +161,7 @@ const INFO = {
   leg_ext: ['Siedząc na maszynie prostujesz nogi w kolanach.', 'Izoluje przód uda, nie szarp ciężarem.'],
   leg_curl: ['Leżąc na maszynie uginasz nogi w kolanach, przyciągając wałek do pośladków.', 'Biodra przyciśnięte do ławki.'],
   adductor: ['Siedząc na maszynie zsuwasz rozchylone nogi do środka.', 'Ruch powolny, bez odbijania.'],
+  abductor: ['Siedząc na maszynie rozpychasz kolana na boki, odwodząc nogi w biodrach.', 'Plecy oparte, ruch tylko w biodrach – powoli wracaj, nie pozwól ciężarowi zbić nóg.'],
   calf_raise: ['Stojąc wspinasz się na palce i powoli opuszczasz pięty.', 'Pełny zakres: od rozciągnięcia do pełnego wspięcia.'],
   seated_calf: ['Siedząc z ciężarem na kolanach unosisz pięty.', 'Przy ugiętych kolanach pracuje głównie mięsień płaszczkowaty.'],
   tib_raise: ['Opierając plecy o ścianę unosisz palce stóp, stojąc na piętach.', 'Wzmacnia przód podudzia, pomaga kolanom i kostkom.'],

@@ -83,7 +83,7 @@ export const MUSCLES = [
   // --- Pośladki ---
   { id: 'glute_max', name: 'Pośladkowy wielki', latin: 'gluteus maximus', group: 'Pośladki',
     bone: 'pelvis', pos: [0.078, -0.03, -0.088], r: [0.085, 0.095, 0.06], mirror: true },
-  { id: 'glute_med', name: 'Pośladkowy średni', latin: 'gluteus medius', group: 'Pośladki',
+  { id: 'glute_med', name: 'Pośladkowy średni (odwodziciel biodra)', latin: 'gluteus medius', group: 'Pośladki',
     bone: 'pelvis', pos: [0.128, 0.05, -0.03], r: [0.045, 0.055, 0.05], rot: [0, 0, -0.3], mirror: true },
 
   // --- Przód uda (czworogłowy) ---
