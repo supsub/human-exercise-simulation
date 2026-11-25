@@ -27,12 +27,12 @@ async function waitFor(fn, what, ms = 20000) {   // zimny start (moduły z CDN) 
 }
 function check(cond, what) { if (!cond) throw new Error(what); }
 // mock: (url, opts, w) => Promise<Response> | undefined – udawany serwer Supabase (src/sync.js używa go w ramce testów)
-async function open(setup = () => {}, mock = null) {
+async function open(setup = () => {}, mock = null, query = '') {
   localStorage.clear();
   setup();
   frame.src = 'about:blank'; await sleep(50);
   window.__hesFetch = mock ? (url, opts = {}, w) => mock(String(url?.url ?? url), opts, w) ?? w.fetch(url, opts) : null;
-  await new Promise((r) => { frame.onload = r; frame.src = '../index.html'; });
+  await new Promise((r) => { frame.onload = r; frame.src = '../index.html' + query; });
   hook();
   await waitFor(() => $('#plan-days')?.children.length || doc().body.classList.contains('no-plan') || visible('#app-loading'), 'wczytanie aplikacji');
 }
@@ -61,10 +61,11 @@ function fakeServer() {
   srv.mock = (url, opts, w) => {
     if (!url.includes('127.0.0.1:54321')) return;
     (srv.calls ??= []).push((opts.method ?? 'GET') + ' ' + url.replace(/^.*54321/, '').slice(0, 60));
-    const json = (x, status = 200) => Promise.resolve(new w.Response(JSON.stringify(x), { status, headers: { 'content-type': 'application/json' } }));
+    const json = (x, status = 200) => new Promise((r) => setTimeout(() => r(new w.Response(JSON.stringify(x), { status, headers: { 'content-type': 'application/json' } })), srv.delay ?? 0));   // srv.delay – opóźnienie sieci
     const accept = new w.Headers(opts.headers).get('accept') ?? '';
     const one = (x) => json(accept.includes('vnd.pgrst.object') ? x : [x]);
     if (url.includes('/auth/v1/logout')) return json({ code: 500, msg: 'błąd serwera' }, 500);
+    if (url.includes('/auth/v1/token')) { const sess = JSON.parse(fakeSession(3600)); return json({ ...sess, expires_in: 3600 }); }   // wymiana kodu z Google na sesję
     if (url.includes('/rest/v1/user_data')) {
       const method = opts.method ?? 'GET', q = new URL(url).searchParams;
       if (method === 'GET') { if (srv.hideOnce) { srv.hideOnce = false; return json([]); } return srv.row ? one(srv.row) : json(accept.includes('vnd.pgrst.object') ? null : []); }
@@ -216,6 +217,32 @@ const tests = {
     vis(); await waitFor(() => scene.body.sex === 'f', 'zmiana z innego urządzenia');
     await sleep(2500); vis(); await sleep(2500); vis(); await sleep(2500);
     check(srv.posts.length === n, `po pobraniu zmiany z innego urządzenia ${srv.posts.length - n} zbędnych zapisów (odsyłanie w kółko)`);
+  },
+  async 'logowanie po wylogowaniu: od razu plany z konta, nie plan gościa'() {
+    const srv = fakeServer(); srv.delay = 900;
+    const guestPlan = { plans: [{ id: 'g1', name: 'Mój plan', sessions: 3, variants: ['gw'], days: null }], workouts: [{ id: 'gw', name: 'Trening A', items: [{ id: 'pushup', sets: 3, reps: 10 }] }], currentId: 'g1' };   // gość dodał ćwiczenie
+    await open(() => {
+      localStorage.setItem('hes.data.v2', JSON.stringify(guestPlan));
+      localStorage.setItem(AUTH + '-code-verifier', JSON.stringify('weryfikator'));   // ślad rozpoczętego logowania (PKCE)
+    }, srv.mock, '?code=kod-z-google');
+    let shownGuest = false;
+    const iv = setInterval(() => { try { if (!visible('#app-loading') && $('#plan-select')?.selectedOptions[0]?.textContent === 'Mój plan') shownGuest = true; } catch { /* */ } }, 20);
+    await waitFor(() => $('#plan-select')?.selectedOptions[0]?.textContent === 'Plan z konta' && !visible('#app-loading'), 'plany z konta po zalogowaniu');
+    await sleep(1500); clearInterval(iv);
+    check(!shownGuest, 'po zalogowaniu przez chwilę widać plan gościa');
+    check($('#plan-select').selectedOptions[0]?.textContent === 'Plan z konta', 'po chwili znów widać plan gościa');
+    check(![...$('#plan-select').options].some((o) => o.textContent === 'Mój plan'), 'plan gościa dołączony do konta z planami');
+    check(!srv.posts.some((d) => d.plans.some((p) => p.name === 'Mój plan')), 'plan gościa wysłany na konto');
+  },
+  async 'logowanie na nowe konto: plan ułożony jako gość trafia na konto'() {
+    const srv = fakeServer(); srv.row = null;
+    await open(() => {
+      localStorage.setItem('hes.data.v2', JSON.stringify({ plans: [{ id: 'g1', name: 'Mój plan', sessions: 3, variants: ['gw'], days: null }],
+        workouts: [{ id: 'gw', name: 'Trening A', items: [{ id: 'pushup', sets: 3, reps: 10 }] }], currentId: 'g1' }));
+      localStorage.setItem(AUTH + '-code-verifier', JSON.stringify('weryfikator'));
+    }, srv.mock, '?code=kod-z-google');
+    await waitFor(() => srv.row?.data.plans.some((p) => p.name === 'Mój plan'), 'plan gościa zapisany na nowym koncie');
+    check($('#plan-select').selectedOptions[0]?.textContent === 'Mój plan', 'po zalogowaniu nie widać planu');
   },
   async 'zapis zmian: aktualizuje znaną wersję konta'() {
     const srv = fakeServer();

@@ -80,7 +80,10 @@ async function pull() {
     if (!row) { setMeta({ uid: user.id, at: null, sent: m.uid === user.id ? m.sent : '' }); send = true; }   // konto puste – pierwszy zapis
     else if (!remoteChanged && dirty) send = true;            // tylko tu są zmiany – wysyłamy
     else if (remoteChanged) {
-      const next = dirty || !known ? merge(row.data, local) : { ...row.data, settings: row.data.settings ?? local.settings };
+      // nowe urządzenie / logowanie z trybu gościa: konto z planami wygrywa w całości (plany gościa tylko w kopii hes.backup);
+      // do pustego konta trafia to, co ułożono jako gość. Niewysłane zmiany z tego samego konta są scalane.
+      const fresh = { ...row.data, settings: row.data.settings ?? local.settings };
+      const next = dirty ? merge(row.data, local) : !known && !row.data.plans?.length ? merge(row.data, local) : fresh;
       // kopia zapasowa planów z tej przeglądarki, zanim zastąpią je dane z konta (hes.backup – do ręcznego odzyskania)
       if (local.plans.length && canon({ plans: next.plans, workouts: next.workouts }) !== canon({ plans: local.plans, workouts: local.workouts })) localStorage.setItem('hes.backup', JSON.stringify({ at: new Date().toISOString(), data: local }));
       setMeta({ uid: user.id, at: row.updated_at, sent: canon(row.data) });
