@@ -29,6 +29,10 @@ Logowanie (Google; link w mailu tylko na lokalnej bazie) i synchronizacja planó
 - Nowa zmiana schematu: `supabase migration new nazwa` → SQL w nowym pliku → lokalnie `supabase migration up`. Na produkcję trafia sama po pushu na main (integracja Supabase z GitHubem: Project Settings → Integrations → GitHub, „Deploy to production”). Migracje tylko dopisujemy – wgranego pliku się nie zmienia.
 - Klucz publishable w `src/config.js` jest jawny z założenia – dane chronią reguły RLS. Kluczy `secret`/`service_role` ani Google client secret nie trzymamy w repozytorium.
 
+## Wersja
+
+Numer wersji i data są w menu ⚙ (`src/version.js`). Przy każdym commicie zmieniającym aplikację aktualizujemy `BUILT` (data i godzina), a `VERSION` podbijamy razem z wpisem w changelogu (docs/index.html).
+
 ## Struktura
 
 | Plik | Rola |

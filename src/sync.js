@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { DB } from './config.js';
+import { VERSION, BUILT } from './version.js';
 import * as planner from './plan/planView.js';
 
 // Konto i synchronizacja planów między urządzeniami (Supabase: logowanie Google, tabela user_data;
@@ -107,6 +108,8 @@ ui.btn.onclick = () => { ui.dlg.hidden = !ui.dlg.hidden; ui.msg.textContent = ''
 ui.close.onclick = () => (ui.dlg.hidden = true);
 // Ustawienia (⚙): funkcje poboczne – twarz na modelu, o projekcie
 const set = { btn: $('settings-open'), dlg: $('settings-dialog') };
+{ const [d, t] = BUILT.split(' '), [y, m, dd] = d.split('-');
+  $('app-version').textContent = `wersja ${VERSION} · ${dd}.${m}.${y} ${t}${DB.name !== 'prod' ? ' · baza lokalna' : ''}`; }
 set.btn.onclick = () => { set.dlg.hidden = !set.dlg.hidden; ui.dlg.hidden = true; };
 $('face-open').addEventListener('click', () => (set.dlg.hidden = true));   // twarz otwiera własny panel
 document.addEventListener('pointerdown', (e) => {                         // klik poza okienkiem je zamyka
