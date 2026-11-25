@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><title>Testy podstawowych funkcji</title>
+<style>body{font:14px system-ui;background:#0f141c;color:#e6ebf2;margin:12px}iframe{border:0;width:390px;height:844px;display:block}pre{white-space:pre-wrap}</style></head>
+<body>
+<pre id="result">trwa…</pre>
+<iframe id="app"></iframe>
+<script type="module">
+// Testy podstawowych funkcji aplikacji (przed każdym wdrożeniem: tools/test.sh).
+// Każdy scenariusz: czysta pamięć przeglądarki → aplikacja w ramce (ekran telefonu) → kliknięcia → sprawdzenie.
+// Baza: lokalna (localhost; bez działającego `supabase start` – serwer nieosiągalny), więc testy nie dotykają danych produkcyjnych
+// i sprawdzają też zachowanie bez sieci. Wynik: „OK – wszystkie testy przeszły” albo lista błędów.
+const frame = document.getElementById('app');
+const AUTH = 'sb-127-auth-token';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const win = () => frame.contentWindow, doc = () => frame.contentDocument;
+const $ = (sel) => doc().querySelector(sel);
+const visible = (sel) => { const e = $(sel); return !!e && !e.hidden && e.getClientRects().length > 0; };   // działa też dla position: fixed
+let errors = [];
+async function waitFor(fn, what, ms = 8000) {
+  const t0 = performance.now();
+  while (performance.now() - t0 < ms) { try { if (await fn()) return; } catch { /* jeszcze nie */ } await sleep(100); }
+  throw new Error(`nie doczekano się: ${what}`);
+}
+function check(cond, what) { if (!cond) throw new Error(what); }
+async function open(setup = () => {}) {
+  localStorage.clear();
+  setup();
+  frame.src = 'about:blank'; await sleep(50);
+  await new Promise((r) => { frame.onload = r; frame.src = '../index.html'; });
+  hook();
+  await waitFor(() => $('#plan-days')?.children.length || doc().body.classList.contains('no-plan') || visible('#app-loading'), 'wczytanie aplikacji');
+}
+// błędy JS w aplikacji, okienka prompt/confirm (nie mogą wyskoczyć same z siebie)
+function hook() {
+  const w = win();
+  w.addEventListener('error', (e) => errors.push(`błąd JS: ${e.message}`));
+  w.addEventListener('unhandledrejection', (e) => errors.push(`błąd JS (promise): ${e.reason?.message ?? e.reason}`));
+  w.__dialogs = [];
+  w.prompt = (m) => { w.__dialogs.push(`prompt: ${m}`); return null; };
+  w.confirm = (m) => { w.__dialogs.push(`confirm: ${m}`); return true; };
+}
+const data = () => JSON.parse(localStorage.getItem('hes.data.v2') ?? 'null');
+const fakeSession = (expiresIn) => JSON.stringify({ access_token: 'x.y.z', token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + expiresIn,
+  refresh_token: 'r', user: { id: '00000000-0000-0000-0000-000000000001', email: 'test@example.com', user_metadata: { full_name: 'Test Testowy' } } });
+
+const tests = {
+  'gość: domyślny „Mój plan” z pustym treningiem'() {
+    return open().then(async () => {
+      await waitFor(() => $('#plan-select')?.selectedOptions[0]?.textContent === 'Mój plan', 'plan „Mój plan”');
+      check(doc().body.classList.contains('guest'), 'brak trybu gościa');
+      check(visible('#guest-bar'), 'brak paska „Zaloguj się…”');
+      check(!visible('#app-loading'), 'ekran wczytywania u gościa');
+      check($('#plan-days .day-card')?.textContent.includes('Trening A'), 'brak „Trening A”');
+      check($('#auth-open').textContent.trim() === 'Zaloguj się', 'przycisk konta nie mówi „Zaloguj się”');
+    });
+  },
+  async 'gość: dodanie ćwiczenia zostaje po odświeżeniu'() {
+    await open();
+    await waitFor(() => $('.add-ex'), 'przycisk „+ Dodaj ćwiczenie”');
+    $('.add-ex').click();
+    await waitFor(() => $('#picker-list .quick-add'), 'lista ćwiczeń z „+”');
+    $('#picker-list .quick-add').click();
+    await waitFor(() => data()?.workouts[0]?.items.length === 1, 'ćwiczenie zapisane w treningu');
+    await new Promise((r) => { frame.onload = r; win().location.reload(); }); hook();
+    await waitFor(() => $('#plan-days .day-card .item') || $('#plan-days [data-ex]'), 'ćwiczenie widoczne po odświeżeniu');
+  },
+  async 'gość: „+ Nowy” plan prosi o logowanie (bez okienka z nazwą)'() {
+    await open();
+    await waitFor(() => $('#plan-new'), 'przycisk „+ Nowy”');
+    $('#plan-new').click();
+    await waitFor(() => visible('#auth-dialog'), 'okienko logowania');
+    check(!win().__dialogs.length, `wyskoczyło okienko: ${win().__dialogs.join(', ')}`);
+    check(data().plans.length === 1, 'powstał nowy plan bez logowania');
+  },
+  async 'ustawienia: przełącznik sylwetki Kobieta / Mężczyzna'() {
+    await open();
+    $('#settings-open').click();
+    await waitFor(() => visible('#settings-dialog'), 'okienko ustawień');
+    $('#sex-switch [data-sex="f"]').click();
+    const scene = await win().eval(`import('${new URL('src/scene.js', doc().baseURI)}')`);   // ten sam moduł, z którego korzysta aplikacja
+    check(scene.body.sex === 'f', 'model nie zmienił się na kobietę');
+    check(localStorage.getItem('hes.sex') === 'f', 'wybór niezapamiętany');
+    check(visible('#settings-dialog'), 'okienko ustawień zamknęło się po wyborze');
+    $('#sex-switch [data-sex="m"]').click();
+    check(scene.body.sex === 'm', 'model nie wrócił do mężczyzny');
+  },
+  async 'zapisana sesja: ekran wczytywania, potem bez zawieszenia'() {
+    await open(() => localStorage.setItem(AUTH, fakeSession(-100)));   // wygasła – serwer nieosiągalny
+    check(visible('#app-loading'), 'brak ekranu wczytywania przy zapisanej sesji');
+    await waitFor(() => !visible('#app-loading'), 'zniknięcie ekranu wczytywania', 15000);
+  },
+  async 'wylogowanie: zawsze kończy się trybem gościa, dane konta znikają'() {
+    await open(() => {
+      localStorage.setItem(AUTH, fakeSession(3600));
+      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 'x', sent: '' }));
+      localStorage.setItem('hes.data.v2', JSON.stringify({ plans: [{ id: 'p1', name: 'Plan z konta', sessions: 3, variants: ['w1'], days: null }],
+        workouts: [{ id: 'w1', name: 'Konto A', items: [{ id: 'squat', sets: 3, reps: 10 }] }], currentId: 'p1' }));
+    });
+    await waitFor(() => $('#auth-open').textContent.includes('Test'), 'zalogowany użytkownik w nagłówku');
+    $('#auth-open').click();
+    await waitFor(() => visible('#auth-logout'), 'przycisk „Wyloguj”');
+    const reloaded = new Promise((r) => (frame.onload = r));
+    $('#auth-logout').click();
+    await Promise.race([reloaded, sleep(12000)]); hook();
+    await waitFor(() => $('#plan-select')?.selectedOptions[0]?.textContent === 'Mój plan', 'po wylogowaniu „Mój plan” gościa', 10000);
+    check(!localStorage.getItem(AUTH), 'sesja została w przeglądarce');
+    check(!JSON.stringify(data()).includes('Plan z konta'), 'dane konta zostały w przeglądarce');
+    check($('#auth-open').textContent.trim() === 'Zaloguj się', 'nagłówek dalej pokazuje użytkownika');
+  },
+};
+
+const out = [];
+for (const [name, fn] of Object.entries(tests)) {
+  errors = [];
+  try { await fn(); if (errors.length) throw new Error(errors.join('; ')); out.push(`✔ ${name}`); }
+  catch (e) { out.push(`✘ ${name}: ${e.message}`); }
+}
+localStorage.clear();
+const failed = out.filter((l) => l.startsWith('✘'));
+document.getElementById('result').textContent = (failed.length ? `BŁĘDY: ${failed.length}` : 'OK – wszystkie testy przeszły') + '\n' + out.join('\n');
+</script>
+</body></html>

@@ -76,7 +76,7 @@ function guestBlock() {
   return true;
 }
 export function setGuest(on) {
-  if (guest === on) return;
+  if (guest === on && (!on || store.plans.length)) return;
   guest = on;
   if (on && !store.plans.length) {
     const w = emptyWorkout('Trening A'), p = emptyPlan('Mój plan', [w.id]);

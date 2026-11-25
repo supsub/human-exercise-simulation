@@ -148,17 +148,28 @@ ui.mailForm.onsubmit = async (e) => {
   const { error } = await sb.auth.signInWithOtp({ email: ui.email.value.trim(), options: { emailRedirectTo: back() } });
   ui.msg.textContent = error ? `Nie udało się: ${error.message}` : 'Sprawdź skrzynkę i kliknij link w mailu.';
 };
-// Wylogowanie: plany zostają na koncie, a to urządzenie wraca do pustej kartki (nikt po nas ich tu nie zobaczy).
-// Jeśli ostatnich zmian nie udało się wysłać (brak sieci), pytamy – inaczej by przepadły.
+// Wylogowanie: plany zostają na koncie, a to urządzenie wraca do trybu gościa (nikt po nas ich tu nie zobaczy).
+// Nie może się „zawiesić”: wysyłka zmian i wylogowanie na serwerze mają limit czasu, a sesja i dane
+// w przeglądarce są czyszczone zawsze – na końcu strona wczytuje się od nowa jako gość.
+const within = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(() => r({ timeout: true }), ms))]);
 ui.logout.onclick = async () => {
-  await push(true);
-  if (state !== 'ok' && !confirm('Ostatnie zmiany nie są jeszcze zapisane na koncie (brak połączenia). Wylogować mimo to? Te zmiany przepadną.')) return;
-  await sb.auth.signOut();
-  localStorage.removeItem(META);
-  planner.setData({ plans: [], workouts: [] });   // czyści dane konta z tej przeglądarki
-  planner.setGuest(true);
-  ui.dlg.hidden = true;
+  ui.logout.disabled = true; ui.logout.textContent = 'Wylogowuję…';
+  try {
+    await within(push(true), 4000);
+    if (state === 'err' && !confirm('Ostatnie zmiany nie są jeszcze zapisane na koncie (brak połączenia). Wylogować mimo to? Te zmiany przepadną.')) {
+      ui.logout.disabled = false; ui.logout.textContent = 'Wyloguj';
+      return;
+    }
+    await within(sb.auth.signOut({ scope: 'local' }), 3000);
+  } catch (e) { console.warn('logout', e); }
+  forget();
+  location.replace(back());
 };
+function forget() {
+  for (const k of Object.keys(localStorage)) if (k.startsWith(AUTH_KEY)) localStorage.removeItem(k);   // sesja (i ślad logowania PKCE)
+  localStorage.removeItem(META);
+  planner.setData({ plans: [], workouts: [] });   // dane konta znikają z tej przeglądarki
+}
 
 // Na żywo: zmiana zapisana na innym urządzeniu przychodzi od razu (Supabase Realtime) – pobieramy ją.
 // Własne zapisy też wracają jako zdarzenia, ale mają znany już znacznik czasu, więc je pomijamy.
@@ -177,6 +188,7 @@ sb.auth.onAuthStateChange((event, session) => {
   const was = user?.id;
   user = session?.user ?? null;
   renderUser();
+  if (!user && was) { localStorage.removeItem(META); planner.setData({ plans: [], workouts: [] }); }   // wylogowano (także na innej karcie)
   if (!user) { planner.setGuest(true); ready(); }
   else planner.setGuest(false);
   if (user?.id !== was) setTimeout(listen, 0);

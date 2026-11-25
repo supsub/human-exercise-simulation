@@ -33,6 +33,10 @@ Logowanie (Google; link w mailu tylko na lokalnej bazie) i synchronizacja planó
 
 Numer wersji i data są w menu ⚙ (`src/version.js`). Przy każdym commicie zmieniającym aplikację aktualizujemy `BUILT` (data i godzina), a `VERSION` podbijamy razem z wpisem w changelogu (docs/index.html).
 
+## Testy przed wdrożeniem
+
+`tools/test.sh` – test fizyki ćwiczeń (obie sylwetki, `tools/sheet.html?check`) i testy podstawowych funkcji (`tools/smoke.html`: tryb gościa, dodawanie ćwiczeń, logowanie przy nowym planie, przełącznik sylwetki, ekran wczytywania, wylogowanie). Uruchamiamy przed każdym commitem; GitHub Actions (`.github/workflows/deploy.yml`) uruchamia je przy każdym pushu i wdraża stronę na GitHub Pages tylko wtedy, gdy przejdą. Nowa funkcja = nowy scenariusz w `tools/smoke.html`.
+
 ## Struktura
 
 | Plik | Rola |
