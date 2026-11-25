@@ -1,27 +1,25 @@
 #!/bin/bash
 # Testy przed każdym wdrożeniem (commit/push): test fizyki ćwiczeń + testy podstawowych funkcji aplikacji.
-# Użycie: tools/test.sh   (wymaga Google Chrome; serwer statyczny uruchamia sam, jeśli nie działa na :8765)
+# Wszystko równolegle w kilku przeglądarkach bez okna (tools/run_pages.py), cel: około minuty.
+# Użycie: tools/test.sh   (wymaga Google Chrome i python3 z websocket-client; PARTS – liczba równoległych części)
+# Fizyka liczy się raz: szkielet, ruchy i bryły kolizyjne są wspólne dla obu sylwetek (różni je tylko skóra).
 # Kod wyjścia 0 = wszystko OK.
 cd "$(dirname "$0")/.."
-PORT=8765
-if ! curl -s -o /dev/null "http://localhost:$PORT/index.html"; then
-  python3 -m http.server $PORT >/dev/null 2>&1 & SERVER=$!
-  trap 'kill $SERVER' EXIT
-  sleep 1
-fi
-CHROME=$(command -v google-chrome || command -v chromium || command -v chromium-browser)
-TMP=$(mktemp -d)
-run() {   # $1 = adres, $2 = id elementu z wynikiem
-  timeout 900 "$CHROME" --headless=new --user-data-dir="$TMP/p$RANDOM" --disable-gpu --enable-unsafe-swiftshader \
-    --virtual-time-budget=900000 --window-size=420,900 --dump-dom "http://localhost:$PORT/$1" 2>/dev/null |
-    python3 -c "import sys,re,html;d=sys.stdin.read();m=re.search(r'<pre id=\"$2\">(.*?)</pre>',d,re.S);print(html.unescape(m.group(1)).strip() if m else 'BRAK WYNIKU')"
-}
-status=0
-# na GitHubie: każdy błąd jako adnotacja (widoczna przy przebiegu, także bez logów)
-note() { [ -n "$GITHUB_ACTIONS" ] && echo "$1" | grep -E '^(✘|BŁĘDY|BRAK)|naruszen|narusz' | sed "s/^/::error title=$2::/"; true; }
-echo "== Fizyka (mężczyzna)"; r=$(run 'tools/sheet.html?check&sex=m' check); echo "$r" | head -20; [[ "$r" == OK* ]] || { status=1; echo "::error title=Fizyka (mężczyzna)::$(echo "$r" | head -3 | tr '\n' ' ')"; }
-echo "== Fizyka (kobieta)";   r=$(run 'tools/sheet.html?check&sex=f' check); echo "$r" | head -20; [[ "$r" == OK* ]] || { status=1; echo "::error title=Fizyka (kobieta)::$(echo "$r" | head -3 | tr '\n' ' ')"; }
-echo "== Funkcje aplikacji";  r=$(run "tools/smoke.html?${SMOKE_ARGS:-}" result); echo "$r"; [[ "$r" == OK* ]] || { status=1; note "$r" Funkcje; }
-rm -rf "$TMP"
+python3 -c 'import websocket' 2>/dev/null || python3 -m pip install -q --break-system-packages websocket-client
+PORT=8766
+python3 tools/serve.py $PORT & SERVER=$!
+trap 'kill $SERVER 2>/dev/null' EXIT
+for _ in $(seq 50); do curl -s -o /dev/null "http://127.0.0.1:$PORT/index.html" && break; sleep 0.1; done
+
+P=${PARTS:-6}
+URL="http://127.0.0.1:$PORT"
+JOBS=()
+for k in $(seq 0 $((P - 1))); do JOBS+=("$URL/tools/sheet.html?check&part=$k/$P#check" "$URL/tools/smoke.html?part=$k/$P&${SMOKE_ARGS:-}#result"); done
+start=$(date +%s)
+out=$(TIMEOUT=${TIMEOUT:-150} python3 tools/run_pages.py "${JOBS[@]}"); status=$?
+echo "$out"
+# na GitHubie: każdy błąd jako adnotacja (widoczna przy przebiegu, także bez dostępu do logów)
+[ -n "$GITHUB_ACTIONS" ] && echo "$out" | grep -E '^(✘|BŁĘDY|BRAK)|cm \(t=|ponad zakres|chwyt' | sed 's/^/::error title=Testy::/'
+echo "czas: $(( $(date +%s) - start )) s"
 [ $status = 0 ] && echo "WSZYSTKO OK" || echo "SĄ BŁĘDY – nie wdrażać"
 exit $status

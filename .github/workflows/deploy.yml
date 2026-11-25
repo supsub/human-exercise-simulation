@@ -13,13 +13,16 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+      - name: Sterownik przeglądarki dla testów
+        run: python3 -m pip install --quiet --break-system-packages websocket-client
       - name: Testy (fizyka + funkcje aplikacji)
         run: tools/test.sh
         env:
-          SMOKE_ARGS: slow=8
+          PARTS: 4          # 4 rdzenie
+          SMOKE_ARGS: slow=3
   deploy:
     needs: test
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

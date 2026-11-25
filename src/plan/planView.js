@@ -14,7 +14,8 @@ import { DAYS, worse, analyzePlan, emptyPlan, emptyWorkout, exampleData, migrate
 // - bez wybranego ćwiczenia model pokazuje mapę obciążenia tygodnia albo jednego treningu,
 // - wybrane ćwiczenie otwiera szczegóły po prawej: animacja, typowe błędy, figura, dodanie do wybranego treningu.
 
-const STORAGE_KEY = 'hes.data.v2';
+const STORAGE_KEY = 'hes.data.v2';       // plany i treningi (wspólne dla kart tej przeglądarki)
+const CURRENT_KEY = 'hes.currentId';     // wybrany plan – osobno, żeby zmiana wyboru nie była „zmianą danych”
 const STORAGE_V1 = 'hes.plans.v1';
 const PLAN_CAMERA = [[0, 1.25, 3.4], [0, 0.95, 0]];
 const $ = (id) => document.getElementById(id);
@@ -49,7 +50,8 @@ let display = Object.fromEntries(MUSCLES.map((m) => [m.id, 0]));
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (s && s.plans?.length) return s;
+    const cur = localStorage.getItem(CURRENT_KEY) ?? s?.currentId;
+    if (s && s.plans?.length) return { plans: s.plans, workouts: s.workouts, currentId: s.plans.some((p) => p.id === cur) ? cur : s.plans[0].id };
   } catch {}
   // dane w starym formacie (ćwiczenia przypisane do dni) – przenosimy jako treningi
   try {
@@ -85,11 +87,22 @@ export function setGuest(on) {
   }
   if (started) render();
 }
+const contentJSON = () => JSON.stringify({ plans: store.plans, workouts: store.workouts });
 function save() {
-  const json = JSON.stringify(store);
+  if (store.currentId) localStorage.setItem(CURRENT_KEY, store.currentId);
+  const json = contentJSON();
   if (json === localStorage.getItem(STORAGE_KEY)) return;
   localStorage.setItem(STORAGE_KEY, json);
   for (const fn of saveListeners) fn(store);
+}
+// Zmiana z innej karty tej przeglądarki (zdarzenie storage): przejmujemy plany bez ponownego zapisu –
+// inaczej karta ze starym stanem uznałaby go za „niewysłane zmiany” i nadpisała nowszą zmianę na koncie.
+export function applyExternal(data) {
+  if (!data?.plans) return;
+  const cur = store.currentId;
+  store = { plans: data.plans, workouts: data.workouts, currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
+  if (focusId && !workout(focusId)) focusId = null;
+  if (started) render();
 }
 // Synchronizacja z kontem (src/sync.js): odczyt, podmiana danych i powiadomienie o każdej zmianie
 export const getData = () => store;
@@ -99,8 +112,8 @@ export const emptiedByUser = () => userEmptied;
 export function setData(data) {
   userEmptied = false;
   const cur = store.currentId;
-  store = { ...data, currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  store = { plans: data.plans, workouts: data.workouts, currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
+  localStorage.setItem(STORAGE_KEY, contentJSON());
   if (focusId && !workout(focusId)) focusId = null;
   render();
 }
@@ -137,7 +150,7 @@ function render() {
   renderAnalysis(p);
   if (selected) renderDetailTop();
   // telefon: przy otwartym ćwiczeniu zakładki Plan/Analiza znikają (pasek dodawania albo nic)
-  document.body.classList.toggle('ex-open', !!selected);
+  document.body.classList.toggle('ex-open', !!selected || !ui.panel.hidden);   // także lista ćwiczeń (na mięsień, do dodania) – zakładki nic by nie zmieniły
   document.body.classList.toggle('ex-add', selected?.from === 'list' && !!addTarget());
   if (!ui.browse.hidden && !ui.panel.hidden) renderList();
   save();

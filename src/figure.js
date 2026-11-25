@@ -3,7 +3,7 @@ import { createBody } from './body.js';
 import { onSex } from './sex.js';
 import { MUSCLES } from './muscles.js';
 import { standingPose } from './exercises/common.js';
-import { activationColor, pickMuscleAt } from './scene.js';
+import { activationColor, pickMuscleAt, TEST_MODE } from './scene.js';
 
 // Statyczna figura (przód + tył) w panelu: pokazuje, które mięśnie pracują w ćwiczeniu,
 // bez animacji i bez skaczących liczb. Osobny mały renderer z kamerą ortograficzną.
@@ -90,7 +90,7 @@ export function createFigure(canvasEl) {
       return pointer ? pickMuscleAt(pointer.clientX, pointer.clientY, canvasEl, camera, meshes()) : null;
     },
     render() {
-      if (!dirty || canvasEl.offsetParent === null) return;
+      if (!dirty || canvasEl.offsetParent === null || TEST_MODE) return;
       dirty = false;
       paint();
       renderer.render(scene, camera);

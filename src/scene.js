@@ -342,6 +342,8 @@ const clock = new THREE.Clock();
 let onFrame = () => {};
 export function setFrameHandler(fn) { onFrame = fn; }
 
+// Tryb testów (tools/smoke.html): sprawdzamy logikę i interfejs, nie obraz – bez rysowania 3D (oszczędza procesor)
+export const TEST_MODE = (() => { try { return window.parent !== window && !!window.parent.__hesTest; } catch { return false; } })();
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.1);
   onFrame(dt, clock.elapsedTime);
@@ -352,6 +354,7 @@ function frame() {
   }
   controls.target.lerp(cameraGoal, 1 - Math.exp(-dt * 3));
   controls.update();
+  if (TEST_MODE) { camera.updateMatrixWorld(); setTimeout(frame, 100); return; }
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }

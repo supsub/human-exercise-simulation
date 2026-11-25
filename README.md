@@ -35,7 +35,7 @@ Numer wersji i data są w menu ⚙ (`src/version.js`). Przy każdym commicie zmi
 
 ## Testy przed wdrożeniem
 
-`tools/test.sh` – test fizyki ćwiczeń (obie sylwetki, `tools/sheet.html?check`) i testy podstawowych funkcji (`tools/smoke.html`: tryb gościa, dodawanie ćwiczeń, logowanie przy nowym planie, przełącznik sylwetki, ekran wczytywania, wylogowanie). Uruchamiamy przed każdym commitem; GitHub Actions (`.github/workflows/deploy.yml`) uruchamia je przy każdym pushu i wdraża stronę na GitHub Pages tylko wtedy, gdy przejdą. Nowa funkcja = nowy scenariusz w `tools/smoke.html`.
+`tools/test.sh` (ok. 30 s) – test fizyki ćwiczeń (`tools/sheet.html?check`, liczony raz – szkielet i bryły kolizyjne są wspólne dla obu sylwetek) i testy podstawowych funkcji (`tools/smoke.html`: tryb gościa, dodawanie ćwiczeń, logowanie przy nowym planie, przełącznik sylwetki, ekran wczytywania, wylogowanie). Wszystko równolegle w kilku przeglądarkach bez okna (`tools/run_pages.py`, własny serwer `tools/serve.py`); aplikacja w ramce testów nie rysuje 3D. Uruchamiamy przed każdym commitem; GitHub Actions (`.github/workflows/deploy.yml`) uruchamia je przy każdym pushu i wdraża stronę na GitHub Pages tylko wtedy, gdy przejdą. Nowa funkcja = nowy scenariusz w `tools/smoke.html`.
 
 ## Struktura
 

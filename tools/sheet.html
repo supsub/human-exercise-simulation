@@ -22,9 +22,13 @@
     import { createBody } from '../src/body.js';
     import { EXERCISES } from '../src/exercises/index.js';
     import { sampleExercise } from '../src/exercises/common.js';
+    import * as physics from '../src/physics.js';
+    import * as grips from '../src/exercises/grips.js';
 
     const only = new URLSearchParams(location.search).get('only')?.split(',');
-    const list = EXERCISES.filter((e) => !only || only.includes(e.id));
+    // &part=k/n – tylko co n-te ćwiczenie od k (test fizyki liczony równolegle w kilku przeglądarkach: tools/test.sh)
+    const [pk, pn] = (new URLSearchParams(location.search).get('part') ?? '0/1').split('/').map(Number);
+    const list = EXERCISES.filter((e) => !only || only.includes(e.id)).filter((e, i) => i % pn === pk);
     const q = new URLSearchParams(location.search);
     const W = +(q.get('w') ?? 240), H = +(q.get('h') ?? 210), COLS = +(q.get('cols') ?? 8);
     // ?mistakes – zamiast pozycji A/B: każdy typowy błąd w punkcie B
@@ -52,8 +56,8 @@
     scene.add(body.root);
     // ?check – test fizyki (src/physics.js) dla każdego ćwiczenia i każdego błędu, 60 chwil cyklu
     if (q.has('check')) {
-      const { checkPose, checkScenery, checkRanges, checkRest, handOrientation } = await import('../src/physics.js');
-      const { gripMismatch } = await import('../src/exercises/grips.js');
+      const { checkPose, checkScenery, checkRanges, checkRest, handOrientation } = physics;
+      const { gripMismatch } = grips;
       const out = [];
       for (const ex of list) {
         // chwyt zgodny ze specyfikacją (grips.js) w pozycji wyjściowej
@@ -150,7 +154,7 @@
     }
     const camera = new THREE.PerspectiveCamera(40, W / H, 0.05, 50);
     const grid = document.getElementById('grid');
-    cells.forEach(([ex, which, mistake], i) => {
+    if (!q.has('check')) cells.forEach(([ex, which, mistake], i) => {   // test fizyki: bez rysowania arkusza
       const cx = (i % COLS) * W, cy = Math.floor(i / COLS) * H;
       // A = pozycja na początku cyklu, B = najgłębszy / najwyższy punkt (koniec drugiej fazy)
       const t = TS ? which : which === 0 ? 0.01 : (ex.phases[1]?.end ?? 0.5) - 0.01;

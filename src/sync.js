@@ -45,12 +45,15 @@ const setMeta = (m) => localStorage.setItem(META, JSON.stringify(m));
 // Porównujemy postać kanoniczną (klucze posortowane): baza (jsonb) zmienia kolejność kluczy, a zwykły JSON.stringify
 // widziałby wtedy „zmianę” i urządzenia odsyłałyby sobie dane w kółko.
 const canon = (x) => JSON.stringify(x, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((key) => [key, v[key]])) : v));
-const payload = () => { const { plans, workouts } = planner.getData(); return canon({ plans, workouts, settings: { sex: getSex() } }); };
+// v – numer formatu danych: baza odrzuca zapis z niższym numerem (stara wersja aplikacji nie nadpisze nowszych danych,
+// supabase/migrations/…_user_data_format_guard.sql). Podbijamy przy każdej zmianie formatu.
+const DATA_V = 2;
+const payload = () => { const { plans, workouts } = planner.getData(); return canon({ v: DATA_V, plans, workouts, settings: { sex: getSex() } }); };
 const applySettings = (st) => { if (st?.sex) setSex(st.sex); };
 
 // --- scalanie: dane z konta + lokalne plany (po nazwie) i treningi, których na koncie brak ---
 function merge(remote, local) {
-  const out = { plans: [...remote.plans], workouts: [...remote.workouts], settings: remote.settings ?? local.settings };
+  const out = { v: DATA_V, plans: [...remote.plans], workouts: [...remote.workouts], settings: remote.settings ?? local.settings };
   const names = new Set(out.plans.map((p) => p.name)), wIds = new Set(out.workouts.map((w) => w.id));
   const wNames = new Set(out.workouts.map((w) => w.name));
   const used = (p) => p.variants.some((id) => local.workouts.find((w) => w.id === id)?.items.length);
@@ -73,6 +76,7 @@ async function pull() {
   try {
     const { data: row, error } = await sb.from('user_data').select('data, updated_at').eq('user_id', user.id).maybeSingle();
     if (error) throw error;
+    if ((row?.data?.v ?? 0) > DATA_V) return updateApp();   // dane z nowszej wersji aplikacji – najpierw aktualizacja
     const m = meta(), local = JSON.parse(payload());
     const known = m.uid === user.id;                          // to urządzenie już synchronizowało to konto
     const dirty = known && m.sent !== canon(local);           // lokalne zmiany jeszcze niewysłane
@@ -82,7 +86,7 @@ async function pull() {
     else if (remoteChanged) {
       // nowe urządzenie / logowanie z trybu gościa: konto z planami wygrywa w całości (plany gościa tylko w kopii hes.backup);
       // do pustego konta trafia to, co ułożono jako gość. Niewysłane zmiany z tego samego konta są scalane.
-      const fresh = { ...row.data, settings: row.data.settings ?? local.settings };
+      const fresh = { ...row.data, v: DATA_V, settings: row.data.settings ?? local.settings };
       const next = dirty ? merge(row.data, local) : !known && !row.data.plans?.length ? merge(row.data, local) : fresh;
       // kopia zapasowa planów z tej przeglądarki, zanim zastąpią je dane z konta (hes.backup – do ręcznego odzyskania)
       if (local.plans.length && canon({ plans: next.plans, workouts: next.workouts }) !== canon({ plans: local.plans, workouts: local.workouts })) localStorage.setItem('hes.backup', JSON.stringify({ at: new Date().toISOString(), data: local }));
@@ -119,6 +123,7 @@ async function push(now = false) {
       ? sb.from('user_data').update({ data }).eq('user_id', user.id).eq('updated_at', m.at).select('updated_at')
       : sb.from('user_data').insert({ user_id: user.id, data }).select('updated_at');
     const { data: rows, error } = await q;
+    if (/outdated_client/.test(error?.message ?? '')) return updateApp();   // na koncie dane z nowszej wersji aplikacji
     if (error?.code === '23505' || (!error && !rows?.length)) conflict = true;   // wiersz już jest / zmienił się w międzyczasie
     else if (error) throw error;
     else { setMeta({ uid: user.id, at: rows[0].updated_at, sent: body }); setState('ok'); }
@@ -236,6 +241,36 @@ onSex(() => { showSex(); push(); });   // sylwetka to część danych konta
 const askLogin = (text) => { $('settings-dialog').hidden = true; ui.dlg.hidden = false; ui.msg.textContent = text; };
 planner.onNeedLogin(() => askLogin('Zaloguj się, żeby tworzyć kolejne plany i zapisywać je na koncie.'));
 $('guest-login').onclick = () => askLogin('Plan zostanie zapisany na Twoim koncie.');
+// Aktualizacja otwartej karty: nowa wersja aplikacji (src/version.js na serwerze) → przeładowanie.
+// Przy powrocie do karty od razu; w tle co 10 min tylko, gdy karta jest schowana – nigdy w trakcie zapisu.
+let updating = false;
+function updateApp() {
+  if (updating) return; updating = true;
+  // zabezpieczenie przed pętlą: jeśli przed chwilą już się odświeżaliśmy, a dalej jest staro – tylko komunikat
+  const last = +sessionStorage.getItem('hes.updatedAt') || 0;
+  if (Date.now() - last < 60000) { setState('err'); ui.status.textContent = 'Jest nowsza wersja aplikacji – odśwież stronę.'; return; }
+  sessionStorage.setItem('hes.updatedAt', String(Date.now()));
+  loading.querySelector('p').textContent = 'Aktualizuję aplikację…';
+  loading.classList.remove('fade'); loading.hidden = false;
+  location.reload();
+}
+async function checkVersion(onlyHidden = false) {
+  if (updating || leaving || state === 'wait' || state === 'sync') return;
+  try {
+    const txt = await (await fetch(`src/version.js?t=${Date.now()}`, { cache: 'no-store' })).text();
+    const live = txt.match(/VERSION = '([^']+)'/)?.[1];
+    if (live && live !== VERSION && (!onlyHidden || document.visibilityState === 'hidden')) updateApp();
+  } catch { /* bez sieci – sprawdzimy później */ }
+}
+setInterval(() => checkVersion(true), 10 * 60 * 1000);
+
+// Kilka kart tej samej przeglądarki: zmiana w jednej od razu w pozostałych (te same plany i sylwetka)
+addEventListener('storage', (e) => {
+  if (e.key === 'hes.data.v2' && e.newValue) planner.applyExternal(JSON.parse(e.newValue));
+  if (e.key === 'hes.sex' && e.newValue) setSex(e.newValue);
+});
 addEventListener('online', () => pull());
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pull(); else if (state === 'wait') push(true); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { checkVersion(); pull(); } else if (state === 'wait') push(true);
+});
 if (DB.name !== 'prod') { ui.btn.classList.add('dev-db'); ui.mailForm.hidden = false; }

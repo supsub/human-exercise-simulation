@@ -10,6 +10,7 @@
 // Baza: lokalna (localhost; bez działającego `supabase start` – serwer nieosiągalny), więc testy nie dotykają danych produkcyjnych
 // i sprawdzają też zachowanie bez sieci. Wynik: „OK – wszystkie testy przeszły” albo lista błędów.
 const frame = document.getElementById('app');
+window.__hesTest = true;   // aplikacja w ramce: tryb testów (bez rysowania 3D, src/scene.js)
 const AUTH = 'sb-127-auth-token';
 const SLOW = +(new URLSearchParams(location.search).get('slow') ?? 1);   // wolniejsza maszyna (CI): dłuższe limity
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -70,6 +71,8 @@ function fakeServer() {
       const method = opts.method ?? 'GET', q = new URL(url).searchParams;
       if (method === 'GET') { if (srv.hideOnce) { srv.hideOnce = false; return json([]); } return srv.row ? one(srv.row) : json(accept.includes('vnd.pgrst.object') ? null : []); }
       const body = JSON.parse(opts.body);
+      // blokada formatu jak w bazie (…_user_data_format_guard.sql): zapis ze starszym `v` odrzucony
+      if (method === 'PATCH' && srv.row && (body.data?.v ?? 0) < (srv.row.data.v ?? 0)) return json({ code: 'P0001', message: `outdated_client: format ${body.data?.v ?? 0} < ${srv.row.data.v}` }, 400);
       const write = () => { srv.posts.push(body.data); srv.row = { data: jsonb(body.data), updated_at: 't' + (srv.posts.length + 1) }; return json([{ updated_at: srv.row.updated_at }]); };
       if (method === 'POST' && /merge-duplicates/.test(new w.Headers(opts.headers).get('prefer') ?? '')) return write();   // upsert – nadpisuje jak prawdziwy Supabase
       if (method === 'POST') return srv.row ? json({ code: '23505', message: 'duplicate key' }, 409) : write();      // insert
@@ -121,6 +124,25 @@ const tests = {
     $('#sex-switch [data-sex="m"]').click();
     check(scene.body.sex === 'm', 'model nie wrócił do mężczyzny');
   },
+  async 'telefon: stuknięcie mięśnia → lista ćwiczeń, bez zbędnych zakładek Plan/Analiza'() {
+    await open();
+    await waitFor(() => !visible('#app-loading'), 'start aplikacji');
+    await sleep(500);   // kamera dolatuje do modelu
+    const c = $('#scene'), w = win();
+    const sc = await w.eval(`import('${new URL('src/scene.js', doc().baseURI)}')`);
+    sc.controls.autoRotate = false;
+    const rr = c.getBoundingClientRect(); sc.camera.aspect = rr.width / rr.height; sc.camera.updateProjectionMatrix();
+    sc.controls.update(); sc.camera.updateMatrixWorld(); sc.body.root.updateWorldMatrix(true, true);
+    let at = null;   // punkt ekranu, pod którym jest mięsień
+    for (let y = 60; y < 500 && !at; y += 20) for (let x = 100; x <= 300 && !at; x += 20) if (sc.pickMuscleAt(x, y, c, sc.camera, sc.body.muscleMeshes)) at = [x, y];
+    check(at, 'nie znaleziono mięśnia na ekranie');
+    const o = { pointerType: 'touch', clientX: at[0], clientY: at[1], bubbles: true, pointerId: 1, isPrimary: true, button: 0 };
+    c.dispatchEvent(new w.PointerEvent('pointerdown', o)); c.dispatchEvent(new w.PointerEvent('pointerup', o));
+    await waitFor(() => visible('#picker') && $('#picker-title').textContent.includes('Ćwiczenia na'), 'lista „Ćwiczenia na: …” po stuknięciu mięśnia', 5000);
+    check(!visible('#mobile-tabs'), 'przy liście ćwiczeń na mięsień widać zakładki Plan/Analiza');
+    $('#picker-close').click();
+    await waitFor(() => visible('#mobile-tabs'), 'zakładki wracają po zamknięciu listy', 5000);
+  },
   async 'zapisana sesja: ekran wczytywania, potem bez zawieszenia'() {
     await open(() => localStorage.setItem(AUTH, fakeSession(-100)));   // wygasła – serwer nieosiągalny
     check(visible('#app-loading'), 'brak ekranu wczytywania przy zapisanej sesji');
@@ -163,7 +185,7 @@ const tests = {
     const reloaded = new Promise((r) => (frame.onload = r));
     $('#auth-logout').click();
     await Promise.race([reloaded, sleep(12000)]); hook();
-    await sleep(3000);   // dawny błąd: pusty stan wysyłał się 1,5 s po wyczyszczeniu
+    await sleep(2000);   // dawny błąd: pusty stan wysyłał się 1,5 s po wyczyszczeniu
     check(!srv.posts.some((d) => !d.plans?.length), 'na konto wysłano pusty stan – plany zostałyby skasowane');
     check(srv.row.data.plans.length === 1, 'plany na koncie zmienione przy wylogowaniu');
   },
@@ -175,7 +197,7 @@ const tests = {
         workouts: [{ id: 'gw', name: 'Trening A', items: [] }], currentId: 'g1' }));   // pusty plan gościa
     }, srv.mock);
     await waitFor(() => ['ok', 'err'].includes($('#auth-open').dataset.state) && !visible('#app-loading'), 'koniec synchronizacji', 15000);
-    await sleep(2500);
+    await sleep(2000);
     check(srv.row.data.plans.some((p) => p.name === 'Plan z konta'), 'plan z konta nadpisany');
     check($('#plan-select').selectedOptions[0]?.textContent === 'Plan z konta', 'po zalogowaniu nie widać planu z konta');
   },
@@ -205,17 +227,17 @@ const tests = {
     const scene = await win().eval(`import('${new URL('src/scene.js', doc().baseURI)}')`);
     check(scene.body.sex === 'f', 'sylwetka z konta (kobieta) nie została ustawiona');
     check($('#sex-switch [data-sex="f"]').getAttribute('aria-checked') === 'true', 'przełącznik w ⚙ nie pokazuje sylwetki z konta');
-    await sleep(2500);
+    await sleep(2000);
     const before = srv.posts.length;
     $('#sex-switch [data-sex="m"]').click();
     await waitFor(() => srv.row.data.settings?.sex === 'm', 'zmiana sylwetki zapisana na koncie');
-    await sleep(4000);
+    await sleep(2000);
     check(srv.posts.length === before + 1, `po jednej zmianie ${srv.posts.length - before} zapisów na koncie (odsyłanie w kółko?)`);
     // zmiana z innego urządzenia, potem kilka pobrań (powrót do aplikacji) – to urządzenie nie może jej odsyłać
     srv.row = { data: jsonb({ ...srv.row.data, settings: { sex: 'f' } }), updated_at: 't99' };
     const n = srv.posts.length, vis = () => doc().dispatchEvent(new (win().Event)('visibilitychange'));
     vis(); await waitFor(() => scene.body.sex === 'f', 'zmiana z innego urządzenia');
-    await sleep(2500); vis(); await sleep(2500); vis(); await sleep(2500);
+    await sleep(1700); vis(); await sleep(1700); vis(); await sleep(1700);
     check(srv.posts.length === n, `po pobraniu zmiany z innego urządzenia ${srv.posts.length - n} zbędnych zapisów (odsyłanie w kółko)`);
   },
   async 'logowanie po wylogowaniu: od razu plany z konta, nie plan gościa'() {
@@ -228,7 +250,7 @@ const tests = {
     let shownGuest = false;
     const iv = setInterval(() => { try { if (!visible('#app-loading') && $('#plan-select')?.selectedOptions[0]?.textContent === 'Mój plan') shownGuest = true; } catch { /* */ } }, 20);
     await waitFor(() => $('#plan-select')?.selectedOptions[0]?.textContent === 'Plan z konta' && !visible('#app-loading'), 'plany z konta po zalogowaniu');
-    await sleep(1500); clearInterval(iv);
+    await sleep(1000); clearInterval(iv);
     check(!shownGuest, 'po zalogowaniu przez chwilę widać plan gościa');
     check($('#plan-select').selectedOptions[0]?.textContent === 'Plan z konta', 'po chwili znów widać plan gościa');
     check(![...$('#plan-select').options].some((o) => o.textContent === 'Mój plan'), 'plan gościa dołączony do konta z planami');
@@ -244,6 +266,51 @@ const tests = {
     await waitFor(() => srv.row?.data.plans.some((p) => p.name === 'Mój plan'), 'plan gościa zapisany na nowym koncie');
     check($('#plan-select').selectedOptions[0]?.textContent === 'Mój plan', 'po zalogowaniu nie widać planu');
   },
+  async 'dane z nowszej wersji aplikacji: nic nie nadpisujemy, jedno odświeżenie bez pętli'() {
+    const srv = fakeServer();
+    srv.row = { data: jsonb({ ...ACCOUNT, v: 99, settings: { sex: 'm' } }), updated_at: 't1' };
+    let loads = 0;
+    await open(() => {
+      sessionStorage.clear();
+      localStorage.setItem(AUTH, fakeSession(3600));
+      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 't1', sent: 'stare' }));   // niewysłane zmiany
+      localStorage.setItem('hes.data.v2', JSON.stringify({ ...ACCOUNT, currentId: 'p1' }));
+    }, srv.mock);
+    frame.addEventListener('load', () => { loads++; hook(); });
+    await waitFor(() => /nowsza wersja/.test($('#auth-status')?.textContent ?? ''), 'komunikat o nowszej wersji (po jednym odświeżeniu)', 15000);
+    await sleep(1000);
+    check(!srv.posts.length, 'stara wersja wysłała dane na konto z nowszym formatem');
+    check(loads <= 1, `aplikacja przeładowała się ${loads} razy (pętla?)`);
+    check(srv.row.data.v === 99, 'dane z nowszej wersji zmienione');
+  },
+  async 'dwie karty: zmiana w jednej nie jest cofana przez drugą'() {
+    const srv = fakeServer();
+    await open(() => {
+      localStorage.setItem(AUTH, fakeSession(3600));
+      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 't1', sent: canon({ v: 2, ...ACCOUNT, settings: { sex: 'm' } }) }));
+      localStorage.setItem('hes.data.v2', JSON.stringify({ ...ACCOUNT, currentId: 'p1' }));
+      localStorage.setItem('hes.sex', 'm');
+    }, srv.mock);
+    await waitFor(() => $('#auth-open').dataset.state === 'ok', 'synchronizacja karty A', 25000);
+    const B = document.createElement('iframe'); B.style.cssText = 'border:0;width:390px;height:400px';
+    await new Promise((r) => { B.onload = r; B.src = '../index.html'; document.body.appendChild(B); });
+    const $B = (sel) => B.contentDocument.querySelector(sel);
+    try {
+      await waitFor(() => $B('#auth-open')?.dataset.state === 'ok', 'synchronizacja karty B', 25000);
+      $('.add-ex').click();
+      await waitFor(() => $('#picker-list .quick-add'), 'lista ćwiczeń w karcie A');
+      $('#picker-list .quick-add').click();
+      $('#sex-switch [data-sex="f"]').click();
+      await waitFor(() => srv.row.data.workouts[0].items.length === 2 && srv.row.data.settings?.sex === 'f', 'zmiana z karty A na koncie');
+      for (let i = 0; i < 3; i++) { B.contentDocument.dispatchEvent(new (B.contentWindow.Event)('visibilitychange')); await sleep(1200); }   // karta B wraca na wierzch
+      check(srv.row.data.workouts[0].items.length === 2, 'karta B cofnęła zmianę planu z karty A');
+      check(srv.row.data.settings?.sex === 'f', 'karta B cofnęła zmianę sylwetki z karty A');
+      const pvB = await B.contentWindow.eval(`import('${new URL('src/plan/planView.js', B.contentDocument.baseURI)}')`);
+      check(pvB.getData().workouts[0].items.length === 2, 'karta B nie przejęła zmiany planu z karty A');
+      const scB = await B.contentWindow.eval(`import('${new URL('src/scene.js', B.contentDocument.baseURI)}')`);
+      check(scB.body.sex === 'f', 'karta B nie przejęła zmiany sylwetki z karty A');
+    } finally { B.remove(); }
+  },
   async 'zapis zmian: aktualizuje znaną wersję konta'() {
     const srv = fakeServer();
     await open(() => {
@@ -258,13 +325,18 @@ const tests = {
     await waitFor(() => srv.row.data.workouts[0].items.length === 2, 'zmiana zapisana na koncie', 8000)
       .catch(async (e) => { const l = await win().navigator.locks.query(); throw new Error(`${e.message} (stan: ${$('#auth-open').dataset.state}, lokalnie: ${data()?.workouts[0]?.items.length} ćw., zapytania: ${srv.calls?.join(', ')}, blokady: ${JSON.stringify(l)})`); });
     check($('#auth-open').dataset.state === 'ok', 'stan po zapisie inny niż „Zapisane”');
+    check(srv.row.data.v === 2, 'zapis bez numeru formatu danych (v)');
   },
 };
 
+// rozgrzewka: pierwsze wczytanie w świeżym profilu pobiera moduły z CDN (wolne, a scenariusze mają limity czasu)
+try { await open(); await waitFor(() => !visible('#app-loading'), 'rozgrzewka', 60000); } catch { /* scenariusze i tak sprawdzą */ }
 const out = [];
 const only = new URLSearchParams(location.search).get('only');   // ?only=fragment nazwy – tylko wybrane scenariusze
-for (const [name, fn] of Object.entries(tests)) {
+const [pk, pn] = (new URLSearchParams(location.search).get('part') ?? '0/1').split('/').map(Number);   // ?part=k/n – co n-ty scenariusz (równolegle)
+for (const [i, [name, fn]] of Object.entries(tests).entries()) {
   if (only && !name.includes(only)) continue;
+  if (i % pn !== pk) continue;
   errors = [];
   try { await fn(); if (errors.length) throw new Error(errors.join('; ')); out.push(`✔ ${name}`); }
   catch (e) { out.push(`✘ ${name}: ${e.message}`); }
