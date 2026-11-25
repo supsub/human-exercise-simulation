@@ -231,6 +231,7 @@ input:focus { border-color: var(--accent); }
 .pick-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .pick-meta { color: var(--muted); font-size: 12px; margin: 2px 0 4px; }
 .anim { font-size: 11px; color: var(--accent); }
+.mrole { font-size: 11px; font-weight: 600; color: #06121f; background: var(--c); border-radius: 999px; padding: 1px 7px; }
 .helps { font-size: 11px; color: var(--good); background: rgba(95,211,138,.12); border-radius: 999px; padding: 1px 7px; }
 .mtags { display: flex; flex-wrap: wrap; gap: 4px; }
 .mtag { font-size: 11px; border: 1px solid; border-radius: 999px; padding: 0 7px; color: #c4ccd8; }

@@ -1,5 +1,5 @@
 import { paintMuscles, flyCamera, jumpCamera, controls, body, pickMuscle, showTooltip, cssColor, volumeColor, cssVolumeColor,
-  updateBreathPuffs, updateStressMarkers, setScenery, WEEK_THRESHOLDS, DAY_THRESHOLDS } from '../scene.js';
+  updateBreathPuffs, updateStressMarkers, onMuscleTap, setScenery, WEEK_THRESHOLDS, DAY_THRESHOLDS } from '../scene.js';
 import { MUSCLES, MUSCLE_BY_ID } from '../muscles.js';
 import { roleOf } from '../exercises/common.js';
 import { EXERCISE_BY_ID } from '../exercises/index.js';
@@ -38,7 +38,8 @@ let store = load();
 let analysis = null;
 let focusId = null;         // wybrany trening (mapa jego mięśni na modelu, cel przycisku "Dodaj do")
 let selected = null;        // { ex: pozycja katalogu, anim: definicja animacji | null, from: 'plan' | 'list' }
-let browseId = null;        // trening, dla którego otwarto listę ćwiczeń
+let browseId = null;        // trening, dla którego otwarto listę ćwiczeń (cel szybkiego dodawania)
+let browseMuscle = null;    // lista „ćwiczenia na mięsień” (kliknięty mięsień na modelu)
 let browseCat = null;
 let listHover = null;       // ćwiczenie wskazane na liście (podgląd mięśni)
 let muscleHover = null;     // mięsień wskazany w panelu
@@ -111,7 +112,7 @@ function render() {
   if (selected) renderDetailTop();
   // telefon: przy otwartym ćwiczeniu zakładki Plan/Analiza znikają (pasek dodawania albo nic)
   document.body.classList.toggle('ex-open', !!selected);
-  document.body.classList.toggle('ex-add', selected?.from === 'list' && !!focusId);
+  document.body.classList.toggle('ex-add', selected?.from === 'list' && !!addTarget());
   if (!ui.browse.hidden && !ui.panel.hidden) renderList();
   save();
 }
@@ -319,7 +320,23 @@ function applyFix(f, p) {
 }
 
 // ---------- Panel: lista ćwiczeń ----------
+const listTitle = () => (browseMuscle ? `Ćwiczenia na: ${MUSCLE_BY_ID[browseMuscle].name}` : `Dodaj ćwiczenie – ${workout(browseId).name}`);
+// Kliknięty mięsień: ćwiczenia od najmocniej go angażujących; szybkie dodawanie do wybranego treningu (albo pierwszego w planie)
+function openMuscle(id) {
+  browseMuscle = id;
+  browseId = (focusId && workout(focusId) ? focusId : plan()?.variants.find((w) => workout(w))) ?? null;
+  deselect();
+  ui.search.value = '';
+  browseCat = null;
+  ui.panel.hidden = false;
+  ui.browse.hidden = false;
+  ui.detail.hidden = true;
+  ui.panelTitle.textContent = listTitle();
+  render();
+}
+onMuscleTap((id) => { if (!selected) openMuscle(id); });
 function openBrowse(id) {
+  browseMuscle = null;
   browseId = id;
   focusId = id;
   deselect();
@@ -336,7 +353,7 @@ function backToList() {
   deselect();
   ui.browse.hidden = false;
   ui.detail.hidden = true;
-  ui.panelTitle.textContent = `Dodaj ćwiczenie – ${workout(browseId).name}`;
+  ui.panelTitle.textContent = listTitle();
   flyCamera(...PLAN_CAMERA);
   render();
 }
@@ -356,10 +373,12 @@ ui.panelClose.onclick = () => (phone() && selected?.from === 'plan' ? closeSheet
 function renderList() {
   const q = ui.search.value.toLowerCase().trim();
   ui.cats.querySelectorAll('button').forEach((b) => b.classList.toggle('active', (b.dataset.c === 'Wszystkie' && !browseCat) || b.dataset.c === browseCat));
-  const items = CATALOG.filter((ex) => (!browseCat || ex.category === browseCat) &&
+  const mw = (ex) => (browseMuscle ? ex.muscles[browseMuscle] ?? 0 : 0);
+  const items = CATALOG.filter((ex) => (!browseMuscle || mw(ex) >= 0.25) && (!browseCat || ex.category === browseCat) &&
     (!q || ex.name.toLowerCase().includes(q) || ex.tags?.includes(q) || Object.keys(ex.muscles).some((id) => MUSCLE_BY_ID[id].name.toLowerCase().includes(q))));
   // uzupełniające braki na górze, ćwiczenia już obecne w tym dniu na końcu (bez możliwości dodania)
-  items.sort((a, b) => !!inWorkout(a.id, browseId) - !!inWorkout(b.id, browseId) || helpsOf(b).length - helpsOf(a).length);
+  // lista na mięsień: od najmocniej go angażujących; zwykła: uzupełniające braki na górze, obecne w treningu na końcu
+  items.sort((a, b) => mw(b) - mw(a) || !!inWorkout(a.id, browseId) - !!inWorkout(b.id, browseId) || helpsOf(b).length - helpsOf(a).length);
   ui.list.innerHTML = items.map((ex) => {
     const helps = helpsOf(ex).length;
     const tags = Object.entries(ex.muscles).sort((a, b) => b[1] - a[1]).slice(0, 3)
@@ -368,9 +387,10 @@ function renderList() {
     return `<div class="pick${here ? ' present' : ''}" data-id="${ex.id}" tabindex="0">
       <div class="pick-body">
         <div class="pick-head"><b>${ex.name}</b></div>
-        <div class="pick-meta">${ex.category} · ${ex.equipment}${helps ? ` <span class="helps">uzupełnia ${helps} ${helps === 1 ? 'brak' : 'braki'}</span>` : ''}</div><div class="mtags">${tags}</div>
+        <div class="pick-meta">${browseMuscle ? `<span class="mrole" style="--c:${cssColor(mw(ex) * 0.9)}">${mw(ex) >= 0.75 ? 'główny' : mw(ex) >= 0.5 ? 'pomocniczy' : 'lekko'}</span> ` : ''}${ex.category} · ${ex.equipment}${helps ? ` <span class="helps">uzupełnia ${helps} ${helps === 1 ? 'brak' : 'braki'}</span>` : ''}</div><div class="mtags">${tags}</div>
       </div>
       ${here ? `<span class="present-tag">już w tym treningu<br>${here.sets} × ${here.reps}</span>`
+        : !browseId ? ''
         : `<button class="quick-add" title="Dodaj od razu do: ${esc(workout(browseId).name)} (3 × 10)">+</button>`}
     </div>`;
   }).join('') || '<div class="muted">Brak ćwiczeń pasujących do wyszukiwania.</div>';
@@ -419,7 +439,7 @@ function selectExercise(ex, from, { t = null, mistake = null } = {}) {
   ui.detail.hidden = false;
   ui.detail.classList.toggle('from-plan', from === 'plan');
   showSection('info');
-  ui.panelTitle.textContent = from === 'list' ? `Dodaj ćwiczenie – ${workout(browseId).name}` : phone() ? ex.name : 'Ćwiczenie';
+  ui.panelTitle.textContent = from === 'list' ? listTitle() : phone() ? ex.name : 'Ćwiczenie';
   ui.pbName.textContent = ex.name;
   controls.autoRotate = !anim; // bez animacji model się obraca, żeby było widać też mięśnie z tyłu
   if (anim) (t !== null ? jumpCamera : flyCamera)(...cameraFor(anim));
@@ -445,9 +465,12 @@ function deselect() {
   updateStressMarkers([], 0, 0);
 }
 
+const addTarget = () => focusId ?? (selected?.from === 'list' ? browseId : null);
 function renderDetailTop() {
   const { ex, from } = selected;
   const p = plan();
+  // trening docelowy: wybrany w planie, a przy liście „ćwiczenia na mięsień” – ten, do którego dodaje lista
+  const focusId = addTarget();
   const inPlan = store.workouts.flatMap((w) => w.items.filter((it) => it.exId === ex.id).map((it) => `${badge(w.id)} ${esc(w.name)} ${it.sets}×${it.reps}`));
   let impact = '';
   if (focusId) {

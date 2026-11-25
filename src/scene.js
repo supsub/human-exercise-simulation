@@ -305,8 +305,17 @@ canvas.addEventListener('pointerdown', (e) => {
   if (touch) pointerEvent = e;
 });
 canvas.addEventListener('pointermove', (e) => { touch = e.pointerType !== 'mouse'; pointerEvent = e; });
+const tapListeners = [];
+// Kliknięcie / stuknięcie mięśnia (bez przeciągania) – np. lista najlepszych ćwiczeń na ten mięsień
+export const onMuscleTap = (fn) => tapListeners.push(fn);
 canvas.addEventListener('pointerup', (e) => {
-  if (touch && downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 10) pointerEvent = null;
+  const moved = downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > (touch ? 10 : 5);
+  if (touch && moved) pointerEvent = null;
+  if (!moved && downAt && e.button === 0) {
+    const hit = pickMuscleAt(e.clientX, e.clientY, canvas, camera, body.muscleMeshes);
+    if (hit) for (const fn of tapListeners) fn(hit.id);
+  }
+  downAt = null;
 });
 canvas.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') pointerEvent = null; });
 // Zwraca { id, x, y } mięśnia pod kursorem na głównej scenie albo null
