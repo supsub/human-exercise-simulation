@@ -64,6 +64,27 @@ function load() {
   return { plans: [], workouts: [], currentId: null };
 }
 const saveListeners = [];
+// Tryb gościa (niezalogowany): domyślny plan „Mój plan” z pustym treningiem – można go od razu wypełniać
+// (zapis w tej przeglądarce, po zalogowaniu trafia na konto). Kolejne plany i usuwanie planu – po zalogowaniu (onNeedLogin, src/sync.js).
+let guest = false;
+const needLogin = [];
+export const onNeedLogin = (fn) => needLogin.push(fn);
+export const isGuest = () => guest;
+function guestBlock() {
+  if (!guest) return false;
+  for (const fn of needLogin) fn();
+  return true;
+}
+export function setGuest(on) {
+  if (guest === on) return;
+  guest = on;
+  if (on && !store.plans.length) {
+    const w = emptyWorkout('Trening A'), p = emptyPlan('Mój plan', [w.id]);
+    store = { plans: [p], workouts: [w], currentId: p.id };
+    focusId = null;
+  }
+  if (started) render();
+}
 function save() {
   const json = JSON.stringify(store);
   if (json === localStorage.getItem(STORAGE_KEY)) return;
@@ -96,6 +117,7 @@ const helpsOf = (ex) => Object.entries(ex.muscles).filter(([id, w]) => w >= 0.5 
 function render() {
   const p = plan();
   document.body.classList.toggle('no-plan', !p);
+  document.body.classList.toggle('guest', guest);
   if (!p) {                       // brak planu: tylko zachęta „Utwórz plan”, model bez mapy obciążenia
     focusId = null;
     ui.select.innerHTML = '';
@@ -603,6 +625,7 @@ window.addEventListener('keydown', (e) => {
 // ---------- Zarządzanie planami i treningami ----------
 ui.select.onchange = () => { store.currentId = ui.select.value; focusId = null; render(); };
 ui.newBtn.onclick = () => {
+  if (guestBlock()) return;
   const name = prompt('Nazwa nowego planu:', 'Mój plan');
   if (!name) return;
   const p = emptyPlan(name.trim());
@@ -616,6 +639,7 @@ ui.renameBtn.onclick = () => {
   if (name) { plan().name = name.trim(); render(); }
 };
 ui.deleteBtn.onclick = () => {
+  if (guestBlock()) return;
   if (!confirm(`Usunąć plan „${plan().name}”? Treningi zostaną (można ich użyć w innych planach).`)) return;
   store.plans = store.plans.filter((p) => p.id !== store.currentId);
   store.currentId = store.plans[0]?.id ?? null;
@@ -732,7 +756,9 @@ function renderLegend(m) {
 //   ?focus=A – wybrany trening (litera), ?picker=B – lista ćwiczeń dla treningu, &preview=row – podgląd z listy,
 //   ?ex=squat – szczegóły ćwiczenia, &t=0.5 – zatrzymanie animacji, &mistake=valgus – typowy błąd,
 //   &sec=info|tech|muscles – otwarta sekcja (telefon: arkusz pod modelem)
+let started = false;
 export function start() {
+  started = true;
   flyCamera(...PLAN_CAMERA);
   controls.autoRotate = true;
   const q = new URLSearchParams(location.search);

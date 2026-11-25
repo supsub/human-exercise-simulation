@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { DIMS } from './dims.js';
 import { MUSCLES } from './muscles.js';
 import { buildOrganic } from './bodyOrganic.js';
+import { getSex } from './sex.js';
 
 // Stylizowany manekin: hierarchia grup = szkielet (stawy obracają się wokół osi X),
 // segmenty ciała to kapsuły/elipsoidy, a mięśnie to osobne bryły na powierzchni,
@@ -103,7 +104,8 @@ function twistChain(rootG, midG, endG, angle, lateralSign) {
 }
 
 // look: 'organic' (domyślny – realistyczna sylwetka) albo 'classic' (dawny ludzik z brył; w przeglądarce ?look=classic)
-export function createBody({ look = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('look')) || 'organic' } = {}) {
+// sex: 'm' | 'f' – sylwetka na start (wygląd organiczny); zmiana w locie: body.setSex
+export function createBody({ look = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('look')) || 'organic', sex = getSex() } = {}) {
   const organic = look === 'organic';
   const joints = {};
   const points = {};
@@ -244,12 +246,13 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
   marker('headTop', neck, [0, 0.29, 0.01]);
 
   // Mięśnie – jeden materiał na mięsień (lewa i prawa strona świecą razem)
-  let muscleMeshes = [];
+  let muscleMeshes = [], variants = null, currentSex = 'm';
   const materials = {};
   for (const m of MUSCLES) materials[m.id] = new THREE.MeshStandardMaterial({ color: 0x4a5a78, roughness: 0.5, metalness: 0.0, emissive: 0x000000 });
   if (organic) {
     const o = buildOrganic({ root, ribcage, belly, RIB_PIVOT, BELLY_PIVOT, neck, sides, skinMat: organicSkin, jointMat: organicSkin, faceMat, materials, MUSCLES, shadowed });
-    muscleMeshes = o.muscleMeshes; fingers = o.fingers; nose = o.nose; faceParts = o.faceParts; mouth = o.mouth;
+    fingers = o.fingers; nose = o.nose; faceParts = o.faceParts; mouth = o.mouth;
+    variants = o.variants;
   }
   for (const m of organic ? [] : MUSCLES) {
     const mat = materials[m.id];
@@ -693,5 +696,15 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     belly.scale.set(1 + 0.015 * b, 1, 1 + 0.1 * b);
   }
 
-  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, plateShape, materials, muscleMeshes, nose, faceParts, setPose, setBreath, setMouth, setMouthOnFace, mouthWorld, resolvePose };
+  // Sylwetka: przełącza widoczną skórę i mięśnie (szkielet, ruch i bryły kolizyjne są wspólne)
+  function setSex(s) {
+    if (!variants || !variants[s]) return;
+    currentSex = s;
+    for (const [k, v] of Object.entries(variants)) for (const m of v.skin) m.visible = k === s;
+    muscleMeshes = variants[s].muscleMeshes;
+  }
+  setSex(sex);
+
+  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, plateShape, materials,
+    get muscleMeshes() { return muscleMeshes; }, get sex() { return currentSex; }, setSex, nose, faceParts, setPose, setBreath, setMouth, setMouthOnFace, mouthWorld, resolvePose };
 }

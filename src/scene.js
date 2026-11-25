@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createBody } from './body.js';
+import { onSex } from './sex.js';
 import { applyFace } from './face.js';
 import { MUSCLES, MUSCLE_BY_ID } from './muscles.js';
 import { smoothstep } from './kinematics.js';
@@ -51,6 +52,7 @@ grid.position.y = 0.001;
 scene.add(grid);
 
 export const body = createBody();
+onSex((s) => body.setSex(s));   // przełącznik sylwetki w ustawieniach (⚙)
 scene.add(body.root);
 // podgląd twarzy (narzędzie): ?faceimg=local/x.jpg&lm=px,py,lx,ly,mx,my (oko prawe, lewe, usta w px zdjęcia)&facetone=photo|model
 {

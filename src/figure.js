@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createBody } from './body.js';
+import { onSex } from './sex.js';
 import { MUSCLES } from './muscles.js';
 import { standingPose } from './exercises/common.js';
 import { activationColor, pickMuscleAt } from './scene.js';
@@ -35,7 +36,8 @@ export function createFigure(canvasEl) {
     scene.add(holder);
     return b;
   });
-  const meshes = bodies.flatMap((b) => b.muscleMeshes);
+  const meshes = () => bodies.flatMap((b) => b.muscleMeshes);
+  onSex((s) => { for (const b of bodies) b.setSex(s); dirty = true; });
 
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 20);
   camera.position.set(0, 0.9, 5);
@@ -85,7 +87,7 @@ export function createFigure(canvasEl) {
       dirty = true;
     },
     pick() {
-      return pointer ? pickMuscleAt(pointer.clientX, pointer.clientY, canvasEl, camera, meshes) : null;
+      return pointer ? pickMuscleAt(pointer.clientX, pointer.clientY, canvasEl, camera, meshes()) : null;
     },
     render() {
       if (!dirty || canvasEl.offsetParent === null) return;

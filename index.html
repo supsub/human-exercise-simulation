@@ -39,6 +39,7 @@
   <div id="ex-action" class="ex-action"></div>
   <div id="plan-view">
     <aside class="panel plan-left">
+      <div id="guest-bar" class="guest-bar"><button id="guest-login" class="link">Zaloguj się</button>, żeby zapisać plan na koncie.</div>
       <div class="plan-head">
         <select id="plan-select" title="Wybierz plan"></select>
         <button id="plan-new" title="Nowy, pusty plan">+ Nowy</button>
@@ -157,12 +158,21 @@
 
   <!-- Ustawienia: funkcje poboczne -->
   <div id="settings-dialog" class="auth-dialog panel settings-dialog" hidden>
+    <div class="menu-row">
+      <span>Sylwetka</span>
+      <div id="sex-switch" class="seg" role="radiogroup" aria-label="Sylwetka modelu">
+        <button type="button" role="radio" data-sex="m">Mężczyzna</button>
+        <button type="button" role="radio" data-sex="f">Kobieta</button>
+      </div>
+    </div>
     <button id="face-open" class="menu-item">🙂 Twoja twarz na modelu</button>
     <a class="menu-item" href="docs/index.html">ℹ️ O projekcie</a>
     <div id="app-version" class="app-version"></div>
   </div>
 
   <div id="tooltip" class="tooltip" hidden></div>
+  <!-- ekran wczytywania: po zalogowaniu, dopóki nie przyjdą plany z konta (nie pokazujemy nieaktualnych danych) -->
+  <div id="app-loading" class="app-loading" hidden><div class="spinner"></div><p>Wczytuję Twoje plany…</p></div>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

@@ -58,13 +58,43 @@ const FOOT = [
   { z: 0.165, y: -0.071, w: 0.038, h: 0.0085 }, { z: 0.176, y: -0.072, w: 0.014, h: 0.004 },
 ];
 
-const SHAPES = {
-  torso: new Loft(TORSO, { exp: 2.4 }), pelvis: new Loft(PELVIS, { exp: 2.2, caps: 'bottom' }),   // zamknięta od spodu (krocze), otwarta u góry pod tułowiem
-  upperArm: new Loft(UPPER_ARM), forearm: new Loft(FOREARM), thigh: new Loft(THIGH), shin: new Loft(SHIN),
+// ---------- Sylwetka kobieca: te same przekroje przeskalowane (szkielet i bryły kolizyjne bez zmian) ----------
+// k(y) → { w, d, db } – mnożniki szerokości, głębokości przodu i tyłu przekroju na wysokości y
+const scaled = (rows, k) => rows.map((r) => {
+  const f = { w: 1, d: 1, db: 1, ...k(r.y) };
+  return { ...r, w: r.w * f.w, d: r.d * f.d, db: (r.db ?? r.d) * f.db };
+});
+const lerpK = (pts) => (y) => {   // pts: [[y, w, d, db], …] rosnąco po y – mnożniki interpolowane liniowo
+  if (y <= pts[0][0]) return { w: pts[0][1], d: pts[0][2], db: pts[0][3] };
+  for (let i = 1; i < pts.length; i++) if (y <= pts[i][0]) {
+    const a = pts[i - 1], b = pts[i], t = (y - a[0]) / (b[0] - a[0]), l = (j) => a[j] + (b[j] - a[j]) * t;
+    return { w: l(1), d: l(2), db: l(3) };
+  }
+  const z = pts.at(-1); return { w: z[1], d: z[2], db: z[3] };
 };
+const FEMALE = {
+  // talia wyraźnie węższa, klatka i barki nieco węższe, biodra i pośladki szersze
+  torso: scaled(TORSO, lerpK([[-0.04, 0.98, 0.97, 1], [0.03, 0.9, 0.92, 0.96], [0.1, 0.85, 0.89, 0.93], [0.17, 0.88, 0.92, 0.94],
+    [0.24, 0.92, 0.95, 0.95], [0.31, 0.93, 0.95, 0.95], [0.42, 0.93, 0.95, 0.95], [0.53, 0.9, 0.92, 0.92]])),
+  pelvis: scaled(PELVIS, lerpK([[-0.15, 1.05, 1, 1.05], [-0.09, 1.09, 1.02, 1.1], [-0.04, 1.09, 1.02, 1.08], [0.06, 1.05, 1, 1.02], [0.12, 0.95, 0.96, 0.96]])),
+  upperArm: scaled(UPPER_ARM, () => ({ w: 0.87, d: 0.87, db: 0.87 })),
+  forearm: scaled(FOREARM, () => ({ w: 0.89, d: 0.89, db: 0.89 })),
+  thigh: scaled(THIGH, lerpK([[-0.3, 0.98, 0.98, 0.98], [-0.08, 1.04, 1.01, 1.03]])),
+  shin: scaled(SHIN, () => ({ w: 0.94, d: 0.95, db: 0.94 })),
+  definition: 1.1,
+  // mięsień piersiowy leży nad piersią i pod nią – widoczna jest jego górna część (od obojczyka do piersi)
+  muscles: { pec_stern: { y: [0.39, 0.325], T: 0.016, peak: 0.45 } },
+};
+const MALE = { torso: TORSO, pelvis: PELVIS, upperArm: UPPER_ARM, forearm: FOREARM, thigh: THIGH, shin: SHIN, definition: 1.6 };
 
-// Jak mocno mięśnie odcinają się od skóry (1 = gładko, ~1.6 = wysportowana sylwetka z wyraźnym zarysem)
-const DEFINITION = 1.6;
+function makeShapes(v) {
+  return {
+    torso: new Loft(v.torso, { exp: 2.4 }), pelvis: new Loft(v.pelvis, { exp: 2.2, caps: 'bottom' }),   // zamknięta od spodu (krocze), otwarta u góry pod tułowiem
+    upperArm: new Loft(v.upperArm), forearm: new Loft(v.forearm), thigh: new Loft(v.thigh), shin: new Loft(v.shin),
+  };
+}
+
+// Jak mocno mięśnie odcinają się od skóry (1 = gładko, ~1.6 = wysportowana sylwetka z wyraźnym zarysem) – w wariantach: definition
 
 // ---------- Mięśnie: płaty na powierzchni (a = kąty, y = zakres wzdłuż segmentu, T = grubość, peak = najgrubsze miejsce) ----------
 export const ORGANIC_MUSCLES = {
@@ -108,20 +138,15 @@ export const ORGANIC_MUSCLES = {
   tibialis_ant: [{ seg: 'shin', a: [38, 84], y: [-0.03, -0.3], T: 0.009, peak: 0.3 }],
 };
 
-// ctx: grupy szkieletu z body.js; zwraca { muscleMeshes, fingers, nose, faceParts }
+// ctx: grupy szkieletu z body.js; zwraca { variants: { m, f }, fingers, nose, faceParts, mouth }
+// Wspólne dla obu sylwetek: głowa z twarzą, dłonie, stopy, stawy. Każdy wariant (m – mężczyzna, f – kobieta) ma własną
+// skórę tułowia i kończyn, płaty mięśni (te same materiały – świecą razem) i dodatki (kobieta: piersi, włosy);
+// widoczny jest jeden wariant naraz (body.setSex).
 export function buildOrganic(ctx) {
   const { root, ribcage, belly, RIB_PIVOT, BELLY_PIVOT, neck, sides, skinMat, jointMat, faceMat, materials, MUSCLES, shadowed } = ctx;
   const mesh = (geo, mat) => shadowed(new THREE.Mesh(geo, mat));
   const ell = (r, pos, mat = jointMat) => { const m = mesh(new THREE.SphereGeometry(1, 20, 14), mat); m.scale.set(...r); m.position.set(...pos); return m; };
 
-  // Tułów: dolna część oddycha z brzuchem, górna z klatką
-  // zakładka 0.17–0.24: końce obu części chowają się pod drugą (bez migotania nakładających się powierzchni)
-  const tuck = (r, k) => ({ ...r, w: r.w * k, d: r.d * k, db: (r.db ?? r.d) * k });
-  const lower = new Loft(TORSO.filter((r) => r.y <= 0.24).map((r) => (r.y === 0.24 ? tuck(r, 0.95) : r)), { exp: 2.4, caps: false });
-  const upper = new Loft(TORSO.filter((r) => r.y >= 0.17).map((r) => (r.y === 0.17 ? tuck(r, 0.95) : r)), { exp: 2.4, caps: false });
-  const lg = lower.geometry(); lg.translate(0, -BELLY_PIVOT, 0); belly.add(mesh(lg, skinMat));
-  const ug = upper.geometry(); ug.translate(0, -RIB_PIVOT, 0); ribcage.add(mesh(ug, skinMat));
-  root.add(mesh(SHAPES.pelvis.geometry(), skinMat));
   // obojczyki – delikatny zarys
   for (const sx of [1, -1]) {
     const c = mesh(new THREE.CapsuleGeometry(0.0055, 0.11, 4, 8), skinMat);
@@ -146,9 +171,7 @@ export function buildOrganic(ctx) {
 
   const fingers = [];
   for (const S of ['L', 'R']) {
-    const { sh, el, wr, hip, kn, an, sx } = sides[S];
-    sh.add(mesh(SHAPES.upperArm.geometry(sx), skinMat));
-    el.add(mesh(SHAPES.forearm.geometry(sx), skinMat));
+    const { el, wr, hip, kn, an, sx } = sides[S];
     el.add(ell([0.016, 0.02, 0.014], [0, 0.0, -0.036], skinMat));                         // wyrostek łokciowy – kierunek łokcia
     // dłoń: śródręcze z kłębem kciuka + 4 palce (3 człony, różne długości) + kciuk (2 człony); zginanie: setGrip w body.js
     wr.add(mesh(new Loft(PALM).geometry(sx), skinMat));
@@ -176,39 +199,80 @@ export function buildOrganic(ctx) {
     const f1 = chains[1][0], f2 = chains[1][1];   // zgodność z klasycznym wyglądem
     fingers.push({ f1, f2, thumb, tj, chains, sx });
 
-    hip.add(mesh(SHAPES.thigh.geometry(sx), skinMat));
     hip.add(ell([0.025, 0.028, 0.016], [0, -0.458, 0.034], skinMat));                       // rzepka – kierunek kolana
-    kn.add(mesh(SHAPES.shin.geometry(sx), skinMat));
     // staw kolanowy: kłykcie – zaokrąglenie zgiętego kolana
     kn.add(ell([0.054, 0.046, 0.048], [0, -0.005, -0.004], skinMat));
     for (const mx of [0.03, -0.028]) an.add(ell([0.011, 0.014, 0.012], [mx * sx, 0, 0], skinMat)); // kostki
     an.add(mesh(loftZ(FOOT, sx), skinMat));
   }
 
-  // Mięśnie
-  const muscleMeshes = [];
   for (const m of MUSCLES) {
-    const patches = ORGANIC_MUSCLES[m.id];
-    if (!patches || m.deep) continue;
+    if (!ORGANIC_MUSCLES[m.id] || m.deep) continue;
     const mat = materials[m.id];
     mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -2;
     softEdges(mat);
+  }
+  const hairMat = new THREE.MeshStandardMaterial({ color: 0x5c5650, roughness: 0.85 });
+  const variants = { m: buildVariant(MALE, false), f: buildVariant(FEMALE, true) };
+
+  function buildVariant(V, female) {
+    const SHAPES = makeShapes(V);
+    const skin = [];   // wszystkie bryły wariantu – do przełączania widoczności
+    const add = (parent, m) => { parent.add(m); skin.push(m); return m; };
+    // Tułów: dolna część oddycha z brzuchem, górna z klatką
+    // zakładka 0.17–0.24: końce obu części chowają się pod drugą (bez migotania nakładających się powierzchni)
+    const tuck = (r, k) => ({ ...r, w: r.w * k, d: r.d * k, db: (r.db ?? r.d) * k });
+    const lower = new Loft(V.torso.filter((r) => r.y <= 0.24).map((r) => (r.y === 0.24 ? tuck(r, 0.95) : r)), { exp: 2.4, caps: false });
+    const upper = new Loft(V.torso.filter((r) => r.y >= 0.17).map((r) => (r.y === 0.17 ? tuck(r, 0.95) : r)), { exp: 2.4, caps: false });
+    const lg = lower.geometry(); lg.translate(0, -BELLY_PIVOT, 0); add(belly, mesh(lg, skinMat));
+    const ug = upper.geometry(); ug.translate(0, -RIB_PIVOT, 0); add(ribcage, mesh(ug, skinMat));
+    add(root, mesh(SHAPES.pelvis.geometry(), skinMat));
     for (const S of ['L', 'R']) {
-      const sx = S === 'L' ? 1 : -1;
-      for (const p of patches) {
-        const geo = musclePatch(SHAPES[p.seg], { ...p, T: (p.T ?? 0.015) * DEFINITION }, sx);
-        let parent;
-        if (p.seg === 'torso') {
-          const yc = (p.y[0] + p.y[1]) / 2;
-          if (yc >= 0.2) { parent = ribcage; geo.translate(0, -RIB_PIVOT, 0); } else { parent = belly; geo.translate(0, -BELLY_PIVOT, 0); }
-        } else if (p.seg === 'pelvis') parent = root;
-        else parent = { upperArm: sides[S].sh, forearm: sides[S].el, thigh: sides[S].hip, shin: sides[S].kn }[p.seg];
-        const me = mesh(geo, mat);
-        me.userData.muscleId = m.id;
-        parent.add(me);
-        muscleMeshes.push(me);
+      const { sh, el, hip, kn, sx } = sides[S];
+      add(sh, mesh(SHAPES.upperArm.geometry(sx), skinMat));
+      add(el, mesh(SHAPES.forearm.geometry(sx), skinMat));
+      add(hip, mesh(SHAPES.thigh.geometry(sx), skinMat));
+      add(kn, mesh(SHAPES.shin.geometry(sx), skinMat));
+      // piersi: nie wystają przed zarys męskich mięśni piersiowych – sztanga i podłoga mają tyle samo miejsca
+      if (female) {
+        const b = mesh(new THREE.SphereGeometry(1, 32, 22), skinMat);
+        b.scale.set(0.058, 0.054, 0.05); b.position.set(sx * 0.066, 0.296 - RIB_PIVOT, 0.09);
+        b.rotation.set(0.15, sx * 0.3, 0);
+        add(ribcage, b);
       }
     }
+    // włosy: czepek na czubku i z tyłu głowy (z przodu chowa się w głowie – nie zasłania twarzy) i kok na czubku
+    if (female) {
+      const cap = mesh(new THREE.SphereGeometry(1, 48, 32), hairMat);
+      cap.scale.set(0.1, 0.095, 0.11); cap.position.set(0, 0.23, -0.025);   // z przodu chowa się w głowie: linia włosów nad czołem
+      add(neck, cap);
+      const bun = mesh(new THREE.SphereGeometry(1, 24, 16), hairMat);
+      bun.scale.set(0.036, 0.031, 0.035); bun.position.set(0, 0.298, -0.06);
+      add(neck, bun);
+    }
+    // Mięśnie
+    const muscleMeshes = [];
+    for (const m of MUSCLES) {
+      const patches = ORGANIC_MUSCLES[m.id];
+      if (!patches || m.deep) continue;
+      for (const S of ['L', 'R']) {
+        const sx = S === 'L' ? 1 : -1;
+        for (const p of patches) {
+          const q = { ...p, ...V.muscles?.[m.id] };
+          const geo = musclePatch(SHAPES[p.seg], { ...q, T: (q.T ?? 0.015) * V.definition }, sx);
+          let parent;
+          if (p.seg === 'torso') {
+            const yc = (p.y[0] + p.y[1]) / 2;
+            if (yc >= 0.2) { parent = ribcage; geo.translate(0, -RIB_PIVOT, 0); } else { parent = belly; geo.translate(0, -BELLY_PIVOT, 0); }
+          } else if (p.seg === 'pelvis') parent = root;
+          else parent = { upperArm: sides[S].sh, forearm: sides[S].el, thigh: sides[S].hip, shin: sides[S].kn }[p.seg];
+          const me = add(parent, mesh(geo, materials[m.id]));
+          me.userData.muscleId = m.id;
+          muscleMeshes.push(me);
+        }
+      }
+    }
+    return { skin, muscleMeshes };
   }
-  return { muscleMeshes, fingers, nose, faceParts, mouth };
+  return { variants, fingers, nose, faceParts, mouth };
 }
