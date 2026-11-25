@@ -85,7 +85,7 @@ const LABEL = { off: '', ok: 'Zapisane na koncie', wait: 'Zapisuję…', sync: '
 function setState(s) {
   state = s;
   ui.btn.dataset.state = user ? s : 'off';
-  ui.btn.title = user ? `${user.email} – ${LABEL[s]}` : 'Zaloguj się, żeby mieć plany na każdym urządzeniu; twarz, o projekcie';
+  ui.btn.title = user ? `${user.email} – ${LABEL[s]}` : 'Zaloguj się, żeby mieć plany na każdym urządzeniu';
   ui.status.textContent = LABEL[s];
   ui.status.className = `auth-status ${s}`;
 }
@@ -98,11 +98,14 @@ function renderUser() {
   setState(user ? state : 'off');
 }
 
-ui.btn.onclick = () => { ui.dlg.hidden = !ui.dlg.hidden; ui.msg.textContent = ''; };
+ui.btn.onclick = () => { ui.dlg.hidden = !ui.dlg.hidden; ui.msg.textContent = ''; $('settings-dialog').hidden = true; };
 ui.close.onclick = () => (ui.dlg.hidden = true);
-$('face-open').addEventListener('click', () => (ui.dlg.hidden = true));   // twarz otwiera własny panel
-document.addEventListener('pointerdown', (e) => {                       // klik poza menu je zamyka
-  if (!ui.dlg.hidden && !ui.dlg.contains(e.target) && !ui.btn.contains(e.target)) ui.dlg.hidden = true;
+// Ustawienia (⚙): funkcje poboczne – twarz na modelu, o projekcie
+const set = { btn: $('settings-open'), dlg: $('settings-dialog') };
+set.btn.onclick = () => { set.dlg.hidden = !set.dlg.hidden; ui.dlg.hidden = true; };
+$('face-open').addEventListener('click', () => (set.dlg.hidden = true));   // twarz otwiera własny panel
+document.addEventListener('pointerdown', (e) => {                         // klik poza okienkiem je zamyka
+  for (const m of [ui, set]) if (!m.dlg.hidden && !m.dlg.contains(e.target) && !m.btn.contains(e.target)) m.dlg.hidden = true;
 });
 const back = () => location.origin + location.pathname;
 ui.google.onclick = async () => {

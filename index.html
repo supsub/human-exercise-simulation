@@ -27,6 +27,7 @@
     <span class="logo">Human Exercise Simulation</span>
     <span class="nav-sub">Plan treningowy</span>
     <button id="auth-open" class="auth-open" data-state="off"><span class="lbl">Zaloguj się</span></button>
+    <button id="settings-open" class="settings-open icon" title="Ustawienia">⚙</button>
   </nav>
 
   <!-- telefon: zakładki pod modelem (na komputerze ukryte – oba panele widać naraz) -->
@@ -124,9 +125,9 @@
     </div>
   </div>
 
-  <!-- Menu: konto (plany na każdym urządzeniu, src/sync.js), twarz, o projekcie -->
+  <!-- Konto: plany na każdym urządzeniu (src/sync.js) -->
   <div id="auth-dialog" class="auth-dialog panel" hidden>
-    <div class="modal-head"><h2>Menu</h2><button id="auth-close" class="icon" title="Zamknij">✕</button></div>
+    <div class="modal-head"><h2>Konto</h2><button id="auth-close" class="icon" title="Zamknij">✕</button></div>
     <div id="auth-out">
       <p class="small muted">Zaloguj się, a plany będą na telefonie i komputerze.</p>
       <button id="auth-google" class="auth-google">Zaloguj przez Google</button>
@@ -141,10 +142,12 @@
       <button id="auth-logout">Wyloguj</button>
     </div>
     <div id="auth-msg" class="small muted"></div>
-    <div class="menu-items">
-      <button id="face-open" class="menu-item">🙂 Twoja twarz na modelu</button>
-      <a class="menu-item" href="docs/index.html">ℹ️ O projekcie</a>
-    </div>
+  </div>
+
+  <!-- Ustawienia: funkcje poboczne -->
+  <div id="settings-dialog" class="auth-dialog panel settings-dialog" hidden>
+    <button id="face-open" class="menu-item">🙂 Twoja twarz na modelu</button>
+    <a class="menu-item" href="docs/index.html">ℹ️ O projekcie</a>
   </div>
 
   <div id="tooltip" class="tooltip" hidden></div>
