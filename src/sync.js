@@ -126,9 +126,14 @@ ui.mailForm.onsubmit = async (e) => {
   const { error } = await sb.auth.signInWithOtp({ email: ui.email.value.trim(), options: { emailRedirectTo: back() } });
   ui.msg.textContent = error ? `Nie udało się: ${error.message}` : 'Sprawdź skrzynkę i kliknij link w mailu.';
 };
+// Wylogowanie: plany zostają na koncie, a to urządzenie wraca do pustej kartki (nikt po nas ich tu nie zobaczy).
+// Jeśli ostatnich zmian nie udało się wysłać (brak sieci), pytamy – inaczej by przepadły.
 ui.logout.onclick = async () => {
   await push(true);
+  if (state !== 'ok' && !confirm('Ostatnie zmiany nie są jeszcze zapisane na koncie (brak połączenia). Wylogować mimo to? Te zmiany przepadną.')) return;
   await sb.auth.signOut();
+  localStorage.removeItem(META);
+  planner.setData({ plans: [], workouts: [] });
   ui.dlg.hidden = true;
 };
 

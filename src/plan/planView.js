@@ -6,7 +6,7 @@ import { EXERCISE_BY_ID } from '../exercises/index.js';
 import { createPlayer } from '../player.js';
 import { createFigure } from '../figure.js';
 import { CATALOG, CATALOG_BY_ID, CATEGORIES } from './catalog.js';
-import { DAYS, analyzePlan, emptyPlan, emptyWorkout, addExamples, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
+import { DAYS, analyzePlan, emptyPlan, emptyWorkout, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
 
 // Jedyny widok aplikacji: plan treningowy z modelem 3D.
 // - treningi (warianty, np. „FBW A”) to bloki ćwiczeń niezależne od dni tygodnia,
@@ -20,7 +20,7 @@ const PLAN_CAMERA = [[0, 1.25, 3.4], [0, 0.95, 0]];
 const $ = (id) => document.getElementById(id);
 const ui = {
   select: $('plan-select'), days: $('plan-days'), schedule: $('plan-schedule'), workoutNew: $('workout-new'),
-  newBtn: $('plan-new'), renameBtn: $('plan-rename'), deleteBtn: $('plan-delete'), exampleBtn: $('plan-example'),
+  newBtn: $('plan-new'), renameBtn: $('plan-rename'), deleteBtn: $('plan-delete'), createBtn: $('plan-create'),
   focus: $('plan-focus'), legend: $('plan-legend'), score: $('plan-score'), groups: $('plan-groups'), warnings: $('plan-warnings'), recs: $('plan-recs'),
   panel: $('picker'), panelTitle: $('picker-title'), panelClose: $('picker-close'),
   browse: $('picker-browse'), search: $('picker-search'), cats: $('picker-cats'), list: $('picker-list'),
@@ -58,8 +58,9 @@ function load() {
       if (m.workouts.length) return { ...m, currentId: m.plans[0].id };
     }
   } catch {}
-  const d = exampleData();
-  return { ...d, currentId: d.plans[0].id };
+  // czysty start: bez planów i treningów (przykładowe tylko do testów: ?examples)
+  if (new URLSearchParams(location.search).has('examples')) { const d = exampleData(); return { ...d, currentId: d.plans[0].id }; }
+  return { plans: [], workouts: [], currentId: null };
 }
 const saveListeners = [];
 function save() {
@@ -72,9 +73,8 @@ function save() {
 export const getData = () => store;
 export function setData(data) {
   const cur = store.currentId;
-  store = { ...data, currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id };
+  store = { ...data, currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  if (!store.plans.length) { store.plans.push(emptyPlan('Mój plan')); store.currentId = store.plans[0].id; }
   if (focusId && !workout(focusId)) focusId = null;
   render();
 }
@@ -94,6 +94,14 @@ const helpsOf = (ex) => Object.entries(ex.muscles).filter(([id, w]) => w >= 0.5 
 // ---------- Render ----------
 function render() {
   const p = plan();
+  document.body.classList.toggle('no-plan', !p);
+  if (!p) {                       // brak planu: tylko zachęta „Utwórz plan”, model bez mapy obciążenia
+    focusId = null;
+    ui.select.innerHTML = '';
+    analysis = analyzePlan(emptyPlan(), []);
+    save();
+    return;
+  }
   ui.select.innerHTML = store.plans.map((x) => `<option value="${x.id}" ${x.id === p.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
   if (focusId && !workout(focusId)) focusId = null;
   analysis = analyzePlan(p, store.workouts);
@@ -547,15 +555,10 @@ ui.renameBtn.onclick = () => {
 ui.deleteBtn.onclick = () => {
   if (!confirm(`Usunąć plan „${plan().name}”? Treningi zostaną (można ich użyć w innych planach).`)) return;
   store.plans = store.plans.filter((p) => p.id !== store.currentId);
-  if (!store.plans.length) store.plans.push(emptyPlan('Mój plan'));
-  store.currentId = store.plans[0].id;
+  store.currentId = store.plans[0]?.id ?? null;
   render();
 };
-ui.exampleBtn.onclick = () => {
-  store.currentId = addExamples(store) ?? store.currentId;
-  focusId = null;
-  render();
-};
+ui.createBtn.onclick = () => ui.newBtn.onclick();
 ui.workoutNew.onclick = () => {
   const name = prompt('Nazwa treningu (np. „FBW A”, „Push”, „Nogi”):', `Trening ${LETTERS[store.workouts.length] ?? ''}`.trim());
   if (!name?.trim()) return;

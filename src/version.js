@@ -1,4 +1,4 @@
 // Wersja widoczna w menu ⚙ – po wdrożeniu widać, czy nowa wersja już się wczytała.
 // Przy każdym commicie zmieniającym aplikację: BUILT = data i godzina commita; VERSION podbijamy razem z changelogiem (docs/index.html).
-export const VERSION = '0.11.1';
-export const BUILT = '2026-11-25 13:48';
+export const VERSION = '0.11.2';
+export const BUILT = '2026-11-25 14:02';

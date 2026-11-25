@@ -51,7 +51,12 @@
         </div>
         <div id="plan-days" class="plan-days"></div>
       </div>
-      <button id="plan-example" class="link small">+ dodaj przykładowe plany (julo A/B, FBW A/B/C)</button>
+      <!-- brak planu: czysty start – użytkownik sam tworzy plan -->
+      <div id="plan-empty" class="plan-empty">
+        <h3>Nie masz jeszcze planu</h3>
+        <p class="muted">Ułóż własny plan treningowy: dodaj treningi i ćwiczenia, a model pokaże, które mięśnie pracują.</p>
+        <button id="plan-create" class="primary">+ Utwórz plan</button>
+      </div>
     </aside>
 
     <aside class="panel plan-right">
