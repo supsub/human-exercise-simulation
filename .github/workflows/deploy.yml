@@ -19,7 +19,7 @@ jobs:
       - name: Testy (fizyka + funkcje aplikacji)
         run: tools/test.sh
         env:
-          SMOKE_ARGS: slow=3
+          SMOKE_ARGS: slow=8
   deploy:
     needs: test
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

@@ -21,7 +21,9 @@ async function waitFor(fn, what, ms = 8000) {
   ms *= SLOW;
   const t0 = performance.now();
   while (performance.now() - t0 < ms) { try { if (await fn()) return; } catch { /* jeszcze nie */ } await sleep(100); }
-  throw new Error(`nie doczekano się: ${what}`);
+  let extra = '';
+  try { const l = await win().navigator.locks.query(); extra = ` [stan konta: ${$('#auth-open')?.dataset.state}, blokady: ${JSON.stringify(l)}, zapytania: ${(window.__srv?.calls ?? []).join(', ')}]`; } catch { /* brak ramki */ }
+  throw new Error(`nie doczekano się: ${what}${extra}`);
 }
 function check(cond, what) { if (!cond) throw new Error(what); }
 // mock: (url, opts, w) => Promise<Response> | undefined – udawany serwer Supabase (src/sync.js używa go w ramce testów)
@@ -51,7 +53,7 @@ const ACCOUNT = { plans: [{ id: 'p1', name: 'Plan z konta', sessions: 3, variant
   workouts: [{ id: 'w1', name: 'Konto A', items: [{ id: 'squat', sets: 3, reps: 10 }] }] };
 // udawany Supabase: wiersz user_data z planem; zapisy (upsert) trafiają do `posts`; wylogowanie na serwerze – błąd 500
 function fakeServer() {
-  const srv = { row: { data: ACCOUNT, updated_at: 't1' }, posts: [] };
+  const srv = window.__srv = { row: { data: ACCOUNT, updated_at: 't1' }, posts: [] };
   srv.mock = (url, opts, w) => {
     if (!url.includes('127.0.0.1:54321')) return;
     (srv.calls ??= []).push((opts.method ?? 'GET') + ' ' + url.replace(/^.*54321/, '').slice(0, 60));
@@ -130,9 +132,13 @@ const tests = {
     $('#auth-open').click();
     await waitFor(() => visible('#auth-logout'), 'przycisk „Wyloguj”');
     const reloaded = new Promise((r) => (frame.onload = r));
+    let shown = false;
+    const ld = $('#app-loading');
+    const MO = win().MutationObserver;
+    new MO(() => { if (!ld.hidden && ld.textContent.includes('Wylogowuję')) shown = true; }).observe(ld, { attributes: true, childList: true, subtree: true });
     $('#auth-logout').click();
-    await waitFor(() => visible('#app-loading') && $('#app-loading').textContent.includes('Wylogowuję'), 'ekran „Wylogowuję…”', 3000);
     await Promise.race([reloaded, sleep(12000)]); hook();
+    check(shown, 'nie było ekranu „Wylogowuję…”');
     await waitFor(() => $('#plan-select')?.selectedOptions[0]?.textContent === 'Mój plan', 'po wylogowaniu „Mój plan” gościa', 10000);
     check(!localStorage.getItem(AUTH), 'sesja została w przeglądarce');
     check(!JSON.stringify(data()).includes('Plan z konta'), 'dane konta zostały w przeglądarce');
@@ -179,7 +185,8 @@ const tests = {
     $('.add-ex').click();
     await waitFor(() => $('#picker-list .quick-add'), 'lista ćwiczeń');
     $('#picker-list .quick-add').click();
-    await waitFor(() => srv.row.data.workouts[0].items.length === 2, 'zmiana zapisana na koncie', 8000);
+    await waitFor(() => srv.row.data.workouts[0].items.length === 2, 'zmiana zapisana na koncie', 8000)
+      .catch(async (e) => { const l = await win().navigator.locks.query(); throw new Error(`${e.message} (stan: ${$('#auth-open').dataset.state}, lokalnie: ${data()?.workouts[0]?.items.length} ćw., zapytania: ${srv.calls?.join(', ')}, blokady: ${JSON.stringify(l)})`); });
     check($('#auth-open').dataset.state === 'ok', 'stan po zapisie inny niż „Zapisane”');
   },
 };
