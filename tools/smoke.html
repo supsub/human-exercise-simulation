@@ -49,6 +49,10 @@ const data = () => JSON.parse(localStorage.getItem('hes.data.v2') ?? 'null');
 const fakeSession = (expiresIn) => JSON.stringify({ access_token: 'x.y.z', token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + expiresIn,
   refresh_token: 'r', user: { id: '00000000-0000-0000-0000-000000000001', email: 'test@example.com', user_metadata: { full_name: 'Test Testowy' } } });
 
+// kolejność kluczy jak w Postgres jsonb: najpierw krótsze, potem alfabetycznie
+const jsonb = (x) => Array.isArray(x) ? x.map(jsonb) : x && typeof x === 'object'
+  ? Object.fromEntries(Object.keys(x).sort((a, b) => a.length - b.length || (a < b ? -1 : 1)).map((k) => [k, jsonb(x[k])])) : x;
+const canon = (x) => JSON.stringify(x, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((key) => [key, v[key]])) : v));
 const ACCOUNT = { plans: [{ id: 'p1', name: 'Plan z konta', sessions: 3, variants: ['w1'], days: null }],
   workouts: [{ id: 'w1', name: 'Konto A', items: [{ id: 'squat', sets: 3, reps: 10 }] }] };
 // udawany Supabase: wiersz user_data z planem; zapisy (upsert) trafiają do `posts`; wylogowanie na serwerze – błąd 500
@@ -65,7 +69,7 @@ function fakeServer() {
       const method = opts.method ?? 'GET', q = new URL(url).searchParams;
       if (method === 'GET') { if (srv.hideOnce) { srv.hideOnce = false; return json([]); } return srv.row ? one(srv.row) : json(accept.includes('vnd.pgrst.object') ? null : []); }
       const body = JSON.parse(opts.body);
-      const write = () => { srv.posts.push(body.data); srv.row = { data: body.data, updated_at: 't' + (srv.posts.length + 1) }; return json([{ updated_at: srv.row.updated_at }]); };
+      const write = () => { srv.posts.push(body.data); srv.row = { data: jsonb(body.data), updated_at: 't' + (srv.posts.length + 1) }; return json([{ updated_at: srv.row.updated_at }]); };
       if (method === 'POST' && /merge-duplicates/.test(new w.Headers(opts.headers).get('prefer') ?? '')) return write();   // upsert – nadpisuje jak prawdziwy Supabase
       if (method === 'POST') return srv.row ? json({ code: '23505', message: 'duplicate key' }, 409) : write();      // insert
       if (method === 'PATCH') return srv.row && q.get('updated_at') === `eq.${srv.row.updated_at}` ? write() : json([]);   // update warunkowy
@@ -148,10 +152,10 @@ const tests = {
     const srv = fakeServer();
     await open(() => {
       localStorage.setItem(AUTH, fakeSession(3600));
-      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 't1', sent: JSON.stringify(ACCOUNT) }));
+      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 't1', sent: canon(ACCOUNT) }));
       localStorage.setItem('hes.data.v2', JSON.stringify({ ...ACCOUNT, currentId: 'p1' }));
     }, srv.mock);
-    await waitFor(() => $('#auth-open').dataset.state === 'ok', 'synchronizacja z (udawanym) kontem').catch((e) => { throw new Error(`${e.message} (stan: ${$('#auth-open').dataset.state}, zapytania: ${srv.calls?.join(', ') ?? 'brak'})`); });
+    await waitFor(() => $('#auth-open').dataset.state === 'ok', 'synchronizacja z (udawanym) kontem', 25000).catch((e) => { throw new Error(`${e.message} (stan: ${$('#auth-open').dataset.state}, zapytania: ${srv.calls?.join(', ') ?? 'brak'})`); });
     check($('#plan-select').selectedOptions[0]?.textContent === 'Plan z konta', 'nie widać planu z konta');
     $('#auth-open').click();
     await waitFor(() => visible('#auth-logout'), 'przycisk „Wyloguj”');
@@ -180,7 +184,7 @@ const tests = {
     const watch = setInterval(() => { try { if (doc().getElementById('app-loading') && firstPaint === null && doc().readyState !== 'uninitialized') firstPaint = !doc().getElementById('app-loading').hidden; } catch { /* ramka */ } }, 1);
     await open(() => {
       localStorage.setItem(AUTH, fakeSession(3600));
-      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 't1', sent: JSON.stringify(ACCOUNT) }));
+      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 't1', sent: canon(ACCOUNT) }));
       localStorage.setItem('hes.data.v2', JSON.stringify({ ...ACCOUNT, currentId: 'p1' }));
     }, srv.mock);
     clearInterval(watch);
@@ -189,14 +193,38 @@ const tests = {
     check($('#auth-open').textContent.includes('Test'), 'ekran wczytywania zniknął, zanim pokazało się konto');
     check($('#plan-select').selectedOptions[0]?.textContent === 'Plan z konta', 'ekran wczytywania zniknął przed planami z konta');
   },
+  async 'sylwetka z konta: ustawienie przychodzi z konta i zmiana trafia na konto, bez odsyłania w kółko'() {
+    const srv = fakeServer();
+    srv.row = { data: jsonb({ ...ACCOUNT, settings: { sex: 'f' } }), updated_at: 't1' };
+    await open(() => {
+      localStorage.setItem(AUTH, fakeSession(3600));
+      localStorage.setItem('hes.data.v2', JSON.stringify({ ...ACCOUNT, currentId: 'p1' }));
+    }, srv.mock);
+    await waitFor(() => $('#auth-open').dataset.state === 'ok', 'synchronizacja', 25000);
+    const scene = await win().eval(`import('${new URL('src/scene.js', doc().baseURI)}')`);
+    check(scene.body.sex === 'f', 'sylwetka z konta (kobieta) nie została ustawiona');
+    check($('#sex-switch [data-sex="f"]').getAttribute('aria-checked') === 'true', 'przełącznik w ⚙ nie pokazuje sylwetki z konta');
+    await sleep(2500);
+    const before = srv.posts.length;
+    $('#sex-switch [data-sex="m"]').click();
+    await waitFor(() => srv.row.data.settings?.sex === 'm', 'zmiana sylwetki zapisana na koncie');
+    await sleep(4000);
+    check(srv.posts.length === before + 1, `po jednej zmianie ${srv.posts.length - before} zapisów na koncie (odsyłanie w kółko?)`);
+    // zmiana z innego urządzenia, potem kilka pobrań (powrót do aplikacji) – to urządzenie nie może jej odsyłać
+    srv.row = { data: jsonb({ ...srv.row.data, settings: { sex: 'f' } }), updated_at: 't99' };
+    const n = srv.posts.length, vis = () => doc().dispatchEvent(new (win().Event)('visibilitychange'));
+    vis(); await waitFor(() => scene.body.sex === 'f', 'zmiana z innego urządzenia');
+    await sleep(2500); vis(); await sleep(2500); vis(); await sleep(2500);
+    check(srv.posts.length === n, `po pobraniu zmiany z innego urządzenia ${srv.posts.length - n} zbędnych zapisów (odsyłanie w kółko)`);
+  },
   async 'zapis zmian: aktualizuje znaną wersję konta'() {
     const srv = fakeServer();
     await open(() => {
       localStorage.setItem(AUTH, fakeSession(3600));
-      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 't1', sent: JSON.stringify(ACCOUNT) }));
+      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 't1', sent: canon(ACCOUNT) }));
       localStorage.setItem('hes.data.v2', JSON.stringify({ ...ACCOUNT, currentId: 'p1' }));
     }, srv.mock);
-    await waitFor(() => $('#auth-open').dataset.state === 'ok', 'synchronizacja');
+    await waitFor(() => $('#auth-open').dataset.state === 'ok', 'synchronizacja', 25000);
     $('.add-ex').click();
     await waitFor(() => $('#picker-list .quick-add'), 'lista ćwiczeń');
     $('#picker-list .quick-add').click();

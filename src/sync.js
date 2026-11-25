@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { DB } from './config.js';
 import { VERSION, BUILT } from './version.js';
 import * as planner from './plan/planView.js';
-import { getSex, setSex } from './sex.js';
+import { getSex, setSex, onSex } from './sex.js';
 
 // Konto i synchronizacja planów między urządzeniami (Supabase: logowanie Google, tabela user_data;
 // link w mailu tylko na lokalnej bazie testowej – maile w podglądzie Mailpit).
@@ -41,11 +41,16 @@ const done = () => { busy = false; if (again) { again = false; setTimeout(pull, 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const meta = () => { try { return JSON.parse(localStorage.getItem(META)) ?? {}; } catch { return {}; } };
 const setMeta = (m) => localStorage.setItem(META, JSON.stringify(m));
-const payload = () => { const { plans, workouts } = planner.getData(); return JSON.stringify({ plans, workouts }); };
+// Dane konta: plany, treningi i ustawienia (sylwetka) – jedna wersja na wszystkich urządzeniach.
+// Porównujemy postać kanoniczną (klucze posortowane): baza (jsonb) zmienia kolejność kluczy, a zwykły JSON.stringify
+// widziałby wtedy „zmianę” i urządzenia odsyłałyby sobie dane w kółko.
+const canon = (x) => JSON.stringify(x, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((key) => [key, v[key]])) : v));
+const payload = () => { const { plans, workouts } = planner.getData(); return canon({ plans, workouts, settings: { sex: getSex() } }); };
+const applySettings = (st) => { if (st?.sex) setSex(st.sex); };
 
 // --- scalanie: dane z konta + lokalne plany (po nazwie) i treningi, których na koncie brak ---
 function merge(remote, local) {
-  const out = { plans: [...remote.plans], workouts: [...remote.workouts] };
+  const out = { plans: [...remote.plans], workouts: [...remote.workouts], settings: remote.settings ?? local.settings };
   const names = new Set(out.plans.map((p) => p.name)), wIds = new Set(out.workouts.map((w) => w.id));
   const wNames = new Set(out.workouts.map((w) => w.name));
   const used = (p) => p.variants.some((id) => local.workouts.find((w) => w.id === id)?.items.length);
@@ -70,17 +75,18 @@ async function pull() {
     if (error) throw error;
     const m = meta(), local = JSON.parse(payload());
     const known = m.uid === user.id;                          // to urządzenie już synchronizowało to konto
-    const dirty = known && m.sent !== JSON.stringify(local);  // lokalne zmiany jeszcze niewysłane
+    const dirty = known && m.sent !== canon(local);           // lokalne zmiany jeszcze niewysłane
     const remoteChanged = row && (!known || row.updated_at !== m.at);
     if (!row) { setMeta({ uid: user.id, at: null, sent: m.uid === user.id ? m.sent : '' }); send = true; }   // konto puste – pierwszy zapis
     else if (!remoteChanged && dirty) send = true;            // tylko tu są zmiany – wysyłamy
     else if (remoteChanged) {
-      const next = dirty || !known ? merge(row.data, local) : row.data;
+      const next = dirty || !known ? merge(row.data, local) : { ...row.data, settings: row.data.settings ?? local.settings };
       // kopia zapasowa planów z tej przeglądarki, zanim zastąpią je dane z konta (hes.backup – do ręcznego odzyskania)
-      if (local.plans.length && JSON.stringify(next) !== JSON.stringify(local)) localStorage.setItem('hes.backup', JSON.stringify({ at: new Date().toISOString(), data: local }));
-      setMeta({ uid: user.id, at: row.updated_at, sent: JSON.stringify(row.data) });
-      planner.setData(next);
-      send = JSON.stringify(next) !== JSON.stringify(row.data);
+      if (local.plans.length && canon({ plans: next.plans, workouts: next.workouts }) !== canon({ plans: local.plans, workouts: local.workouts })) localStorage.setItem('hes.backup', JSON.stringify({ at: new Date().toISOString(), data: local }));
+      setMeta({ uid: user.id, at: row.updated_at, sent: canon(row.data) });
+      planner.setData({ plans: next.plans, workouts: next.workouts });
+      applySettings(next.settings);
+      send = canon(next) !== canon(row.data);
     }
     if (!send) setState('ok');
   } catch (e) {
@@ -222,6 +228,7 @@ sb.auth.onAuthStateChange((event, session) => {
   if (user && user.id !== was && /[?&]code=/.test(location.search)) history.replaceState(null, '', back());
 });
 planner.onSave(() => push());
+onSex(() => { showSex(); push(); });   // sylwetka to część danych konta
 // gość chce coś utworzyć albo zmienić – zapraszamy do logowania
 const askLogin = (text) => { $('settings-dialog').hidden = true; ui.dlg.hidden = false; ui.msg.textContent = text; };
 planner.onNeedLogin(() => askLogin('Zaloguj się, żeby tworzyć kolejne plany i zapisywać je na koncie.'));
