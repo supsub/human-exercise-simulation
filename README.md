@@ -22,7 +22,7 @@ Parametry URL przydatne do demo i testów:
 
 ## Konto i baza danych (Supabase)
 
-Logowanie (Google / link w mailu) i synchronizacja planów: `src/sync.js`, wybór bazy: `src/config.js`, schemat: `supabase/migrations/`.
+Logowanie (Google; link w mailu tylko na lokalnej bazie) i synchronizacja planów: `src/sync.js`, wybór bazy: `src/config.js`, schemat: `supabase/migrations/`.
 
 - **localhost** → lokalny Supabase w Dockerze, **GitHub Pages i telefon w sieci domowej** → produkcja. Ręcznie: `?db=local` / `?db=prod` / `?db=auto`. Lokalna baza: przerywana żółta obwódka wokół przycisku konta.
 - Lokalnie: zainstaluj [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), potem w katalogu projektu `supabase start` (pierwszy raz pobiera obrazy Dockera; migracje wgrywa sam). Maile z linkami logowania: http://127.0.0.1:54324. Reset danych: `supabase db reset`. Stop: `supabase stop`.

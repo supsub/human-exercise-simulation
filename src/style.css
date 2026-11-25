@@ -338,7 +338,15 @@ input:focus { border-color: var(--accent); }
 .auth-dialog #auth-out, .auth-dialog #auth-in { display: flex; flex-direction: column; gap: 9px; }
 .auth-dialog [hidden] { display: none !important; }
 .auth-dialog p { margin: 0; }
-.auth-google { background: #fff; color: #1f1f1f; font-weight: 600; padding: 9px; border-radius: 9px; }
+/* przycisk wg wytycznych Google (jasny wariant) */
+.auth-google { display: flex; align-items: center; justify-content: center; gap: 12px; height: 42px; padding: 0 16px;
+  background: #fff; color: #1f1f1f; border: 1px solid #747775; border-radius: 999px; font: 500 14px/1 Roboto, system-ui, sans-serif;
+  cursor: pointer; transition: background .15s, box-shadow .15s; }
+.auth-google:hover { background: #f5f7fa; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.auth-google:active { background: #e8eaed; }
+.auth-me { display: flex; align-items: center; gap: 10px; }
+.auth-me img { width: 40px; height: 40px; border-radius: 50%; flex: none; }
+.auth-open img.av { width: 22px; height: 22px; margin: -3px 6px -3px -7px; border-radius: 50%; vertical-align: middle; }
 .auth-mail { display: flex; gap: 6px; }
 .auth-mail input { flex: 1; min-width: 0; }
 .auth-who { font-weight: 600; word-break: break-all; }

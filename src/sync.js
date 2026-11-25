@@ -2,7 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import { DB } from './config.js';
 import * as planner from './plan/planView.js';
 
-// Konto i synchronizacja planów między urządzeniami (Supabase: logowanie Google / link w mailu, tabela user_data).
+// Konto i synchronizacja planów między urządzeniami (Supabase: logowanie Google, tabela user_data;
+// link w mailu tylko na lokalnej bazie testowej – maile w podglądzie Mailpit).
 // - bez logowania aplikacja działa jak dotąd – wszystko w pamięci przeglądarki,
 // - po zalogowaniu: plany i treningi zapisują się na koncie (jeden dokument JSON na użytkownika),
 // - zmiany są zawsze najpierw zapisywane lokalnie; bez internetu czekają i wysyłają się po powrocie sieci,
@@ -13,7 +14,7 @@ const META = `hes.sync.${DB.name}`;   // { uid, at: updated_at ostatnio zgodnej 
 const $ = (id) => document.getElementById(id);
 const ui = { btn: $('auth-open'), dlg: $('auth-dialog'), close: $('auth-close'), out: $('auth-out'), inn: $('auth-in'),
   google: $('auth-google'), mailForm: $('auth-mail'), email: $('auth-email'), msg: $('auth-msg'), who: $('auth-who'),
-  status: $('auth-status'), logout: $('auth-logout') };
+  status: $('auth-status'), logout: $('auth-logout'), pic: $('auth-pic') };
 
 let user = null, state = 'off', timer = null, busy = false;
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -92,8 +93,10 @@ function setState(s) {
 function renderUser() {
   ui.inn.hidden = !user; ui.out.hidden = !!user;
   const name = user?.user_metadata?.full_name || user?.email || '';
-  const first = name.split(/[ @]/)[0];
-  ui.btn.innerHTML = user ? `<span class="av">${esc(first[0]?.toUpperCase() ?? '?')}</span><span class="lbl">${esc(first)}</span>` : '<span class="lbl">Zaloguj się</span>';
+  const first = name.split(/[ @]/)[0], pic = user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
+  const av = pic ? `<img class="av" src="${esc(pic)}" alt="" referrerpolicy="no-referrer">` : `<span class="av">${esc(first[0]?.toUpperCase() ?? '?')}</span>`;
+  ui.btn.innerHTML = user ? `${av}<span class="lbl">${esc(first)}</span>` : '<span class="lbl">Zaloguj się</span>';
+  ui.pic.hidden = !pic; if (pic) ui.pic.src = pic;
   ui.who.textContent = user ? `${name}${user.email && user.email !== name ? ` (${user.email})` : ''}` : '';
   setState(user ? state : 'off');
 }
@@ -134,4 +137,4 @@ sb.auth.onAuthStateChange((event, session) => {
 planner.onSave(() => push());
 addEventListener('online', () => pull());
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pull(); else if (state === 'wait') push(true); });
-if (DB.name !== 'prod') ui.btn.classList.add('dev-db');
+if (DB.name !== 'prod') { ui.btn.classList.add('dev-db'); ui.mailForm.hidden = false; }
