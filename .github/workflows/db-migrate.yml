@@ -1,0 +1,25 @@
+# Migracje bazy produkcyjnej: po pushu na main ze zmianą w supabase/migrations/ GitHub sam wgrywa
+# nowe pliki SQL do Supabase (już wgrane pomija). Można też uruchomić ręcznie: Actions → „Migracje bazy” → Run workflow.
+# Sekrety repozytorium (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN – supabase.com → Account → Access Tokens
+#   SUPABASE_DB_PASSWORD  – hasło do bazy podane przy zakładaniu projektu (Project Settings → Database: reset hasła)
+name: Migracje bazy
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/migrations/**']
+  workflow_dispatch:
+concurrency: db-migrate
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase link --project-ref itfuaoptseyxztqncbvd
+      - run: supabase db push

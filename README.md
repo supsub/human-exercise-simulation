@@ -26,7 +26,7 @@ Logowanie (Google / link w mailu) i synchronizacja planów: `src/sync.js`, wybó
 
 - **localhost** → lokalny Supabase w Dockerze, **GitHub Pages i telefon w sieci domowej** → produkcja. Ręcznie: `?db=local` / `?db=prod` / `?db=auto`. Lokalna baza: przerywana żółta obwódka wokół przycisku konta.
 - Lokalnie: zainstaluj [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), potem w katalogu projektu `supabase start` (pierwszy raz pobiera obrazy Dockera; migracje wgrywa sam). Maile z linkami logowania: http://127.0.0.1:54324. Reset danych: `supabase db reset`. Stop: `supabase stop`.
-- Produkcja: nową migrację wgraj w panelu Supabase → SQL Editor (albo `supabase link` + `supabase db push`).
+- Nowa zmiana schematu: `supabase migration new nazwa` → SQL w nowym pliku → lokalnie `supabase migration up`. Na produkcję trafia sama po pushu na main (GitHub Actions: `.github/workflows/db-migrate.yml`, sekrety `SUPABASE_ACCESS_TOKEN` i `SUPABASE_DB_PASSWORD`). Migracje tylko dopisujemy – wgranego pliku się nie zmienia.
 - Klucz publishable w `src/config.js` jest jawny z założenia – dane chronią reguły RLS. Kluczy `secret`/`service_role` ani Google client secret nie trzymamy w repozytorium.
 
 ## Struktura
