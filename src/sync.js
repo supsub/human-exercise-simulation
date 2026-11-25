@@ -27,7 +27,7 @@ const AUTH_KEY = `sb-${new URL(DB.url).hostname.split('.')[0]}-auth-token`;
 const loading = $('app-loading');
 let waiting = true;
 if (localStorage.getItem(AUTH_KEY) || /[?&]code=/.test(location.search)) setTimeout(ready, 10000);   // bez sieci nie czekamy w nieskończoność
-else { planner.setGuest(true); setTimeout(() => requestAnimationFrame(ready), 0); }   // gość: po pierwszym narysowaniu planu i modelu
+else { planner.setGuest(true); setTimeout(ready, 50); }   // gość: plan rysuje się synchronicznie przy starcie (main.js) – zaraz po nim
 function ready() {
   if (!waiting) return;
   waiting = false;

@@ -17,7 +17,7 @@ const win = () => frame.contentWindow, doc = () => frame.contentDocument;
 const $ = (sel) => doc().querySelector(sel);
 const visible = (sel) => { const e = $(sel); return !!e && !e.hidden && e.getClientRects().length > 0; };   // działa też dla position: fixed
 let errors = [];
-async function waitFor(fn, what, ms = 8000) {
+async function waitFor(fn, what, ms = 20000) {   // zimny start (moduły z CDN) bywa wolny
   ms *= SLOW;
   const t0 = performance.now();
   while (performance.now() - t0 < ms) { try { if (await fn()) return; } catch { /* jeszcze nie */ } await sleep(100); }
