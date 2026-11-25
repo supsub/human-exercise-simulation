@@ -93,7 +93,11 @@ function save() {
 }
 // Synchronizacja z kontem (src/sync.js): odczyt, podmiana danych i powiadomienie o każdej zmianie
 export const getData = () => store;
+// Czy użytkownik sam usunął ostatni plan (src/sync.js nie wysyła na konto pustego stanu w żadnym innym przypadku)
+let userEmptied = false;
+export const emptiedByUser = () => userEmptied;
 export function setData(data) {
+  userEmptied = false;
   const cur = store.currentId;
   store = { ...data, currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
@@ -643,6 +647,7 @@ ui.deleteBtn.onclick = () => {
   if (!confirm(`Usunąć plan „${plan().name}”? Treningi zostaną (można ich użyć w innych planach).`)) return;
   store.plans = store.plans.filter((p) => p.id !== store.currentId);
   store.currentId = store.plans[0]?.id ?? null;
+  if (!store.plans.length) userEmptied = true;   // świadome usunięcie ostatniego planu – wolno to wysłać na konto
   render();
 };
 ui.createBtn.onclick = () => ui.newBtn.onclick();

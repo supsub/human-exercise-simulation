@@ -22,10 +22,12 @@ async function waitFor(fn, what, ms = 8000) {
   throw new Error(`nie doczekano się: ${what}`);
 }
 function check(cond, what) { if (!cond) throw new Error(what); }
-async function open(setup = () => {}) {
+// mock: (url, opts, w) => Promise<Response> | undefined – udawany serwer Supabase (src/sync.js używa go w ramce testów)
+async function open(setup = () => {}, mock = null) {
   localStorage.clear();
   setup();
   frame.src = 'about:blank'; await sleep(50);
+  window.__hesFetch = mock ? (url, opts = {}, w) => mock(String(url?.url ?? url), opts, w) ?? w.fetch(url, opts) : null;
   await new Promise((r) => { frame.onload = r; frame.src = '../index.html'; });
   hook();
   await waitFor(() => $('#plan-days')?.children.length || doc().body.classList.contains('no-plan') || visible('#app-loading'), 'wczytanie aplikacji');
@@ -42,6 +44,32 @@ function hook() {
 const data = () => JSON.parse(localStorage.getItem('hes.data.v2') ?? 'null');
 const fakeSession = (expiresIn) => JSON.stringify({ access_token: 'x.y.z', token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + expiresIn,
   refresh_token: 'r', user: { id: '00000000-0000-0000-0000-000000000001', email: 'test@example.com', user_metadata: { full_name: 'Test Testowy' } } });
+
+const ACCOUNT = { plans: [{ id: 'p1', name: 'Plan z konta', sessions: 3, variants: ['w1'], days: null }],
+  workouts: [{ id: 'w1', name: 'Konto A', items: [{ id: 'squat', sets: 3, reps: 10 }] }] };
+// udawany Supabase: wiersz user_data z planem; zapisy (upsert) trafiają do `posts`; wylogowanie na serwerze – błąd 500
+function fakeServer() {
+  const srv = { row: { data: ACCOUNT, updated_at: 't1' }, posts: [] };
+  srv.mock = (url, opts, w) => {
+    if (!url.includes('127.0.0.1:54321')) return;
+    (srv.calls ??= []).push((opts.method ?? 'GET') + ' ' + url.replace(/^.*54321/, '').slice(0, 60));
+    const json = (x, status = 200) => Promise.resolve(new w.Response(JSON.stringify(x), { status, headers: { 'content-type': 'application/json' } }));
+    const accept = new w.Headers(opts.headers).get('accept') ?? '';
+    const one = (x) => json(accept.includes('vnd.pgrst.object') ? x : [x]);
+    if (url.includes('/auth/v1/logout')) return json({ code: 500, msg: 'błąd serwera' }, 500);
+    if (url.includes('/rest/v1/user_data')) {
+      const method = opts.method ?? 'GET', q = new URL(url).searchParams;
+      if (method === 'GET') { if (srv.hideOnce) { srv.hideOnce = false; return json([]); } return srv.row ? one(srv.row) : json(accept.includes('vnd.pgrst.object') ? null : []); }
+      const body = JSON.parse(opts.body);
+      const write = () => { srv.posts.push(body.data); srv.row = { data: body.data, updated_at: 't' + (srv.posts.length + 1) }; return json([{ updated_at: srv.row.updated_at }]); };
+      if (method === 'POST' && /merge-duplicates/.test(new w.Headers(opts.headers).get('prefer') ?? '')) return write();   // upsert – nadpisuje jak prawdziwy Supabase
+      if (method === 'POST') return srv.row ? json({ code: '23505', message: 'duplicate key' }, 409) : write();      // insert
+      if (method === 'PATCH') return srv.row && q.get('updated_at') === `eq.${srv.row.updated_at}` ? write() : json([]);   // update warunkowy
+    }
+    return Promise.reject(new TypeError('offline'));
+  };
+  return srv;
+}
 
 const tests = {
   'gość: domyślny „Mój plan” z pustym treningiem'() {
@@ -101,16 +129,63 @@ const tests = {
     await waitFor(() => visible('#auth-logout'), 'przycisk „Wyloguj”');
     const reloaded = new Promise((r) => (frame.onload = r));
     $('#auth-logout').click();
+    await waitFor(() => visible('#app-loading') && $('#app-loading').textContent.includes('Wylogowuję'), 'ekran „Wylogowuję…”', 3000);
     await Promise.race([reloaded, sleep(12000)]); hook();
     await waitFor(() => $('#plan-select')?.selectedOptions[0]?.textContent === 'Mój plan', 'po wylogowaniu „Mój plan” gościa', 10000);
     check(!localStorage.getItem(AUTH), 'sesja została w przeglądarce');
     check(!JSON.stringify(data()).includes('Plan z konta'), 'dane konta zostały w przeglądarce');
     check($('#auth-open').textContent.trim() === 'Zaloguj się', 'nagłówek dalej pokazuje użytkownika');
   },
+  async 'wylogowanie z błędem serwera: plany na koncie zostają (nie wysyłamy pustego stanu)'() {
+    const srv = fakeServer();
+    await open(() => {
+      localStorage.setItem(AUTH, fakeSession(3600));
+      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 't1', sent: JSON.stringify(ACCOUNT) }));
+      localStorage.setItem('hes.data.v2', JSON.stringify({ ...ACCOUNT, currentId: 'p1' }));
+    }, srv.mock);
+    await waitFor(() => $('#auth-open').dataset.state === 'ok', 'synchronizacja z (udawanym) kontem').catch((e) => { throw new Error(`${e.message} (stan: ${$('#auth-open').dataset.state}, zapytania: ${srv.calls?.join(', ') ?? 'brak'})`); });
+    check($('#plan-select').selectedOptions[0]?.textContent === 'Plan z konta', 'nie widać planu z konta');
+    $('#auth-open').click();
+    await waitFor(() => visible('#auth-logout'), 'przycisk „Wyloguj”');
+    const reloaded = new Promise((r) => (frame.onload = r));
+    $('#auth-logout').click();
+    await Promise.race([reloaded, sleep(12000)]); hook();
+    await sleep(3000);   // dawny błąd: pusty stan wysyłał się 1,5 s po wyczyszczeniu
+    check(!srv.posts.some((d) => !d.plans?.length), 'na konto wysłano pusty stan – plany zostałyby skasowane');
+    check(srv.row.data.plans.length === 1, 'plany na koncie zmienione przy wylogowaniu');
+  },
+  async 'logowanie: odczyt nie widzi wiersza (wyścig) – plany na koncie nie są nadpisywane'() {
+    const srv = fakeServer(); srv.hideOnce = true;
+    await open(() => {
+      localStorage.setItem(AUTH, fakeSession(3600));
+      localStorage.setItem('hes.data.v2', JSON.stringify({ plans: [{ id: 'g1', name: 'Mój plan', sessions: 3, variants: ['gw'], days: null }],
+        workouts: [{ id: 'gw', name: 'Trening A', items: [] }], currentId: 'g1' }));   // pusty plan gościa
+    }, srv.mock);
+    await waitFor(() => ['ok', 'err'].includes($('#auth-open').dataset.state) && !visible('#app-loading'), 'koniec synchronizacji', 15000);
+    await sleep(2500);
+    check(srv.row.data.plans.some((p) => p.name === 'Plan z konta'), 'plan z konta nadpisany');
+    check($('#plan-select').selectedOptions[0]?.textContent === 'Plan z konta', 'po zalogowaniu nie widać planu z konta');
+  },
+  async 'zapis zmian: aktualizuje znaną wersję konta'() {
+    const srv = fakeServer();
+    await open(() => {
+      localStorage.setItem(AUTH, fakeSession(3600));
+      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 't1', sent: JSON.stringify(ACCOUNT) }));
+      localStorage.setItem('hes.data.v2', JSON.stringify({ ...ACCOUNT, currentId: 'p1' }));
+    }, srv.mock);
+    await waitFor(() => $('#auth-open').dataset.state === 'ok', 'synchronizacja');
+    $('.add-ex').click();
+    await waitFor(() => $('#picker-list .quick-add'), 'lista ćwiczeń');
+    $('#picker-list .quick-add').click();
+    await waitFor(() => srv.row.data.workouts[0].items.length === 2, 'zmiana zapisana na koncie', 8000);
+    check($('#auth-open').dataset.state === 'ok', 'stan po zapisie inny niż „Zapisane”');
+  },
 };
 
 const out = [];
+const only = new URLSearchParams(location.search).get('only');   // ?only=fragment nazwy – tylko wybrane scenariusze
 for (const [name, fn] of Object.entries(tests)) {
+  if (only && !name.includes(only)) continue;
   errors = [];
   try { await fn(); if (errors.length) throw new Error(errors.join('; ')); out.push(`✔ ${name}`); }
   catch (e) { out.push(`✘ ${name}: ${e.message}`); }

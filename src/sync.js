@@ -11,7 +11,10 @@ import { getSex, setSex } from './sex.js';
 // - zmiany są zawsze najpierw zapisywane lokalnie; bez internetu czekają i wysyłają się po powrocie sieci,
 // - pierwsze logowanie na nowym urządzeniu: dane z konta + lokalne plany o nazwach, których na koncie nie ma.
 
-const sb = createClient(DB.url, DB.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
+// testy (tools/smoke.html): aplikacja w ramce strony testowej korzysta z jej udawanego serwera (window.__hesFetch rodzica)
+const testFetch = (() => { try { return window.parent !== window && window.parent.__hesFetch; } catch { return null; } })();
+const sb = createClient(DB.url, DB.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true },
+  ...(testFetch ? { global: { fetch: (url, opts) => testFetch(url, opts, window) } } : {}) });
 const META = `hes.sync.${DB.name}`;   // { uid, at: updated_at ostatnio zgodnej wersji, sent: JSON ostatnio wysłanych danych }
 const $ = (id) => document.getElementById(id);
 const ui = { btn: $('auth-open'), dlg: $('auth-dialog'), close: $('auth-close'), out: $('auth-out'), inn: $('auth-in'),
@@ -33,6 +36,7 @@ function ready() {
 }
 
 let user = null, state = 'off', timer = null, busy = false, again = false;
+let leaving = false, conflicts = 0;   // trwa wylogowanie: żadnej wymiany z kontem (czyszczenie danych w przeglądarce nie może trafić na konto)
 const done = () => { busy = false; if (again) { again = false; setTimeout(pull, 0); } };
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const meta = () => { try { return JSON.parse(localStorage.getItem(META)) ?? {}; } catch { return {}; } };
@@ -57,7 +61,7 @@ function merge(remote, local) {
 }
 
 async function pull() {
-  if (!user) return;
+  if (!user || leaving) return;
   if (busy) { again = true; return; }   // trwa inna wymiana – sprawdzimy ponownie zaraz po niej
   busy = true; setState('sync');
   let send = false;
@@ -68,9 +72,12 @@ async function pull() {
     const known = m.uid === user.id;                          // to urządzenie już synchronizowało to konto
     const dirty = known && m.sent !== JSON.stringify(local);  // lokalne zmiany jeszcze niewysłane
     const remoteChanged = row && (!known || row.updated_at !== m.at);
-    if (!row || (!remoteChanged && dirty)) send = true;       // konto puste albo tylko tu są zmiany – wysyłamy
+    if (!row) { setMeta({ uid: user.id, at: null, sent: m.uid === user.id ? m.sent : '' }); send = true; }   // konto puste – pierwszy zapis
+    else if (!remoteChanged && dirty) send = true;            // tylko tu są zmiany – wysyłamy
     else if (remoteChanged) {
       const next = dirty || !known ? merge(row.data, local) : row.data;
+      // kopia zapasowa planów z tej przeglądarki, zanim zastąpią je dane z konta (hes.backup – do ręcznego odzyskania)
+      if (local.plans.length && JSON.stringify(next) !== JSON.stringify(local)) localStorage.setItem('hes.backup', JSON.stringify({ at: new Date().toISOString(), data: local }));
       setMeta({ uid: user.id, at: row.updated_at, sent: JSON.stringify(row.data) });
       planner.setData(next);
       send = JSON.stringify(next) !== JSON.stringify(row.data);
@@ -83,21 +90,35 @@ async function pull() {
 }
 
 async function push(now = false) {
-  if (!user) return;
+  if (!user || leaving) return;
   clearTimeout(timer);
   if (!now) { setState('wait'); timer = setTimeout(() => push(true), 1500); return; }
   if (busy) { timer = setTimeout(() => push(true), 800); return; }
   const body = payload();
   if (meta().uid === user.id && meta().sent === body) { setState('ok'); return; }
+  // bezpiecznik: pusty stan nadpisałby plany na koncie – wysyłamy go tylko, gdy użytkownik sam usunął ostatni plan
+  const hadPlans = (() => { try { return JSON.parse(meta().sent ?? 'null')?.plans?.length > 0; } catch { return false; } })();
+  if (!JSON.parse(body).plans.length && hadPlans && !planner.emptiedByUser()) { console.warn('sync: pomijam wysłanie pustego stanu'); return; }
+  // Zapis warunkowy – nigdy „na ślepo”: aktualizujemy tylko wersję konta, którą to urządzenie zna (updated_at),
+  // a nowy wiersz wyłącznie wstawiamy. Jeśli na koncie jest coś innego (inne urządzenie, wyścig przy logowaniu),
+  // zapis się nie uda – wtedy pobieramy konto i scalamy (pull), zamiast nadpisywać cudze plany.
   busy = true; setState('sync');
+  let conflict = false;
   try {
-    const { data: row, error } = await sb.from('user_data').upsert({ user_id: user.id, data: JSON.parse(body) }).select('updated_at').single();
-    if (error) throw error;
-    setMeta({ uid: user.id, at: row.updated_at, sent: body });
-    setState('ok');
+    const m = meta(), data = JSON.parse(body);
+    const q = m.uid === user.id && m.at
+      ? sb.from('user_data').update({ data }).eq('user_id', user.id).eq('updated_at', m.at).select('updated_at')
+      : sb.from('user_data').insert({ user_id: user.id, data }).select('updated_at');
+    const { data: rows, error } = await q;
+    if (error?.code === '23505' || (!error && !rows?.length)) conflict = true;   // wiersz już jest / zmienił się w międzyczasie
+    else if (error) throw error;
+    else { setMeta({ uid: user.id, at: rows[0].updated_at, sent: body }); setState('ok'); }
   } catch (e) {
     console.warn('sync push', e); setState('err');
   } finally { done(); }
+  if (conflict && conflicts++ < 3) { console.warn('sync: konto zmieniło się w międzyczasie – pobieram i scalam'); await pull(); }
+  else if (conflict) setState('err');
+  else conflicts = 0;
 }
 
 // --- interfejs ---
@@ -160,8 +181,13 @@ ui.logout.onclick = async () => {
       ui.logout.disabled = false; ui.logout.textContent = 'Wyloguj';
       return;
     }
+    leaving = true; clearTimeout(timer);   // od tej chwili nic nie trafia na konto
+    ui.dlg.hidden = true;                   // ekran wylogowania zamiast znikających pól – aż strona wczyta się od nowa
+    loading.querySelector('p').textContent = 'Wylogowuję…';
+    loading.classList.remove('fade'); loading.hidden = false;
     await within(sb.auth.signOut({ scope: 'local' }), 3000);
   } catch (e) { console.warn('logout', e); }
+  leaving = true; clearTimeout(timer); user = null;
   forget();
   location.replace(back());
 };
