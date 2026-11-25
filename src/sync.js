@@ -16,7 +16,8 @@ const ui = { btn: $('auth-open'), dlg: $('auth-dialog'), close: $('auth-close'),
   google: $('auth-google'), mailForm: $('auth-mail'), email: $('auth-email'), msg: $('auth-msg'), who: $('auth-who'),
   status: $('auth-status'), logout: $('auth-logout'), pic: $('auth-pic') };
 
-let user = null, state = 'off', timer = null, busy = false;
+let user = null, state = 'off', timer = null, busy = false, again = false;
+const done = () => { busy = false; if (again) { again = false; setTimeout(pull, 0); } };
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const meta = () => { try { return JSON.parse(localStorage.getItem(META)) ?? {}; } catch { return {}; } };
 const setMeta = (m) => localStorage.setItem(META, JSON.stringify(m));
@@ -39,7 +40,8 @@ function merge(remote, local) {
 }
 
 async function pull() {
-  if (!user || busy) return;
+  if (!user) return;
+  if (busy) { again = true; return; }   // trwa inna wymiana – sprawdzimy ponownie zaraz po niej
   busy = true; setState('sync');
   let send = false;
   try {
@@ -59,7 +61,7 @@ async function pull() {
     if (!send) setState('ok');
   } catch (e) {
     console.warn('sync pull', e); setState('err');
-  } finally { busy = false; }
+  } finally { done(); }
   if (send) await push(true);
 }
 
@@ -78,7 +80,7 @@ async function push(now = false) {
     setState('ok');
   } catch (e) {
     console.warn('sync push', e); setState('err');
-  } finally { busy = false; }
+  } finally { done(); }
 }
 
 // --- interfejs ---
@@ -127,10 +129,24 @@ ui.logout.onclick = async () => {
   ui.dlg.hidden = true;
 };
 
+// Na żywo: zmiana zapisana na innym urządzeniu przychodzi od razu (Supabase Realtime) – pobieramy ją.
+// Własne zapisy też wracają jako zdarzenia, ale mają znany już znacznik czasu, więc je pomijamy.
+let live = null;
+function listen() {
+  if (live) { sb.removeChannel(live); live = null; }
+  if (!user) return;
+  live = sb.channel(`user_data:${user.id}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'user_data', filter: `user_id=eq.${user.id}` }, (ev) => {
+      if (ev.new?.updated_at && ev.new.updated_at !== meta().at) pull();
+    })
+    .subscribe((status) => { if (status === 'SUBSCRIBED') pull(); });   // po (ponownym) połączeniu nadrabiamy zmiany
+}
+
 sb.auth.onAuthStateChange((event, session) => {
   const was = user?.id;
   user = session?.user ?? null;
   renderUser();
+  if (user?.id !== was) setTimeout(listen, 0);
   if (user && user.id !== was) setTimeout(pull, 0);   // poza callbackiem (zalecenie supabase-js)
   if (user && user.id !== was && /[?&]code=/.test(location.search)) history.replaceState(null, '', back());
 });
