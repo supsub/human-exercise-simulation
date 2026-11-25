@@ -130,6 +130,14 @@ const setsOf = (w) => w.items.reduce((s, it) => s + (it.sets || 0), 0);
 // mięśnie, które ćwiczenie mocno angażuje, a w planie dostają za mało pracy
 const helpsOf = (ex) => Object.entries(ex.muscles).filter(([id, w]) => w >= 0.5 && analysis.weekly[id] < 3).map(([id]) => id);
 
+// Telefon: zakładki Plan/Analiza tylko wtedy, gdy plan jest widoczny. Panel (lista ćwiczeń, ćwiczenie z listy,
+// rozwinięta sekcja Opis/Błędy/Mięśnie) zasłania plan – wtedy zakładki nic by nie zmieniły, więc znikają
+// (przy ćwiczeniu z listy ich miejsce zajmuje pasek „Dodaj do”).
+function syncTabs() {
+  document.body.classList.toggle('ex-open', !ui.panel.hidden);
+  document.body.classList.toggle('ex-add', selected?.from === 'list' && !!addTarget());
+}
+
 // ---------- Render ----------
 function render() {
   const p = plan();
@@ -150,8 +158,7 @@ function render() {
   renderAnalysis(p);
   if (selected) renderDetailTop();
   // telefon: przy otwartym ćwiczeniu zakładki Plan/Analiza znikają (pasek dodawania albo nic)
-  document.body.classList.toggle('ex-open', !!selected || !ui.panel.hidden);   // także lista ćwiczeń (na mięsień, do dodania) – zakładki nic by nie zmieniły
-  document.body.classList.toggle('ex-add', selected?.from === 'list' && !!addTarget());
+  syncTabs();
   if (!ui.browse.hidden && !ui.panel.hidden) renderList();
   save();
 }
@@ -615,10 +622,12 @@ function toggleSheet(sec) {
   ui.browse.hidden = true;
   ui.detail.hidden = false;
   showSection(sec);
+  syncTabs();
 }
 function closeSheet() {
   ui.panel.hidden = true;
   showSection(ui.detail.dataset.sec);
+  syncTabs();
 }
 document.querySelectorAll('#pb-chips button').forEach((b) => (b.onclick = () => toggleSheet(b.dataset.sec)));
 ui.pbClose.onclick = closePanel;
