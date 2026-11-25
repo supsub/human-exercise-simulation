@@ -140,6 +140,10 @@ input:focus { border-color: var(--accent); }
 .item-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item input { padding: 4px 6px; font-size: 13px; width: 46px; text-align: center; }
 .item .x { color: var(--muted); text-align: center; }
+/* wskazany mięsień: ćwiczenia, które go angażują (kolor wg udziału), pozostałe przygaszone */
+.hl-on .item { opacity: .45; transition: opacity .15s, background .15s; }
+.hl-on .item.hl { opacity: 1; box-shadow: inset 4px 0 0 var(--hl);
+  background: color-mix(in srgb, var(--hl) calc(var(--hla) * 100%), transparent); }
 .del { color: var(--muted); }
 .add-ex { margin-top: 2px; background: transparent; border: 1px dashed rgba(255,255,255,.18); color: var(--muted); padding: 5px; font-size: 12.5px; }
 .add-ex:hover { color: var(--text); border-color: var(--accent); background: rgba(79,179,255,.06); }

@@ -199,6 +199,7 @@ function renderWorkouts(p) {
       if (!ex) return;
       const row = document.createElement('div');
       row.className = 'item' + (selected?.ex === ex ? ' selected' : '');
+      row.dataset.ex = ex.id;
       row.title = 'Kliknij, aby zobaczyć ćwiczenie';
       row.innerHTML = `
         <span class="item-name">${esc(ex.name)}</span>
@@ -659,6 +660,7 @@ export function frame(dt, time) {
     showTooltip(hit, `Tydzień: <b>${w.toFixed(1)}</b> efektywnych serii – ${volumeStatus(w).label}${dayTxt}`);
   } else showTooltip(null);
   paintMuscles(display, hovered, colorFn, glowFn);
+  highlightPlan(hovered);
 
   // Figura w panelu szczegółów i pasek odtwarzania
   if (selected) {
@@ -669,6 +671,23 @@ export function frame(dt, time) {
     ui.dMuscles.querySelectorAll('.role-item').forEach((el) => el.classList.toggle('hover', el.dataset.id === hovered));
   }
   if (out.sample) ui.play.textContent = player.state.playing ? '❚❚' : '▶';
+}
+
+// Wskazany mięsień (model / panel) → ćwiczenia w planie podświetlone wg tego, jak mocno go angażują:
+// kolor paska i tła jak na modelu (główny – ciepły, pomocniczy – chłodny), ćwiczenia bez udziału przygaszone.
+let lastHi;
+function highlightPlan(id) {
+  const rows = ui.days.querySelectorAll('.item');
+  const key = `${id}|${rows.length}|${rows[0]?.isConnected}`;
+  if (key === lastHi) return;
+  lastHi = key;
+  ui.days.classList.toggle('hl-on', !!id);
+  rows.forEach((el) => {
+    const w = id ? CATALOG_BY_ID[el.dataset.ex]?.muscles[id] ?? 0 : 0;
+    el.classList.toggle('hl', w > 0);
+    el.style.setProperty('--hl', w > 0 ? cssColor(w * 0.9) : 'transparent');
+    el.style.setProperty('--hla', String(0.08 + 0.22 * w));
+  });
 }
 
 function renderLegend(m) {
