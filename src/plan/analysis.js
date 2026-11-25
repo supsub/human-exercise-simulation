@@ -272,7 +272,9 @@ export function analyzePlan(plan, workouts) {
 function recommend(inPlan, weekly, perWorkout) {
   if (!inPlan.length) return [];
   const used = new Set(inPlan.flatMap((w) => w.items.map((it) => it.exId)));
-  const deficient = new Set(MUSCLES.filter((m) => weekly[m.id] < 3).map((m) => m.id));
+  // najpierw mięśnie bez minimum (< 3 serie/tydz.); gdy wszystkie je mają – te poniżej optimum (< 8)
+  let deficient = new Set(MUSCLES.filter((m) => weekly[m.id] < 3).map((m) => m.id)), tier = 'min';
+  if (!deficient.size) { deficient = new Set(MUSCLES.filter((m) => weekly[m.id] < 8).map((m) => m.id)); tier = 'opt'; }
   const out = [];
   while (deficient.size && out.length < 4) {
     let best = null;
@@ -289,7 +291,7 @@ function recommend(inPlan, weekly, perWorkout) {
     }
     if (!best) break;
     for (const id of best.fixes) deficient.delete(id);
-    out.push({ exId: best.ex.id, fixes: best.fixes, workout: pickWorkout(best.ex, inPlan, perWorkout) });
+    out.push({ exId: best.ex.id, fixes: best.fixes, tier, workout: pickWorkout(best.ex, inPlan, perWorkout) });
   }
   return out;
 }

@@ -25,7 +25,7 @@ const ui = {
   panel: $('picker'), panelTitle: $('picker-title'), panelClose: $('picker-close'),
   browse: $('picker-browse'), search: $('picker-search'), cats: $('picker-cats'), list: $('picker-list'),
   detail: $('picker-detail'), dTop: $('d-top'), dInfo: $('d-info'), dTech: $('d-technique'), dMuscles: $('d-muscles'),
-  bar: $('player-bar'), play: $('play'), speed: $('speed'), pbName: $('pb-name'), pbClose: $('pb-close'),
+  exAction: $('ex-action'), bar: $('player-bar'), play: $('play'), speed: $('speed'), pbName: $('pb-name'), pbClose: $('pb-close'),
 };
 // Telefon: wybór ćwiczenia z planu nie zasłania planu – model ćwiczy, a opis / błędy / mięśnie
 // otwierają się przyciskami na pasku pod modelem (arkusz z jedną sekcją, bez długiego przewijania)
@@ -109,6 +109,9 @@ function render() {
   renderWorkouts(p);
   renderAnalysis(p);
   if (selected) renderDetailTop();
+  // telefon: przy otwartym ćwiczeniu zakładki Plan/Analiza znikają (pasek dodawania albo nic)
+  document.body.classList.toggle('ex-open', !!selected);
+  document.body.classList.toggle('ex-add', selected?.from === 'list' && !!focusId);
   if (!ui.browse.hidden && !ui.panel.hidden) renderList();
   save();
 }
@@ -269,11 +272,11 @@ function renderAnalysis(p) {
         const ex = CATALOG_BY_ID[r.exId];
         return `<div class="rec">
           <div><button class="link rec-name" data-i="${i}" title="Zobacz ćwiczenie">${ex.name}</button> <span class="muted">· ${ex.equipment}</span><br>
-          <small>Uzupełnia: ${r.fixes.map((id) => MUSCLE_BY_ID[id].name).join(', ')}</small></div>
+          <small>${r.tier === 'opt' ? 'Do optimum (8+ serii/tydz.)' : 'Uzupełnia'}: ${r.fixes.map((id) => MUSCLE_BY_ID[id].name).join(', ')}</small></div>
           ${r.workout ? `<button class="rec-add" data-i="${i}" title="Dodaj do: ${esc(workout(r.workout).name)}">+ ${badge(r.workout)}</button>` : ''}
         </div>`;
       }).join('')
-    : '<div class="muted">Brak – wszystkie mięśnie dostają minimum bodźca.</div>';
+    : '<div class="muted">Brak – wszystkie mięśnie są w zakresie optymalnym (8+ serii tygodniowo).</div>';
   ui.recs.querySelectorAll('.rec-name').forEach((b) => (b.onclick = () => {
     const r = a.recommendations[+b.dataset.i];
     if (r.workout) focusId = r.workout;
@@ -459,9 +462,14 @@ function renderDetailTop() {
         : '<div class="d-impact">Aby dodać, kliknij trening w planie.</div>'}
       ${inPlan.length ? `<div class="d-impact muted">Już w treningach: ${inPlan.join(', ')}</div>` : ''}
     </div>`;
+  // telefon: dodawanie na stałym pasku na dole (zamiast powtarzać je nad każdą sekcją)
+  const here = focusId && inWorkout(ex.id, focusId);
+  ui.exAction.innerHTML = !focusId ? ''
+    : here ? `<div class="ex-done">✓ W treningu <b>${esc(workout(focusId).name)}</b> · ${here.sets} × ${here.reps}</div>`
+    : `<div class="ex-impact">${impact}</div><button class="d-add-btn">+ Dodaj do: ${esc(workout(focusId).name)}</button>`;
   ui.dInfo.innerHTML = `<p class="d-text">${ex.how}</p><p class="d-tip">💡 ${ex.tip}</p>`;
   ui.dTop.querySelector('.back')?.addEventListener('click', backToList);
-  ui.dTop.querySelector('.d-add-btn')?.addEventListener('click', () => addToWorkout(ex, focusId));
+  for (const b of [ui.dTop, ui.exAction]) b.querySelector('.d-add-btn')?.addEventListener('click', () => addToWorkout(ex, focusId));
   renderMuscleSummary();
 }
 
