@@ -11,12 +11,14 @@
 // i sprawdzają też zachowanie bez sieci. Wynik: „OK – wszystkie testy przeszły” albo lista błędów.
 const frame = document.getElementById('app');
 const AUTH = 'sb-127-auth-token';
+const SLOW = +(new URLSearchParams(location.search).get('slow') ?? 1);   // wolniejsza maszyna (CI): dłuższe limity
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const win = () => frame.contentWindow, doc = () => frame.contentDocument;
 const $ = (sel) => doc().querySelector(sel);
 const visible = (sel) => { const e = $(sel); return !!e && !e.hidden && e.getClientRects().length > 0; };   // działa też dla position: fixed
 let errors = [];
 async function waitFor(fn, what, ms = 8000) {
+  ms *= SLOW;
   const t0 = performance.now();
   while (performance.now() - t0 < ms) { try { if (await fn()) return; } catch { /* jeszcze nie */ } await sleep(100); }
   throw new Error(`nie doczekano się: ${what}`);

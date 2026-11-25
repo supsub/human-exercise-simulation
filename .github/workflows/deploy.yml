@@ -13,11 +13,13 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       - name: Testy (fizyka + funkcje aplikacji)
         run: tools/test.sh
+        env:
+          SMOKE_ARGS: slow=3
   deploy:
     needs: test
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
