@@ -26,9 +26,7 @@
   <nav class="topnav">
     <span class="logo">Human Exercise Simulation</span>
     <span class="nav-sub">Plan treningowy</span>
-    <button id="face-open" class="face-open" title="Twoja twarz na modelu">🙂<span class="lbl"> Twarz</span></button>
-    <button id="auth-open" class="auth-open" data-state="off">👤<span class="lbl"> Zaloguj</span></button>
-    <a class="tab about" href="docs/index.html">O projekcie →</a>
+    <button id="auth-open" class="auth-open" data-state="off"><span class="lbl">Zaloguj się</span></button>
   </nav>
 
   <!-- telefon: zakładki pod modelem (na komputerze ukryte – oba panele widać naraz) -->
@@ -126,9 +124,9 @@
     </div>
   </div>
 
-  <!-- Konto: plany na każdym urządzeniu (src/sync.js) -->
+  <!-- Menu: konto (plany na każdym urządzeniu, src/sync.js), twarz, o projekcie -->
   <div id="auth-dialog" class="auth-dialog panel" hidden>
-    <div class="modal-head"><h2>Konto</h2><button id="auth-close" class="icon" title="Zamknij">✕</button></div>
+    <div class="modal-head"><h2>Menu</h2><button id="auth-close" class="icon" title="Zamknij">✕</button></div>
     <div id="auth-out">
       <p class="small muted">Zaloguj się, a plany będą na telefonie i komputerze.</p>
       <button id="auth-google" class="auth-google">Zaloguj przez Google</button>
@@ -143,6 +141,10 @@
       <button id="auth-logout">Wyloguj</button>
     </div>
     <div id="auth-msg" class="small muted"></div>
+    <div class="menu-items">
+      <button id="face-open" class="menu-item">🙂 Twoja twarz na modelu</button>
+      <a class="menu-item" href="docs/index.html">ℹ️ O projekcie</a>
+    </div>
   </div>
 
   <div id="tooltip" class="tooltip" hidden></div>

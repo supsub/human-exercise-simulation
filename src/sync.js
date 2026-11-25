@@ -16,6 +16,7 @@ const ui = { btn: $('auth-open'), dlg: $('auth-dialog'), close: $('auth-close'),
   status: $('auth-status'), logout: $('auth-logout') };
 
 let user = null, state = 'off', timer = null, busy = false;
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const meta = () => { try { return JSON.parse(localStorage.getItem(META)) ?? {}; } catch { return {}; } };
 const setMeta = (m) => localStorage.setItem(META, JSON.stringify(m));
 const payload = () => { const { plans, workouts } = planner.getData(); return JSON.stringify({ plans, workouts }); };
@@ -84,20 +85,25 @@ const LABEL = { off: '', ok: 'Zapisane na koncie', wait: 'Zapisuję…', sync: '
 function setState(s) {
   state = s;
   ui.btn.dataset.state = user ? s : 'off';
-  ui.btn.title = user ? `${user.email} – ${LABEL[s]}` : 'Zaloguj, żeby mieć plany na każdym urządzeniu';
+  ui.btn.title = user ? `${user.email} – ${LABEL[s]}` : 'Zaloguj się, żeby mieć plany na każdym urządzeniu; twarz, o projekcie';
   ui.status.textContent = LABEL[s];
   ui.status.className = `auth-status ${s}`;
 }
 function renderUser() {
   ui.inn.hidden = !user; ui.out.hidden = !!user;
   const name = user?.user_metadata?.full_name || user?.email || '';
-  ui.btn.querySelector('.lbl').textContent = user ? ` ${name.split(' ')[0]}` : ' Zaloguj';
+  const first = name.split(/[ @]/)[0];
+  ui.btn.innerHTML = user ? `<span class="av">${esc(first[0]?.toUpperCase() ?? '?')}</span><span class="lbl">${esc(first)}</span>` : '<span class="lbl">Zaloguj się</span>';
   ui.who.textContent = user ? `${name}${user.email && user.email !== name ? ` (${user.email})` : ''}` : '';
   setState(user ? state : 'off');
 }
 
 ui.btn.onclick = () => { ui.dlg.hidden = !ui.dlg.hidden; ui.msg.textContent = ''; };
 ui.close.onclick = () => (ui.dlg.hidden = true);
+$('face-open').addEventListener('click', () => (ui.dlg.hidden = true));   // twarz otwiera własny panel
+document.addEventListener('pointerdown', (e) => {                       // klik poza menu je zamyka
+  if (!ui.dlg.hidden && !ui.dlg.contains(e.target) && !ui.btn.contains(e.target)) ui.dlg.hidden = true;
+});
 const back = () => location.origin + location.pathname;
 ui.google.onclick = async () => {
   const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: back() } });
