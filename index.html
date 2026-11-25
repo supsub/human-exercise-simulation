@@ -20,6 +20,15 @@
   </script>
 </head>
 <body>
+  <!-- ekran wczytywania: widoczny od pierwszej klatki, znika, gdy aplikacja pokaże właściwy stan
+       (gość – po pierwszym rysowaniu; zalogowany – gdy przyjdą plany z konta; src/sync.js) -->
+  <div id="app-loading" class="app-loading"><div class="app-loading-logo">Human Exercise Simulation</div><div class="spinner"></div><p>Wczytuję…</p></div>
+  <script>
+    // zapisana sesja / powrót z logowania → „Wczytuję Twoje plany…”; awaryjnie (aplikacja się nie wczytała) chowamy po 20 s
+    if (Object.keys(localStorage).some((k) => /^sb-.+-auth-token$/.test(k)) || /[?&]code=/.test(location.search))
+      document.querySelector('#app-loading p').textContent = 'Wczytuję Twoje plany…';
+    setTimeout(() => document.getElementById('app-loading').classList.add('fade'), 20000);
+  </script>
   <canvas id="scene"></canvas>
   <div id="markers" class="markers"></div>
 
@@ -171,8 +180,7 @@
   </div>
 
   <div id="tooltip" class="tooltip" hidden></div>
-  <!-- ekran wczytywania: po zalogowaniu, dopóki nie przyjdą plany z konta (nie pokazujemy nieaktualnych danych) -->
-  <div id="app-loading" class="app-loading" hidden><div class="spinner"></div><p>Wczytuję Twoje plany…</p></div>
+
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

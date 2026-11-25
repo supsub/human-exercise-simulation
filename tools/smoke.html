@@ -81,7 +81,7 @@ const tests = {
       await waitFor(() => $('#plan-select')?.selectedOptions[0]?.textContent === 'Mój plan', 'plan „Mój plan”');
       check(doc().body.classList.contains('guest'), 'brak trybu gościa');
       check(visible('#guest-bar'), 'brak paska „Zaloguj się…”');
-      check(!visible('#app-loading'), 'ekran wczytywania u gościa');
+      await waitFor(() => !visible('#app-loading'), 'zniknięcie ekranu wczytywania u gościa');
       check($('#plan-days .day-card')?.textContent.includes('Trening A'), 'brak „Trening A”');
       check($('#auth-open').textContent.trim() === 'Zaloguj się', 'przycisk konta nie mówi „Zaloguj się”');
     });
@@ -173,6 +173,21 @@ const tests = {
     await sleep(2500);
     check(srv.row.data.plans.some((p) => p.name === 'Plan z konta'), 'plan z konta nadpisany');
     check($('#plan-select').selectedOptions[0]?.textContent === 'Plan z konta', 'po zalogowaniu nie widać planu z konta');
+  },
+  async 'start zalogowanego: ekran wczytywania, aż widać konto i plany (bez migania „Zaloguj się”)'() {
+    const srv = fakeServer();
+    let firstPaint = null;
+    const watch = setInterval(() => { try { if (doc().getElementById('app-loading') && firstPaint === null && doc().readyState !== 'uninitialized') firstPaint = !doc().getElementById('app-loading').hidden; } catch { /* ramka */ } }, 1);
+    await open(() => {
+      localStorage.setItem(AUTH, fakeSession(3600));
+      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 't1', sent: JSON.stringify(ACCOUNT) }));
+      localStorage.setItem('hes.data.v2', JSON.stringify({ ...ACCOUNT, currentId: 'p1' }));
+    }, srv.mock);
+    clearInterval(watch);
+    check(firstPaint !== false, 'ekran wczytywania nie był widoczny od początku');
+    await waitFor(() => $('#app-loading').classList.contains('fade') || !visible('#app-loading'), 'zniknięcie ekranu wczytywania', 15000);
+    check($('#auth-open').textContent.includes('Test'), 'ekran wczytywania zniknął, zanim pokazało się konto');
+    check($('#plan-select').selectedOptions[0]?.textContent === 'Plan z konta', 'ekran wczytywania zniknął przed planami z konta');
   },
   async 'zapis zmian: aktualizuje znaną wersję konta'() {
     const srv = fakeServer();

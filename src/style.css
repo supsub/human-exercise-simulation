@@ -401,9 +401,11 @@ body.guest .guest-bar { display: block; }
 
 /* Ekran wczytywania po zalogowaniu */
 .app-loading { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 16px; color: var(--muted); font-size: 14px; transition: opacity .25s; }
+  align-items: center; justify-content: center; gap: 16px; color: var(--muted); font-size: 14px; transition: opacity .25s;
+  text-align: center; padding: 24px; }
 .app-loading.fade { opacity: 0; pointer-events: none; }
 .app-loading p { margin: 0; }
+.app-loading-logo { font-weight: 700; font-size: 18px; letter-spacing: .02em; color: var(--text); margin-bottom: 6px; }
 .spinner { width: 38px; height: 38px; border-radius: 50%; border: 3px solid rgba(255,255,255,.1); border-top-color: var(--accent);
   animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

@@ -25,9 +25,9 @@ const ui = { btn: $('auth-open'), dlg: $('auth-dialog'), close: $('auth-close'),
 // bez sesji → od razu tryb gościa (przykładowy plan, bez migania pustą kartką)
 const AUTH_KEY = `sb-${new URL(DB.url).hostname.split('.')[0]}-auth-token`;
 const loading = $('app-loading');
-let waiting = !!localStorage.getItem(AUTH_KEY) || /[?&]code=/.test(location.search);
-if (waiting) { loading.hidden = false; setTimeout(ready, 10000); }   // bez sieci nie czekamy w nieskończoność
-else planner.setGuest(true);
+let waiting = true;
+if (localStorage.getItem(AUTH_KEY) || /[?&]code=/.test(location.search)) setTimeout(ready, 10000);   // bez sieci nie czekamy w nieskończoność
+else { planner.setGuest(true); setTimeout(() => requestAnimationFrame(ready), 0); }   // gość: po pierwszym narysowaniu planu i modelu
 function ready() {
   if (!waiting) return;
   waiting = false;
