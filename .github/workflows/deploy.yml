@@ -23,6 +23,8 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
+      contents: read
+      actions: read      # deploy-pages odczytuje artefakt strony przez API Actions
       pages: write
       id-token: write
     environment:
