@@ -229,6 +229,12 @@ function render() {
         (store.sessions ??= []).push(q);
         render();
       },
+      onSkip: (iso, wid) => {   // „nie trenowałem”: wpis w historii bez ćwiczeń (synchronizuje się jak trening)
+        const q = sessionFromWorkout(workout(wid), activeOn(iso)?.plan ?? p, iso, []);
+        q.items = []; q.skipped = true; q.finished = false;
+        (store.sessions ??= []).push(q);
+        render();
+      },
       onUndo: (id) => { store.sessions = store.sessions.filter((x) => x.id !== id); render(); },
       onOpen: (id) => {
         const ses = store.sessions.find((x) => x.id === id);

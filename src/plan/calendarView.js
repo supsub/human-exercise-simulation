@@ -22,7 +22,7 @@ export function resetCalendar() { month = null; day = null; }
 
 // ctx: { plannedFor(date) → id treningu | null, activeOn(iso) → { plan, from, to } | null, periods: [{ plan, from, to }], plans: [plan],
 //        planColor(planId), workout(id), allWorkouts, color(id), letter(id), sessionOn(iso),
-//        onPick(iso, workoutId), onStart(iso, workoutId), onQuickDone(iso, workoutId), onUndo(sessionId), onOpen(sessionId), onSetActive(planId, fromIso) }
+//        onPick(iso, workoutId), onStart(iso, workoutId), onQuickDone(iso, workoutId), onSkip(iso, workoutId), onUndo(sessionId), onOpen(sessionId), onSetActive(planId, fromIso) }
 export function renderCalendar(el, ctx) {
   const today = new Date(), todayIso = isoDate(today);
   day ??= todayIso;
@@ -39,12 +39,12 @@ export function renderCalendar(el, ctx) {
     if (act && d.getMonth() === month.getMonth()) inMonth.set(act.plan.id, act);
     const start = act && act.from === iso;
     const cls = ['cal-d', d.getMonth() !== month.getMonth() && 'other', iso === todayIso && 'today', iso === day && 'picked', iso < todayIso && 'past',
-      act && 'in-plan', start && 'p-start', ses && (ses.finished ? 'done' : 'live')].filter(Boolean).join(' ');
-    const title = [act ? `Plan: ${act.plan.name}` : 'bez planu', ses ? `${ses.name} – ${ses.finished ? 'wykonany' : 'w trakcie'}` : w ? w.name : 'odpoczynek'].join(' · ');
+      act && 'in-plan', start && 'p-start', ses && (ses.skipped ? 'skipped' : ses.finished ? 'done' : 'live')].filter(Boolean).join(' ');
+    const title = [act ? `Plan: ${act.plan.name}` : 'bez planu', ses ? `${ses.name} – ${ses.skipped ? 'pominięty' : ses.finished ? 'wykonany' : 'w trakcie'}` : w ? w.name : 'odpoczynek'].join(' · ');
     cells.push(`<button class="${cls}" data-iso="${iso}" style="--i:${i};${pc ? `--pc:${pc}` : ''}" title="${esc(title)}">
       ${start ? '<i class="cal-flag">▸</i>' : ''}<span class="n">${d.getDate()}</span>
       ${w ? `<i class="wbadge" style="--c:${ctx.color(id)}">${ctx.letter(id)}</i>` : ses ? '<i class="wbadge" style="--c:#8d98aa">•</i>' : '<i class="cal-rest"></i>'}
-      ${ses ? (ses.finished ? '<i class="cal-mark">✓</i>' : '<i class="cal-mark live">●</i>') : ''}</button>`);
+      ${ses ? (ses.skipped ? '<i class="cal-mark skip">✕</i>' : ses.finished ? '<i class="cal-mark">✓</i>' : '<i class="cal-mark live">●</i>') : ''}</button>`);
   }
 
   // realizowany plan (karta) albo formularz zmiany
@@ -80,7 +80,9 @@ export function renderCalendar(el, ctx) {
   const chip = (w, cls) => `<button class="chip ${cls}" data-w="${w.id}"><i class="wbadge" style="--c:${ctx.color(w.id)}">${ctx.letter(w.id)}</i> ${esc(w.name)}</button>`;
   // warianty do wyboru: z planu tego dnia; dzień bez planu (np. przed pierwszym okresem) – z obecnego planu, inaczej wszystkie treningi
   const all = (act ?? ctx.activeOn(todayIso))?.plan.variants.map((id) => ctx.workout(id)).filter(Boolean) ?? ctx.allWorkouts;
-  const actions = ses
+  const actions = ses?.skipped
+    ? `<div class="cal-ses skipped">✕ Pominięty: <b>${esc(ses.name)}</b> <button class="link small cal-undo" title="Usuń oznaczenie">cofnij</button></div>`
+    : ses
     ? (() => { const st = sessionStats(ses); return `<div class="cal-ses ${ses.finished ? 'done' : ''}">${ses.finished ? '✓ Wykonany' : '● W trakcie'}: <b>${esc(ses.name)}</b> · ${st.done}/${st.total} serii
           <button class="link small cal-undo" title="Usuń zapis tego dnia">cofnij</button></div>
         <button class="primary cal-open">${ses.finished ? 'Pokaż trening' : 'Wróć do treningu'}</button>`; })()
@@ -91,6 +93,7 @@ export function renderCalendar(el, ctx) {
            <button class="chip done-chip cal-quick" data-w="${pid}">✓ Oznacz jako wykonany</button>`
          : `<button class="primary done-btn cal-quick" data-w="${pid}">✓ Oznacz jako wykonany</button>
            <button class="link small cal-start" data-w="${pid}">zapisz ze szczegółami (serie, ciężary)</button>`}
+         <button class="chip skip-chip cal-skip" data-w="${pid}" title="Oznacz, że w tym dniu nie było treningu">✕ Nie trenowałem</button>
          ${others.length ? `<div class="cal-other">inny trening: ${others.map((w) => chip(w, isToday ? 'cal-start' : 'cal-quick')).join(' ')}</div>` : ''}`
       // dzień bez treningu w planie (np. dodatkowy trening w niedzielę)
       : all.length ? `<div class="cal-other">${isToday ? 'Zacznij trening:' : 'Oznacz jako wykonany:'} ${all.map((w) => chip(w, isToday ? 'cal-start' : 'cal-quick')).join(' ')}</div>
@@ -125,6 +128,7 @@ export function renderCalendar(el, ctx) {
   el.querySelector('.cal-today')?.addEventListener('click', () => { day = todayIso; month = null; pick(); });
   el.querySelectorAll('.cal-start').forEach((b) => (b.onclick = () => ctx.onStart(day, b.dataset.w)));
   el.querySelectorAll('.cal-quick').forEach((b) => (b.onclick = () => ctx.onQuickDone(day, b.dataset.w)));
+  el.querySelector('.cal-skip')?.addEventListener('click', (e) => ctx.onSkip(day, e.currentTarget.dataset.w));
   el.querySelector('.cal-undo')?.addEventListener('click', () => ctx.onUndo(ses.id));
   el.querySelector('.cal-plan-edit')?.addEventListener('click', () => { editing = true; renderCalendar(el, ctx); });
   el.querySelector('.cal-plan-cancel')?.addEventListener('click', () => { editing = false; renderCalendar(el, ctx); });

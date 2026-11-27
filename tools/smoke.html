@@ -266,6 +266,16 @@ const tests = {
     // cofnięcie
     $('.cal-undo').click();
     await waitFor(() => !data().sessions.some((x) => x.date === isoOf(early)) && $('.cal-quick'), 'cofnięcie oznaczenia');
+
+    // „nie trenowałem” w dniu z planu (tydzień wcześniej) – pominięty, z możliwością cofnięcia
+    const mon2 = d(-back - 7);
+    (await cell(mon2)).click();
+    await waitFor(() => $('.cal-skip'), 'przycisk „Nie trenowałem”');
+    $('.cal-skip').click();
+    await waitFor(() => $(`.cal-d.skipped[data-iso="${isoOf(mon2)}"]`) && /Pominięty/.test($('.cal-detail').textContent), 'dzień oznaczony jako pominięty');
+    check(data().sessions.find((x) => x.date === isoOf(mon2))?.skipped, 'pominięcie nie zapisało się');
+    $('.cal-undo').click();
+    await waitFor(() => !data().sessions.some((x) => x.date === isoOf(mon2)) && $('.cal-skip'), 'cofnięcie pominięcia');
   },
   async 'gość: „+ Nowy” plan prosi o logowanie (bez okienka z nazwą)'() {
     await open();
