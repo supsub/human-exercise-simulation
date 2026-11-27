@@ -104,6 +104,22 @@ const tests = {
     await new Promise((r) => { frame.onload = r; win().location.reload(); }); hook();
     await waitFor(() => $('#plan-days .day-card .item') || $('#plan-days [data-ex]'), 'ćwiczenie widoczne po odświeżeniu');
   },
+  async 'jednostki: deska mierzona w sekundach (domyślnie 3 × 30 s)'() {
+    await open();
+    await waitFor(() => $('.add-ex'), 'przycisk „+ Dodaj ćwiczenie”');
+    $('.add-ex').click();
+    await waitFor(() => $('#picker-search'), 'wyszukiwarka');
+    $('#picker-search').value = 'deska'; $('#picker-search').dispatchEvent(new (win().Event)('input'));
+    await waitFor(() => $('#picker-list .pick')?.textContent.includes('Deska'), 'deska na liście');
+    check(/30 s/.test($('#picker-list .quick-add').title), `podpowiedź szybkiego dodania bez sekund: ${$('#picker-list .quick-add').title}`);
+    $('#picker-list .quick-add').click();
+    await waitFor(() => data()?.workouts[0]?.items.length === 1, 'deska w treningu');
+    check(data().workouts[0].items[0].reps === 30, `deska dodana z ilością ${data().workouts[0].items[0].reps} zamiast 30 s`);
+    $('#picker-close').click();
+    await waitFor(() => $('#plan-days [data-ex]'), 'deska w planie');
+    const row = $('#plan-days [data-ex]');
+    check(row.querySelector('input[title^="Sekundy"]') && /\bs\b/.test(row.textContent), 'w planie brak jednostki sekund przy desce');
+  },
   async 'gość: „+ Nowy” plan prosi o logowanie (bez okienka z nazwą)'() {
     await open();
     await waitFor(() => $('#plan-new'), 'przycisk „+ Nowy”');

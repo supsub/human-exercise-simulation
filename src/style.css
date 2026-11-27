@@ -132,7 +132,7 @@ input:focus { border-color: var(--accent); }
 .day-meta { margin-left: auto; color: var(--muted); font-size: 12px; }
 .day-items { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .day-items:empty { display: none; }
-.item { display: grid; grid-template-columns: 1fr 46px 10px 46px 26px; gap: 4px; align-items: center; font-size: 13px;
+.item { display: grid; grid-template-columns: 1fr 46px 10px 46px 12px 26px; gap: 4px; align-items: center; font-size: 13px;
   padding: 2px 4px; margin: 0 -4px; border-radius: 7px; cursor: pointer; }
 .item:hover { background: rgba(255,255,255,.05); }
 .item.selected { background: rgba(79,179,255,.16); box-shadow: inset 2px 0 0 var(--accent); }

@@ -2,6 +2,9 @@
 // muscles: udział mięśnia w ćwiczeniu – 1 = główny, 0.5–0.75 = pomocniczy, 0.25 = stabilizujący.
 // "Efektywne serie" mięśnia = serie × udział (tak liczymy tygodniową objętość).
 // animated: id ćwiczenia z animacją 3D w symulacji (jeśli jest).
+// measure: jak mierzymy serię – 'reps' (powtórzenia, domyślnie) albo 'time' (sekundy, np. deska);
+//   w planie pole `reps` pozycji treningu to „ilość na serię” w tej jednostce (powtórzenia albo sekundy).
+// repsLabel: własna nazwa powtórzeń (np. kroki); amount: domyślna ilość na serię przy dodawaniu.
 
 export const CATEGORIES = ['Klatka', 'Plecy', 'Barki', 'Ramiona', 'Nogi', 'Pośladki', 'Core'];
 
@@ -103,19 +106,19 @@ export const CATALOG = [
   // --- Pośladki ---
   { id: 'hip_thrust', name: 'Hip thrust (wypychanie bioder)', category: 'Pośladki', equipment: 'sztanga',
     muscles: { glute_max: 1, glute_med: 0.5, biceps_femoris: 0.5, semitendinosus: 0.5, adductors: 0.25 } },
-  { id: 'band_walk', name: 'Chodzenie bokiem z gumą', category: 'Pośladki', equipment: 'guma',
+  { id: 'band_walk', name: 'Chodzenie bokiem z gumą', category: 'Pośladki', equipment: 'guma', repsLabel: 'kroków', amount: 12,
     muscles: { glute_med: 1, glute_max: 0.25 }, tags: 'odwodziciele abduktory biodro biodra hip abduction' },
 
   // --- Core ---
-  { id: 'plank', name: 'Deska (plank)', category: 'Core', equipment: 'masa ciała',
+  { id: 'plank', name: 'Deska (plank)', category: 'Core', equipment: 'masa ciała', measure: 'time', amount: 30,
     muscles: { rectus_abdominis: 1, obliques: 0.75, serratus: 0.25, delt_ant: 0.25, glute_max: 0.25, rectus_femoris: 0.25, iliopsoas: 0.25 } },
-  { id: 'side_plank', name: 'Deska bokiem', category: 'Core', equipment: 'masa ciała',
+  { id: 'side_plank', name: 'Deska bokiem', category: 'Core', equipment: 'masa ciała', measure: 'time', amount: 30,
     muscles: { obliques: 1, glute_med: 0.75, rectus_abdominis: 0.25, delt_lat: 0.25 } },
   { id: 'crunch', name: 'Spięcia brzucha', category: 'Core', equipment: 'masa ciała',
     muscles: { rectus_abdominis: 1, obliques: 0.5 } },
   { id: 'leg_raise', name: 'Unoszenie nóg w zwisie', category: 'Core', equipment: 'drążek',
     muscles: { iliopsoas: 1, rectus_abdominis: 1, obliques: 0.5, rectus_femoris: 0.5, forearm_flex: 0.5, latissimus: 0.25 } },
-  { id: 'farmer', name: 'Spacer farmera', category: 'Core', equipment: 'hantle',
+  { id: 'farmer', name: 'Spacer farmera', category: 'Core', equipment: 'hantle', measure: 'time', amount: 40,
     muscles: { forearm_flex: 1, trap_upper: 0.75, forearm_ext: 0.5, obliques: 0.5, rectus_abdominis: 0.25, glute_med: 0.25 } },
 ];
 
@@ -174,3 +177,15 @@ const INFO = {
   farmer: ['Idziesz z ciężkimi hantlami w dłoniach, trzymając prostą sylwetkę.', 'Barki w dół, tułów nie przechyla się na boki.'],
 };
 for (const ex of CATALOG) [ex.how, ex.tip] = INFO[ex.id] ?? ['', ''];
+
+// ---------- Jednostki serii ----------
+export const measureOf = (ex) => ex?.measure ?? 'reps';
+export const isTime = (ex) => measureOf(ex) === 'time';
+export const defaultAmount = (ex) => ex?.amount ?? (isTime(ex) ? 30 : 10);
+// zakres pola „ilość na serię”: sekundy co 5 do 10 min, powtórzenia 1–50 (kroki do 100)
+export const amountRange = (ex) => (isTime(ex) ? { min: 5, max: 600, step: 5 } : { min: 1, max: ex?.repsLabel ? 100 : 50, step: 1 });
+// „3 × 30 s”, „3 × 12 kroków”, „3 × 10”
+export const fmtAmount = (ex, n) => (isTime(ex) ? `${n} s` : ex?.repsLabel ? `${n} ${ex.repsLabel}` : `${n}`);
+export const fmtSets = (ex, it) => `${it.sets} × ${fmtAmount(ex, it.reps)}`;
+// obciążenie (do zapisu treningu): 'kg' – ciężar zewnętrzny, 'body' – masa ciała (opcjonalnie dociążenie), 'none' – bez ciężaru
+export const loadOf = (ex) => ex?.load ?? (['masa ciała', 'guma'].includes(ex?.equipment) ? 'body' : ex?.equipment === 'drążek' || ex?.equipment === 'poręcze' || ex?.equipment === 'ławka' ? 'body' : 'kg');

@@ -5,7 +5,7 @@ import { roleOf } from '../exercises/common.js';
 import { EXERCISE_BY_ID } from '../exercises/index.js';
 import { createPlayer } from '../player.js';
 import { createFigure } from '../figure.js';
-import { CATALOG, CATALOG_BY_ID, CATEGORIES } from './catalog.js';
+import { CATALOG, CATALOG_BY_ID, CATEGORIES, isTime, defaultAmount, amountRange, fmtSets } from './catalog.js';
 import { DAYS, worse, analyzePlan, emptyPlan, emptyWorkout, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
 
 // Jedyny widok aplikacji: plan treningowy z modelem 3D.
@@ -251,11 +251,11 @@ function renderWorkouts(p) {
       row.innerHTML = `
         <span class="item-name">${esc(ex.name)}</span>
         <input type="number" min="1" max="10" value="${it.sets}" title="Serie"> <span class="x">×</span>
-        <input type="number" min="1" max="50" value="${it.reps}" title="Powtórzenia">
+        <input type="number" min="${amountRange(ex).min}" max="${amountRange(ex).max}" step="${amountRange(ex).step}" value="${it.reps}" title="${isTime(ex) ? 'Sekundy na serię' : ex.repsLabel ? `Ilość (${ex.repsLabel})` : 'Powtórzenia'}"><span class="x unit">${isTime(ex) ? 's' : ''}</span>
         <button class="icon del" title="Usuń z treningu">✕</button>`;
       const [setsIn, repsIn] = row.querySelectorAll('input');
       setsIn.onchange = () => { it.sets = clampInt(setsIn.value, 1, 10); render(); };
-      repsIn.onchange = () => { it.reps = clampInt(repsIn.value, 1, 50); render(); };
+      repsIn.onchange = () => { it.reps = clampInt(repsIn.value, amountRange(ex).min, amountRange(ex).max); render(); };
       row.querySelectorAll('input, .del').forEach((el) => el.addEventListener('click', (e) => e.stopPropagation()));
       row.querySelector('.del').onclick = (e) => { e.stopPropagation(); w.items.splice(idx, 1); render(); };
       row.onclick = (e) => { e.stopPropagation(); selected?.ex === ex ? closePanel() : selectExercise(ex, 'plan'); };
@@ -435,9 +435,9 @@ function renderList() {
         <div class="pick-head"><b>${ex.name}</b></div>
         <div class="pick-meta">${browseMuscle ? `<span class="mrole" style="--c:${cssColor(mw(ex) * 0.9)}">${mw(ex) >= 0.75 ? 'główny' : mw(ex) >= 0.5 ? 'pomocniczy' : 'lekko'}</span> ` : ''}${ex.category} · ${ex.equipment}${helps ? ` <span class="helps">uzupełnia ${helps} ${helps === 1 ? 'brak' : 'braki'}</span>` : ''}</div><div class="mtags">${tags}</div>
       </div>
-      ${here ? `<span class="present-tag">już w tym treningu<br>${here.sets} × ${here.reps}</span>`
+      ${here ? `<span class="present-tag">już w tym treningu<br>${fmtSets(ex, here)}</span>`
         : !browseId ? ''
-        : `<button class="quick-add" title="Dodaj od razu do: ${esc(workout(browseId).name)} (3 × 10)">+</button>`}
+        : `<button class="quick-add" title="Dodaj od razu do: ${esc(workout(browseId).name)} (${fmtSets(ex, { sets: 3, reps: defaultAmount(ex) })})">+</button>`}
     </div>`;
   }).join('') || '<div class="muted">Brak ćwiczeń pasujących do wyszukiwania.</div>';
   ui.list.querySelectorAll('.pick').forEach((el) => {
@@ -458,7 +458,7 @@ const inWorkout = (exId, id) => workout(id)?.items.find((it) => it.exId === exId
 function addToWorkout(ex, id) {
   const w = workout(id);
   if (!w || inWorkout(ex.id, id)) return;
-  w.items.push({ exId: ex.id, sets: 3, reps: 10 });
+  w.items.push({ exId: ex.id, sets: 3, reps: defaultAmount(ex) });
   const p = plan();
   if (!p.variants.includes(id)) p.variants.push(id);
   render();
@@ -517,10 +517,10 @@ function renderDetailTop() {
   const p = plan();
   // trening docelowy: wybrany w planie, a przy liście „ćwiczenia na mięsień” – ten, do którego dodaje lista
   const focusId = addTarget();
-  const inPlan = store.workouts.flatMap((w) => w.items.filter((it) => it.exId === ex.id).map((it) => `${badge(w.id)} ${esc(w.name)} ${it.sets}×${it.reps}`));
+  const inPlan = store.workouts.flatMap((w) => w.items.filter((it) => it.exId === ex.id).map((it) => `${badge(w.id)} ${esc(w.name)} ${fmtSets(ex, it)}`));
   let impact = '';
   if (focusId) {
-    const trialW = store.workouts.map((w) => (w.id === focusId ? { ...w, items: [...w.items, { exId: ex.id, sets: 3, reps: 10 }] } : w));
+    const trialW = store.workouts.map((w) => (w.id === focusId ? { ...w, items: [...w.items, { exId: ex.id, sets: 3, reps: defaultAmount(ex) }] } : w));
     const trialP = p.variants.includes(focusId) ? p : { ...p, variants: [...p.variants, focusId] };
     const after = analyzePlan(trialP, trialW);
     impact = after.trained > analysis.trained
@@ -534,7 +534,7 @@ function renderDetailTop() {
     <div class="d-add">
       ${focusId
         ? inWorkout(ex.id, focusId)
-          ? `<div class="d-impact">✓ Już jest w: <b>${esc(workout(focusId).name)}</b> (${inWorkout(ex.id, focusId).sets} × ${inWorkout(ex.id, focusId).reps}). Chcesz więcej pracy? Zwiększ liczbę serii.</div>`
+          ? `<div class="d-impact">✓ Już jest w: <b>${esc(workout(focusId).name)}</b> (${fmtSets(ex, inWorkout(ex.id, focusId))}). Chcesz więcej pracy? Zwiększ liczbę serii.</div>`
           : `<button class="d-add-btn">+ Dodaj do: ${esc(workout(focusId).name)}</button><div class="d-impact">${impact}</div>`
         : '<div class="d-impact">Aby dodać, kliknij trening w planie.</div>'}
       ${inPlan.length ? `<div class="d-impact muted">Już w treningach: ${inPlan.join(', ')}</div>` : ''}
@@ -542,7 +542,7 @@ function renderDetailTop() {
   // telefon: dodawanie na stałym pasku na dole (zamiast powtarzać je nad każdą sekcją)
   const here = focusId && inWorkout(ex.id, focusId);
   ui.exAction.innerHTML = !focusId ? ''
-    : here ? `<div class="ex-done">✓ W treningu <b>${esc(workout(focusId).name)}</b> · ${here.sets} × ${here.reps}</div>`
+    : here ? `<div class="ex-done">✓ W treningu <b>${esc(workout(focusId).name)}</b> · ${fmtSets(ex, here)}</div>`
     : `<div class="ex-impact">${impact}</div><button class="d-add-btn">+ Dodaj do: ${esc(workout(focusId).name)}</button>`;
   ui.dInfo.innerHTML = `<p class="d-text">${ex.how}</p><p class="d-tip">💡 ${ex.tip}</p>`;
   ui.dTop.querySelector('.back')?.addEventListener('click', backToList);
