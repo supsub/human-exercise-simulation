@@ -55,6 +55,9 @@ function periods() {
     return { plan: store.plans.find((p) => p.id === x.planId), from: x.from, to };
   }).filter((x) => x.plan);
 }
+// kolor planu w kalendarzu (inna paleta niż kolory treningów, żeby okres planu nie mylił się z wariantem)
+const PLAN_COLORS = ['#8b7cff', '#ff9f5a', '#3fd0a0', '#ff6fb0', '#e8c547', '#5ec3f2', '#b7d65a', '#c98a6b'];
+const planColor = (id) => PLAN_COLORS[Math.max(0, store.plans.findIndex((p) => p.id === id)) % PLAN_COLORS.length];
 const activeOn = (iso) => periods().filter((x) => x.from <= iso).at(-1) ?? null;
 function plannedFor(date) {
   const act = activeOn(isoDate(date));
@@ -204,7 +207,7 @@ function render() {
       selectedExId: selected?.ex.id ?? null,
       onOpenExercise: (ex) => { if (selected?.ex !== ex) selectExercise(ex, 'plan'); },
       onDelete: () => { store.sessions = store.sessions.filter((x) => x !== ses); openSessionId = null; render(); } });
-    else renderCalendar(ui.calendar, { plannedFor, activeOn, periods: periods(), plans: store.plans, workout, color, letter,
+    else renderCalendar(ui.calendar, { plannedFor, activeOn, periods: periods(), plans: store.plans, workout, color, letter, planColor,
       onSetActive: setActive,
       sessionOn: (iso) => (store.sessions ?? []).find((x) => x.date === iso),
       onPick: (iso, wid) => {
