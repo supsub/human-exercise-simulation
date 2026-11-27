@@ -338,7 +338,7 @@ const tests = {
     $('#picker-list .quick-add').click();
     await waitFor(() => srv.row.data.workouts[0].items.length === 2, 'zmiana zapisana na koncie', 8000)
       .catch(async (e) => { const l = await win().navigator.locks.query(); throw new Error(`${e.message} (stan: ${$('#auth-open').dataset.state}, lokalnie: ${data()?.workouts[0]?.items.length} ćw., zapytania: ${srv.calls?.join(', ')}, blokady: ${JSON.stringify(l)})`); });
-    check($('#auth-open').dataset.state === 'ok', 'stan po zapisie inny niż „Zapisane”');
+    await waitFor(() => $('#auth-open').dataset.state === 'ok', 'stan „Zapisane” po zapisie', 5000);   // odpowiedź serwera jeszcze się przetwarza
     check(srv.row.data.v === 2, 'zapis bez numeru formatu danych (v)');
   },
 };

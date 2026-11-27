@@ -129,6 +129,22 @@ export function checkPose(body, pose, tol = 0.012) {
   const props = pose.props ?? {};
   const pt = (name) => body.points[name].getWorldPosition(new THREE.Vector3());
 
+  // 0. poduszki maszyny (odwodzenie / przywodzenie): nie wchodzą w uda (z mięśniami ok. 2 cm ponad bryłą) ani w siebie
+  if (props.pads && body.padShape?.length) {
+    const thighs = body.colliders.filter((c) => /^thigh/.test(c.part));
+    const seg = (p, t) => p.a.clone().lerp(p.b, t);
+    for (const p of body.padShape) for (let t = 0; t <= 1; t += 0.25) for (const c of thighs) {
+      const d = depthIn(c, seg(p, t)) + p.r + 0.02;
+      if (d > tol) issues.push({ what: 'poduszka maszyny wchodzi w udo', part: c.part, depth: d });
+    }
+    const [P, Q] = body.padShape;
+    if (P && Q) {
+      let best = Infinity;
+      for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) best = Math.min(best, seg(P, i / 8).distanceTo(seg(Q, j / 8)));
+      if (P.r + Q.r - best > tol) issues.push({ what: 'poduszki maszyny wchodzą w siebie', part: 'thighL', depth: P.r + Q.r - best });
+    }
+  }
+
   // 1. drążek / sztanga: punkty co 2 cm wzdłuż pręta
   if (props.bar) {
     const front = props.bar.on === 'front';

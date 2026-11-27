@@ -490,6 +490,7 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
   const metal = new THREE.MeshStandardMaterial({ color: 0x8a919c, roughness: 0.35, metalness: 0.8 });
   const plateMat = new THREE.MeshStandardMaterial({ color: 0x23272e, roughness: 0.6, metalness: 0.3 });
   const padMat = new THREE.MeshStandardMaterial({ color: 0x3a4150, roughness: 0.8 });
+  const machinePadMat = new THREE.MeshStandardMaterial({ color: 0x8d6b4a, roughness: 0.75 });   // poduszki maszyny – wyraźne na tle ciała
   const cableMat = new THREE.MeshBasicMaterial({ color: 0xc8ccd4 });
   const bandMat = new THREE.MeshStandardMaterial({ color: 0x6fbf73, roughness: 0.7 });
   const CYL = new THREE.CylinderGeometry(1, 1, 1, 14);
@@ -515,7 +516,7 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
     if (_u.lengthSq() < 0.5) _u.set(1, 0, 0);
     return cyl(_l.copy(_c).addScaledVector(_u, len / 2), _r.copy(_c).addScaledVector(_u, -len / 2), r, mat);
   }
-  const gobletShape = { base: null, r: 0 }, plateShape = { c: null, n: null };
+  const gobletShape = { base: null, r: 0 }, plateShape = { c: null, n: null }, padShape = [];   // padShape: poduszki maszyny [{ a, b, r }] – test fizyki
   function updateWorldProps(props = {}) {
     if (!worldProps.parent && root.parent) root.parent.add(worldProps);
     used = 0;
@@ -578,6 +579,32 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
       const n = new THREE.Vector3(-e[4], -e[5], -e[6]).normalize();
       plateShape.c = c.clone(); plateShape.n = n.clone();
       cyl(c.clone().addScaledVector(n, 0.002), c.clone().addScaledVector(n, 0.042), 0.32, plateMat);
+    }
+    if (props.pads) {
+      // Maszyna do odwodzenia / przywodzenia: poduszki na dźwigniach przy kolanach (side 'out' – po zewnętrznej,
+      // 'in' – po wewnętrznej stronie ud), nogi rozpychają / ściągają je wbrew ciężarowi ze stosu obok maszyny.
+      // Poduszka 13,5 cm od osi uda: poza skórą i mięśniami (udo z mięśniami ok. 9 cm), bez przenikania.
+      const { side, rest, full } = props.pads, k = side === 'out' ? 1 : -1;
+      padShape.length = 0;
+      for (const S of ['L', 'R']) {
+        const sx = S === 'L' ? 1 : -1, hip = joints['hip' + S];
+        const a = hip.localToWorld(new THREE.Vector3(sx * k * 0.135, -0.26, 0)), b = hip.localToWorld(new THREE.Vector3(sx * k * 0.135, -0.42, 0));
+        cyl(a, b, 0.035, machinePadMat);
+        padShape.push({ a: a.clone(), b: b.clone(), r: 0.035 });
+        const m = a.clone().add(b).multiplyScalar(0.5);
+        cyl(m, new THREE.Vector3(m.x, 0.3, m.z), 0.012, metal);            // dźwignia w dół, do osi obrotu przy podstawie
+      }
+      // stos ciężarów: część górnych płyt unosi się tym wyżej, im dalej poduszki od pozycji spoczynku
+      const abd = Math.abs(joints.hipL.rotation.z) * 180 / Math.PI;
+      const lift = Math.max(0, Math.min(1, (abd - rest) / (full - rest))) * 0.22;
+      const SX = -0.78, SZ = -0.3, up = (y) => new THREE.Vector3(SX, y, SZ);
+      for (const dx of [-0.13, 0.13]) cyl(new THREE.Vector3(SX + dx, 0, SZ), new THREE.Vector3(SX + dx, 1.45, SZ), 0.01, metal);   // prowadnice
+      for (let i = 0; i < 10; i++) {
+        const y = 0.03 + i * 0.028 + (i >= 5 ? lift : 0);
+        cyl(up(y), up(y + 0.024), 0.11, plateMat);
+      }
+      cyl(up(0.03 + 10 * 0.028 + lift), up(1.42), 0.004, cableMat);              // linka do bloczka
+      cyl(new THREE.Vector3(SX - 0.16, 1.45, SZ), new THREE.Vector3(SX + 0.16, 1.45, SZ), 0.02, metal);   // belka z bloczkiem
     }
     for (const pad of props.rollers ?? []) {
       // wałki maszyn: 'shin' (przód goleni) albo 'calf' (tył goleni)
@@ -705,6 +732,6 @@ export function createBody({ look = (typeof location !== 'undefined' && new URLS
   }
   setSex(sex);
 
-  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, plateShape, materials,
+  return { root, joints, points, colliders, dumbbells: props.dumbbells, gobletShape, plateShape, padShape, materials,
     get muscleMeshes() { return muscleMeshes; }, get sex() { return currentSex; }, setSex, nose, faceParts, setPose, setBreath, setMouth, setMouthOnFace, mouthWorld, resolvePose };
 }

@@ -379,8 +379,9 @@ const adductor = animated({
   id: 'adductor', type: 'lift', camera: 'seat', scenery: [...machineSeat, ...handles(0.53, 0.559, 0.088)],
   steps: ['Nogi rozchylone', 'Ściąganie kolan do środka', 'Kolana razem', 'Rozchylanie'],
   pose: keyframes({ root: { y: 0.55, z: 0 }, rx: -6, trunk: -10, thigh: -86, shin: 0, foot: 0, arm: 10, fore: -40, abd: 30,
-    handL: { at: [0.53, 0.559, 0.088], pole: [1, -0.5, -0.5] }, handR: { at: [-0.53, 0.559, 0.088], pole: [-1, -0.5, -0.5] } },   // dłonie na uchwytach
-    { hipAbd: 38 }, { hipAbd: 4 }),
+    handL: { at: [0.53, 0.559, 0.088], pole: [1, -0.5, -0.5] }, handR: { at: [-0.53, 0.559, 0.088], pole: [-1, -0.5, -0.5] },   // dłonie na uchwytach
+    props: { pads: { side: 'in', rest: 38, full: 15 } } },   // poduszki między kolanami: kolana schodzą się do ok. 15° (poduszki się stykają)
+    { hipAbd: 38 }, { hipAbd: 15 }),
   cameraPosition: [0.6, 1.5, 2.6], cameraTarget: [0, 0.6, 0.2],
 });
 // Odwodzenie: ta sama maszyna co przywodzenie, ruch odwrotny – kolana rozpychane na boki
@@ -388,7 +389,8 @@ const abductor = animated({
   id: 'abductor', type: 'lift', camera: 'seat', scenery: [...machineSeat, ...handles(0.53, 0.559, 0.088)],
   steps: ['Kolana razem', 'Rozpychanie kolan na boki', 'Nogi rozchylone', 'Powolny powrót'],
   pose: keyframes({ root: { y: 0.55, z: 0 }, rx: -6, trunk: -10, thigh: -86, shin: 0, foot: 0, arm: 10, fore: -40, abd: 30,
-    handL: { at: [0.53, 0.559, 0.088], pole: [1, -0.5, -0.5] }, handR: { at: [-0.53, 0.559, 0.088], pole: [-1, -0.5, -0.5] } },   // dłonie na uchwytach
+    handL: { at: [0.53, 0.559, 0.088], pole: [1, -0.5, -0.5] }, handR: { at: [-0.53, 0.559, 0.088], pole: [-1, -0.5, -0.5] },   // dłonie na uchwytach
+    props: { pads: { side: 'out', rest: 4, full: 38 } } },   // poduszki po zewnętrznej stronie kolan
     { hipAbd: 4 }, { hipAbd: 38 }),
   cameraPosition: [0.6, 1.5, 2.6], cameraTarget: [0, 0.6, 0.2],
 });
