@@ -316,6 +316,17 @@ body.no-plan .calendar-view, body.no-plan .left-switch { display: none !importan
 .cal-w { display: flex; align-items: center; gap: 6px; font-size: 15px; }
 .cal-items { margin: 8px 0 0; padding-left: 18px; font-size: 13px; }
 .cal-items li { margin: 3px 0; }
+.ses-sum { list-style: none; padding-left: 0; }
+.ses-sum li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+.ses-sum .sname { font-weight: 600; margin-right: 2px; }
+.ses-sum .ssets { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.sset { font-size: 11.5px; padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,.06); color: var(--muted); }
+.sset.ok { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--text); }
+.sset.cut { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+.ses-sum .removed { color: var(--muted); }
+.ses-sum .removed s, .sset.cut s { text-decoration-thickness: 2px; text-decoration-color: color-mix(in srgb, var(--bad) 70%, transparent); }
+.ses-sum .tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,.05); color: var(--muted); }
+.ses-sum .added .tag { color: var(--good); }
 .cal-actions { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .cal-actions .primary { width: 100%; padding: 11px; font-size: 15px; border-radius: 10px; }
 .cal-ses { font-size: 13px; }

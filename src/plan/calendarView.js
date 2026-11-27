@@ -4,7 +4,7 @@
 // więc od razu widać, który plan obowiązywał / obowiązuje w danym dniu.
 // Kliknięty dzień pokazuje swój trening, a model – jego mięśnie. Dane i akcje dostaje z planView (ctx).
 import { DAYS, isoDate, parseDate, mondayOf } from './analysis.js';
-import { CATALOG_BY_ID, fmtSets } from './catalog.js';
+import { CATALOG_BY_ID, fmtSets, fmtAmount } from './catalog.js';
 import { sessionStats } from './sessionView.js';
 
 const MONTHS = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];
@@ -18,6 +18,28 @@ let editing = false;  // otwarty formularz „zmień plan od…”
 let lastLayout = '';  // animacja „wypełniania” kafelków tylko przy zmianie miesiąca albo planów, nie przy każdym kliknięciu
 
 export const calendarDay = () => day;
+
+// Podsumowanie dnia z zapisem treningu: co faktycznie zrobiono w porównaniu z planem (szablonem treningu).
+// Usunięte serie i ćwiczenia są jawnie przekreślone, dodane spoza planu – oznaczone.
+function sessionSummary(ses, ctx) {
+  const tpl = ses.workoutId && ctx.workout(ses.workoutId), planned = tpl?.items ?? [];
+  const setChip = (ex, x) => `<span class="sset${x.done ? ' ok' : ''}">${fmtAmount(ex, x.reps ?? '–')}${x.kg ? ` × ${x.kg} kg` : ''}${x.done ? ' ✓' : ''}</span>`;
+  const rows = [];
+  for (const it of planned) {
+    const ex = CATALOG_BY_ID[it.exId]; if (!ex) continue;
+    const got = ses.skipped ? null : ses.items.find((x) => x.exId === it.exId);
+    if (!got) { rows.push(`<li class="removed"><s>${esc(ex.name)} ${fmtSets(ex, it)}</s> <span class="tag">${ses.skipped ? 'nie wykonano' : 'pominięte'}</span></li>`); continue; }
+    const cut = Math.max(0, it.sets - got.sets.length);
+    rows.push(`<li><span class="sname">${esc(ex.name)}</span> <span class="ssets">${got.sets.map((x) => setChip(ex, x)).join('')}${
+      Array.from({ length: cut }, () => `<span class="sset cut" title="Seria usunięta w tym dniu"><s>${fmtAmount(ex, it.reps)}</s> usunięta</span>`).join('')}</span></li>`);
+  }
+  for (const got of ses.skipped ? [] : ses.items.filter((x) => !planned.some((it) => it.exId === x.exId))) {
+    const ex = CATALOG_BY_ID[got.exId]; if (!ex) continue;
+    rows.push(`<li class="added"><span class="sname">${esc(ex.name)}</span> <span class="tag">+ dodane</span> <span class="ssets">${got.sets.map((x) => setChip(ex, x)).join('')}</span></li>`);
+  }
+  return `<div class="cal-w">${ses.workoutId ? `<i class="wbadge" style="--c:${ctx.color(ses.workoutId)}">${ctx.letter(ses.workoutId)}</i>` : ''} <b>${esc(ses.name)}</b></div>
+    <ul class="cal-items ses-sum">${rows.join('') || '<li class="muted">bez ćwiczeń</li>'}</ul>`;
+}
 export function resetCalendar() { month = null; day = null; }
 
 // ctx: { plannedFor(date) → id treningu | null, activeOn(iso) → { plan, from, to } | null, periods: [{ plan, from, to }], plans: [plan],
@@ -114,7 +136,7 @@ export function renderCalendar(el, ctx) {
     <div class="cal-grid${animate ? ' anim' : ''}">${DAYS.map((d) => `<span class="cal-wd">${d.short}</span>`).join('')}${cells.join('')}</div>
     <div class="cal-detail" style="${act ? `--pc:${ctx.planColor(act.plan.id)}` : ''}">
       <div class="cal-date">${label}${act && !ses ? ` <span class="cal-dplan">${dot(act.plan)}${esc(act.plan.name)}</span>` : ''}</div>
-      ${pw ? `<div class="cal-w"><i class="wbadge" style="--c:${ctx.color(pid)}">${ctx.letter(pid)}</i> <b>${esc(pw.name)}</b>
+      ${ses ? sessionSummary(ses, ctx) : pw ? `<div class="cal-w"><i class="wbadge" style="--c:${ctx.color(pid)}">${ctx.letter(pid)}</i> <b>${esc(pw.name)}</b>
         <span class="muted">${pw.items.length ? `${pw.items.length} ćw.` : 'pusty'}</span></div>
         <ul class="cal-items">${pw.items.map((it) => { const ex = CATALOG_BY_ID[it.exId]; return ex ? `<li>${esc(ex.name)} <span class="muted">${fmtSets(ex, it)}</span></li>` : ''; }).join('')}</ul>`
       : `<div class="muted">${act ? 'Dzień odpoczynku' : 'Bez planu w tym dniu'}</div>`}

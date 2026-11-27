@@ -180,7 +180,9 @@ const tests = {
     await waitFor(() => data()?.sessions?.[0]?.items[0].sets[0].kg === 40, 'ciężar zapisany');
     $('.ses-ex .ses-done').click();
     await waitFor(() => data().sessions[0].items[0].sets[0].done, 'seria odhaczona');
-    // edycja tylko tego dnia: usunięcie deski nie zmienia planu
+    // edycja tylko tego dnia: jedna seria wyciskania mniej, usunięcie deski – plan bez zmian
+    $('.ses-ex .ses-rmset').click();
+    await waitFor(() => data().sessions[0].items[0].sets.length === 2, 'seria usunięta');
     doc().querySelectorAll('.ses-ex')[1].querySelector('.ses-del').click();
     await waitFor(() => data().sessions[0].items.length === 1, 'deska usunięta z treningu');
     check(data().workouts[0].items.length === 2, 'usunięcie z treningu dnia zmieniło plan');
@@ -188,6 +190,12 @@ const tests = {
     await waitFor(() => data().sessions[0].finished, 'trening zakończony');
     $('.ses-back').click();
     await waitFor(() => $(`.cal-d.done[data-iso="${iso(yest)}"]`) || ($('.cal-next')?.click(), false), 'wczoraj oznaczone jako wykonane');
+    // podsumowanie dnia: to, co zrobiono – usunięta seria i usunięte ćwiczenie jawnie przekreślone
+    (await dayBtn(yest)).click();
+    await waitFor(() => $('.cal-detail .ses-sum'), 'podsumowanie wykonanego treningu');
+    check(/Deska/.test($('.cal-detail .removed')?.textContent ?? '') && $('.cal-detail .removed s'), 'usunięte ćwiczenie nie jest przekreślone w podsumowaniu dnia');
+    check(doc().querySelectorAll('.cal-detail .sset.cut').length === 1, 'usunięta seria nie jest przekreślona w podsumowaniu dnia');
+    check(/40 kg ✓/.test($('.cal-detail .ses-sum').textContent), 'w podsumowaniu brak wykonanej serii z ciężarem');
     // dziś: start podpowiada ostatni ciężar (40 kg)
     if (!$(`.cal-d[data-iso="${iso(today)}"]`)) $('.cal-next').click();
     $(`.cal-d[data-iso="${iso(today)}"]`).click();
