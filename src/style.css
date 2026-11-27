@@ -268,6 +268,36 @@ body.no-plan .calendar-view, body.no-plan .left-switch { display: none !importan
 .cal-w { display: flex; align-items: center; gap: 6px; }
 .cal-items { margin: 8px 0 0; padding-left: 18px; font-size: 13px; }
 .cal-items li { margin: 2px 0; }
+.cal-d .cal-mark { position: absolute; top: 2px; right: 4px; font-style: normal; font-size: 11px; color: var(--good); font-weight: 700; }
+.cal-d .cal-mark.live { color: #f0c04a; font-size: 9px; }
+.cal-d.done { background: rgba(95,211,138,.10); border-color: rgba(95,211,138,.45); opacity: 1; }
+.cal-actions { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.cal-actions .primary { width: 100%; padding: 10px; font-size: 15px; }
+.cal-ses { font-size: 13px; }
+.cal-ses.done { color: var(--good); }
+.cal-other { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cal-other .chip { display: inline-flex; align-items: center; gap: 5px; }
+.cal-other .wbadge { width: 16px; height: 16px; font-size: 10px; }
+
+/* Trening dnia (src/plan/sessionView.js) */
+.ses-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; }
+.ses-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 16px; }
+.ses-state { font-size: 12px; color: #f0c04a; margin-left: auto; }
+.ses-state.done { color: var(--good); }
+.ses-ex { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; background: rgba(255,255,255,.03); }
+.ses-ex-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.ses-ex-head .ses-open { flex: 1; text-align: left; font-weight: 600; color: var(--text); padding: 0; font-size: 14px; }
+.ses-set { display: grid; grid-template-columns: 18px 58px 40px 64px 18px 1fr; gap: 6px; align-items: center; padding: 3px 0; }
+.ses-set input { width: 100%; padding: 6px; font-size: 14px; text-align: center; }
+.ses-n { color: var(--muted); font-size: 12px; text-align: center; }
+.ses-u { color: var(--muted); font-size: 12px; }
+.ses-done { justify-self: end; width: 36px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: none; color: var(--muted); font-size: 16px; cursor: pointer; }
+.ses-set.done .ses-done { background: var(--good); border-color: var(--good); color: #06121f; font-weight: 700; }
+.ses-set.done input { opacity: .75; }
+.ses-ex-foot { display: flex; gap: 12px; align-items: center; margin-top: 4px; }
+.ses-ex-foot .muted { margin-left: auto; }
+.ses-foot { display: flex; align-items: center; gap: 12px; margin: 12px 0 6px; }
+.ses-foot .primary { flex: 1; padding: 10px; font-size: 15px; }
 .plan-scroll .plan-days { overflow: visible; flex: none; }
 .plan-schedule { border: 1px solid var(--border); border-radius: 11px; padding: 10px 12px; background: rgba(11,16,23,.5); margin-bottom: 6px; }
 .sch-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }

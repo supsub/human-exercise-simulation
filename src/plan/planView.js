@@ -7,6 +7,7 @@ import { createPlayer } from '../player.js';
 import { createFigure } from '../figure.js';
 import { CATALOG, CATALOG_BY_ID, CATEGORIES, isTime, defaultAmount, amountRange, fmtSets } from './catalog.js';
 import { renderCalendar } from './calendarView.js';
+import { renderSession, sessionFromWorkout, newSet, dateLabel } from './sessionView.js';
 import { DAYS, isoDate, mondayOf, worse, analyzePlan, emptyPlan, emptyWorkout, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
 
 // Jedyny widok aplikacji: plan treningowy z modelem 3D.
@@ -44,6 +45,9 @@ let selected = null;        // { ex: pozycja katalogu, anim: definicja animacji 
 let browseId = null;        // trening, dla którego otwarto listę ćwiczeń (cel szybkiego dodawania)
 let browseMuscle = null;    // lista „ćwiczenia na mięsień” (kliknięty mięsień na modelu)
 let browseCat = null;
+let browseSession = null;   // lista ćwiczeń otwarta z zapisu treningu (dodawanie do tego dnia, nie do planu)
+let openSessionId = null;   // otwarty zapis treningu (w widoku kalendarza)
+const openSession = () => (openSessionId && store.sessions?.find((x) => x.id === openSessionId)) || null;
 let listHover = null;       // ćwiczenie wskazane na liście (podgląd mięśni)
 let muscleHover = null;     // mięsień wskazany w panelu
 let showNotes = localStorage.getItem('hes.mistakeNotes') !== '0';
@@ -53,7 +57,7 @@ function load() {
   try {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
     const cur = localStorage.getItem(CURRENT_KEY) ?? s?.currentId;
-    if (s && s.plans?.length) return { plans: s.plans, workouts: s.workouts, currentId: s.plans.some((p) => p.id === cur) ? cur : s.plans[0].id };
+    if (s && s.plans?.length) return { plans: s.plans, workouts: s.workouts, sessions: s.sessions ?? [], currentId: s.plans.some((p) => p.id === cur) ? cur : s.plans[0].id };
   } catch {}
   // dane w starym formacie (ćwiczenia przypisane do dni) – przenosimy jako treningi
   try {
@@ -65,7 +69,7 @@ function load() {
   } catch {}
   // czysty start: bez planów i treningów (przykładowe tylko do testów: ?examples)
   if (new URLSearchParams(location.search).has('examples')) { const d = exampleData(); return { ...d, currentId: d.plans[0].id }; }
-  return { plans: [], workouts: [], currentId: null };
+  return { plans: [], workouts: [], sessions: [], currentId: null };
 }
 const saveListeners = [];
 // Tryb gościa (niezalogowany): domyślny plan „Mój plan” z pustym treningiem – można go od razu wypełniać
@@ -84,12 +88,12 @@ export function setGuest(on) {
   guest = on;
   if (on && !store.plans.length) {
     const w = emptyWorkout('Trening A'), p = emptyPlan('Mój plan', [w.id]);
-    store = { plans: [p], workouts: [w], currentId: p.id };
+    store = { plans: [p], workouts: [w], sessions: store.sessions ?? [], currentId: p.id };
     focusId = null;
   }
   if (started) render();
 }
-const contentJSON = () => JSON.stringify({ plans: store.plans, workouts: store.workouts });
+const contentJSON = () => JSON.stringify({ plans: store.plans, workouts: store.workouts, sessions: store.sessions ?? [] });
 function save() {
   if (store.currentId) localStorage.setItem(CURRENT_KEY, store.currentId);
   const json = contentJSON();
@@ -102,7 +106,7 @@ function save() {
 export function applyExternal(data) {
   if (!data?.plans) return;
   const cur = store.currentId;
-  store = { plans: data.plans, workouts: data.workouts, currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
+  store = { plans: data.plans, workouts: data.workouts, sessions: data.sessions ?? [], currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
   if (focusId && !workout(focusId)) focusId = null;
   if (started) render();
 }
@@ -114,7 +118,7 @@ export const emptiedByUser = () => userEmptied;
 export function setData(data) {
   userEmptied = false;
   const cur = store.currentId;
-  store = { plans: data.plans, workouts: data.workouts, currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
+  store = { plans: data.plans, workouts: data.workouts, sessions: data.sessions ?? [], currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
   localStorage.setItem(STORAGE_KEY, contentJSON());
   if (focusId && !workout(focusId)) focusId = null;
   render();
@@ -159,11 +163,25 @@ function render() {
   renderWorkouts(p);
   if (view === 'calendar') {
     if (!p.start) p.start = isoDate(mondayOf(new Date()));   // początek cyklu planu: ten tydzień (zapisze się z planem)
-    renderCalendar(ui.calendar, { plan: p, schedule: analysis.schedule, workout, color, letter,
+    const ses = openSession();
+    if (ses) renderSession(ui.calendar, { s: ses, badge,
+      onChange: render,
+      onClose: () => { openSessionId = null; render(); },
+      onAdd: () => openBrowseSession(ses),
+      onOpenExercise: (ex) => selectExercise(ex, 'plan'),
+      onDelete: () => { store.sessions = store.sessions.filter((x) => x !== ses); openSessionId = null; render(); } });
+    else renderCalendar(ui.calendar, { plan: p, schedule: analysis.schedule, workout, color, letter,
+      sessionOn: (iso) => (store.sessions ?? []).find((x) => x.date === iso),
       onPick: (iso, wid) => {
         focusId = wid ?? null; render();
         if (phone()) setTimeout(() => ui.calendar.querySelector('.cal-detail')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 0);   // szczegóły dnia pod kalendarzem
-      } });
+      },
+      onStart: (iso, wid) => {   // trening dnia: kopia szablonu z planu (z ostatnio użytymi ciężarami)
+        const sesNew = sessionFromWorkout(workout(wid), p, iso, store.sessions ?? []);
+        (store.sessions ??= []).push(sesNew);
+        openSessionId = sesNew.id; focusId = wid ?? null; render();
+      },
+      onOpen: (id) => { openSessionId = id; focusId = store.sessions.find((x) => x.id === id)?.workoutId ?? null; if (focusId && !workout(focusId)) focusId = null; render(); } });
   }
   renderAnalysis(p);
   if (selected) renderDetailTop();
@@ -376,10 +394,27 @@ function applyFix(f, p) {
 }
 
 // ---------- Panel: lista ćwiczeń ----------
-const listTitle = () => (browseMuscle ? `Ćwiczenia na: ${MUSCLE_BY_ID[browseMuscle].name}` : `Dodaj ćwiczenie – ${workout(browseId).name}`);
+const listTitle = () => (browseMuscle ? `Ćwiczenia na: ${MUSCLE_BY_ID[browseMuscle].name}` : browseSession ? `Dodaj do treningu – ${dateLabel(browseSession.date)}`
+  : `Dodaj ćwiczenie – ${workout(browseId).name}`);
+function openBrowseSession(ses) {
+  browseMuscle = null; browseId = null; browseSession = ses;
+  deselect();
+  ui.search.value = '';
+  ui.panel.hidden = false; ui.browse.hidden = false; ui.detail.hidden = true;
+  ui.panelTitle.textContent = listTitle();
+  render();
+  ui.search.focus();
+}
+function addToSession(ex) {
+  const ses = browseSession;
+  if (!ses || ses.items.some((it) => it.exId === ex.id)) return;
+  ses.items.push({ exId: ex.id, sets: Array.from({ length: 3 }, () => newSet(ex, store.sessions, ses.date)) });
+  ses.upd = Date.now();
+  closePanel();   // z powrotem do treningu
+}
 // Kliknięty mięsień: ćwiczenia od najmocniej go angażujących; szybkie dodawanie do wybranego treningu (albo pierwszego w planie)
 function openMuscle(id) {
-  browseMuscle = id;
+  browseMuscle = id; browseSession = null;
   browseId = (focusId && workout(focusId) ? focusId : plan()?.variants.find((w) => workout(w))) ?? null;
   deselect();
   ui.search.value = '';
@@ -392,7 +427,7 @@ function openMuscle(id) {
 }
 onMuscleTap((id) => { if (!selected) openMuscle(id); });
 function openBrowse(id) {
-  browseMuscle = null;
+  browseMuscle = null; browseSession = null;
   browseId = id;
   focusId = id;
   deselect();
@@ -415,6 +450,7 @@ function backToList() {
 }
 function closePanel() {
   ui.panel.hidden = true;
+  browseSession = null;
   listHover = null;
   deselect();
   flyCamera(...PLAN_CAMERA);
@@ -439,13 +475,14 @@ function renderList() {
     const helps = helpsOf(ex).length;
     const tags = Object.entries(ex.muscles).sort((a, b) => b[1] - a[1]).slice(0, 3)
       .map(([id, w]) => `<span class="mtag" style="border-color:${cssColor(w * 0.9)}">${MUSCLE_BY_ID[id].name}</span>`).join('');
-    const here = inWorkout(ex.id, browseId);
+    const here = browseSession ? browseSession.items.find((it) => it.exId === ex.id) : inWorkout(ex.id, browseId);
     return `<div class="pick${here ? ' present' : ''}" data-id="${ex.id}" tabindex="0">
       <div class="pick-body">
         <div class="pick-head"><b>${ex.name}</b></div>
         <div class="pick-meta">${browseMuscle ? `<span class="mrole" style="--c:${cssColor(mw(ex) * 0.9)}">${mw(ex) >= 0.75 ? 'główny' : mw(ex) >= 0.5 ? 'pomocniczy' : 'lekko'}</span> ` : ''}${ex.category} · ${ex.equipment}${helps ? ` <span class="helps">uzupełnia ${helps} ${helps === 1 ? 'brak' : 'braki'}</span>` : ''}</div><div class="mtags">${tags}</div>
       </div>
-      ${here ? `<span class="present-tag">już w tym treningu<br>${fmtSets(ex, here)}</span>`
+      ${here ? `<span class="present-tag">już w tym treningu${browseSession ? '' : `<br>${fmtSets(ex, here)}`}</span>`
+        : browseSession ? `<button class="quick-add" title="Dodaj do treningu z dnia ${dateLabel(browseSession.date)} (3 serie)">+</button>`
         : !browseId ? ''
         : `<button class="quick-add" title="Dodaj od razu do: ${esc(workout(browseId).name)} (${fmtSets(ex, { sets: 3, reps: defaultAmount(ex) })})">+</button>`}
     </div>`;
@@ -456,7 +493,7 @@ function renderList() {
     el.onkeydown = (e) => { if (e.key === 'Enter') selectExercise(ex, 'list'); };
     el.querySelector('.quick-add')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      addToWorkout(ex, browseId);
+      if (browseSession) addToSession(ex); else addToWorkout(ex, browseId);
     });
     el.onmouseenter = () => (listHover = ex);
     el.onmouseleave = () => (listHover = null);
@@ -521,7 +558,7 @@ function deselect() {
   updateStressMarkers([], 0, 0);
 }
 
-const addTarget = () => focusId ?? (selected?.from === 'list' ? browseId : null);
+const addTarget = () => (browseSession ? null : focusId ?? (selected?.from === 'list' ? browseId : null));   // przy treningu dnia: tylko „+” na liście
 function renderDetailTop() {
   const { ex, from } = selected;
   const p = plan();

@@ -139,6 +139,44 @@ const tests = {
     $('#mobile-tabs [data-tab="plan"]').click();
     await waitFor(() => visible('.plan-scroll') && !visible('#calendar-view'), 'powrót do planu');
   },
+  async 'trening dnia: start z planu, ciężary (ostatnio użyte), odhaczanie, edycja tylko tego dnia, zakończenie'() {
+    const ALL = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    await open(() => localStorage.setItem('hes.data.v2', JSON.stringify({ plans: [{ id: 'g1', name: 'Mój plan', sessions: 7, variants: ['gw'], days: ALL }],
+      workouts: [{ id: 'gw', name: 'Trening A', items: [{ exId: 'bench', sets: 3, reps: 8 }, { exId: 'plank', sets: 2, reps: 45 }] }], currentId: 'g1' })));
+    await waitFor(() => !visible('#app-loading'), 'start');
+    $('#mobile-tabs [data-tab="calendar"]').click();
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const today = new Date(), yest = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    const dayBtn = async (d) => { await waitFor(() => $('.cal-grid'), 'kalendarz'); let b = $(`.cal-d[data-iso="${iso(d)}"]`); if (!b) { $('.cal-prev').click(); b = $(`.cal-d[data-iso="${iso(d)}"]`); } return b; };
+    // wczoraj: zapis wykonanego treningu z ciężarem 40 kg
+    (await dayBtn(yest)).click();
+    await waitFor(() => $('.cal-start'), 'przycisk zapisu treningu na wczoraj');
+    check(/Zapisz wykonany/.test($('.cal-start').textContent), 'na miniony dzień brak „Zapisz wykonany trening”');
+    $('.cal-start').click();
+    await waitFor(() => doc().querySelectorAll('.ses-ex').length === 2, 'trening z ćwiczeniami z planu');
+    check(doc().querySelectorAll('.ses-ex')[0].querySelectorAll('.ses-set').length === 3, 'wyciskanie: 3 serie jak w planie');
+    check(doc().querySelectorAll('.ses-ex')[1].querySelector('.ses-amt').value === '45', 'deska: 45 s jak w planie');
+    const kg = $('.ses-ex .ses-kg'); kg.value = '40'; kg.dispatchEvent(new (win().Event)('change'));
+    await waitFor(() => data()?.sessions?.[0]?.items[0].sets[0].kg === 40, 'ciężar zapisany');
+    $('.ses-ex .ses-done').click();
+    await waitFor(() => data().sessions[0].items[0].sets[0].done, 'seria odhaczona');
+    // edycja tylko tego dnia: usunięcie deski nie zmienia planu
+    doc().querySelectorAll('.ses-ex')[1].querySelector('.ses-del').click();
+    await waitFor(() => data().sessions[0].items.length === 1, 'deska usunięta z treningu');
+    check(data().workouts[0].items.length === 2, 'usunięcie z treningu dnia zmieniło plan');
+    $('.ses-finish').click();
+    await waitFor(() => data().sessions[0].finished, 'trening zakończony');
+    $('.ses-back').click();
+    await waitFor(() => $(`.cal-d.done[data-iso="${iso(yest)}"]`) || ($('.cal-next')?.click(), false), 'wczoraj oznaczone jako wykonane');
+    // dziś: start podpowiada ostatni ciężar (40 kg)
+    if (!$(`.cal-d[data-iso="${iso(today)}"]`)) $('.cal-next').click();
+    $(`.cal-d[data-iso="${iso(today)}"]`).click();
+    await waitFor(() => /Zacznij trening/.test($('.cal-start')?.textContent ?? ''), 'przycisk „Zacznij trening” na dziś');
+    $('.cal-start').click();
+    await waitFor(() => $('.ses-ex .ses-kg'), 'dzisiejszy trening');
+    check($('.ses-ex .ses-kg').value === '40', `dzisiejszy trening nie podpowiada ostatniego ciężaru (jest „${$('.ses-ex .ses-kg').value}”)`);
+    check(data().sessions.length === 2, 'drugi zapis treningu nie powstał');
+  },
   async 'gość: „+ Nowy” plan prosi o logowanie (bez okienka z nazwą)'() {
     await open();
     await waitFor(() => $('#plan-new'), 'przycisk „+ Nowy”');
@@ -360,6 +398,21 @@ const tests = {
       check(scB.body.sex === 'f', 'karta B nie przejęła zmiany sylwetki z karty A');
     } finally { B.remove(); }
   },
+  async 'treningi z dwóch urządzeń naraz: konto ma oba dni, nowsza wersja dnia wygrywa'() {
+    const srv = fakeServer();
+    const ses = (id, date, upd, kg) => ({ id, date, planId: 'p1', workoutId: 'w1', name: 'Konto A', finished: true, upd, items: [{ exId: 'squat', sets: [{ reps: 10, kg, done: true }] }] });
+    srv.row = { data: jsonb({ v: 3, ...ACCOUNT, settings: { sex: 'm' }, sessions: [ses('s1', '2026-11-20', 100, 50), ses('s3', '2026-11-22', 500, 70)] }), updated_at: 't2' };   // inne urządzenie dopisało dzień 22
+    await open(() => {
+      localStorage.setItem(AUTH, fakeSession(3600));
+      const mine = { ...ACCOUNT, sessions: [ses('s1', '2026-11-20', 300, 55), ses('s2', '2026-11-21', 200, 60)] };   // tu: poprawka dnia 20 (nowsza) i nowy dzień 21
+      localStorage.setItem('hes.sync.local', JSON.stringify({ uid: '00000000-0000-0000-0000-000000000001', at: 't1', sent: 'starsze' }));
+      localStorage.setItem('hes.data.v2', JSON.stringify({ ...mine, currentId: 'p1' }));
+    }, srv.mock);
+    await waitFor(() => (srv.row.data.sessions ?? []).length === 3, 'na koncie trzy dni treningów');
+    const byId = Object.fromEntries(srv.row.data.sessions.map((x) => [x.id, x]));
+    check(byId.s1.items[0].sets[0].kg === 55, 'poprawka dnia z tego urządzenia (nowsza) przepadła');
+    check(byId.s3.items[0].sets[0].kg === 70, 'dzień dopisany na innym urządzeniu przepadł');
+  },
   async 'zapis zmian: aktualizuje znaną wersję konta'() {
     const srv = fakeServer();
     await open(() => {
@@ -374,7 +427,7 @@ const tests = {
     await waitFor(() => srv.row.data.workouts[0].items.length === 2, 'zmiana zapisana na koncie', 8000)
       .catch(async (e) => { const l = await win().navigator.locks.query(); throw new Error(`${e.message} (stan: ${$('#auth-open').dataset.state}, lokalnie: ${data()?.workouts[0]?.items.length} ćw., zapytania: ${srv.calls?.join(', ')}, blokady: ${JSON.stringify(l)})`); });
     await waitFor(() => $('#auth-open').dataset.state === 'ok', 'stan „Zapisane” po zapisie', 5000);   // odpowiedź serwera jeszcze się przetwarza
-    check(srv.row.data.v === 2, 'zapis bez numeru formatu danych (v)');
+    check(srv.row.data.v === 3, `zapis z numerem formatu ${srv.row.data.v} zamiast 3 (z treningami)`);
   },
 };
 
