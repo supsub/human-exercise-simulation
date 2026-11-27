@@ -6,7 +6,8 @@ import { EXERCISE_BY_ID } from '../exercises/index.js';
 import { createPlayer } from '../player.js';
 import { createFigure } from '../figure.js';
 import { CATALOG, CATALOG_BY_ID, CATEGORIES, isTime, defaultAmount, amountRange, fmtSets } from './catalog.js';
-import { DAYS, worse, analyzePlan, emptyPlan, emptyWorkout, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
+import { renderCalendar } from './calendarView.js';
+import { DAYS, isoDate, mondayOf, worse, analyzePlan, emptyPlan, emptyWorkout, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
 
 // Jedyny widok aplikacji: plan treningowy z modelem 3D.
 // - treningi (warianty, np. „FBW A”) to bloki ćwiczeń niezależne od dni tygodnia,
@@ -22,6 +23,7 @@ const $ = (id) => document.getElementById(id);
 const ui = {
   select: $('plan-select'), days: $('plan-days'), schedule: $('plan-schedule'), workoutNew: $('workout-new'),
   newBtn: $('plan-new'), renameBtn: $('plan-rename'), deleteBtn: $('plan-delete'), createBtn: $('plan-create'),
+  calendar: $('calendar-view'), leftSwitch: $('left-switch'),
   focus: $('plan-focus'), legend: $('plan-legend'), score: $('plan-score'), groups: $('plan-groups'), warnings: $('plan-warnings'), recs: $('plan-recs'),
   panel: $('picker'), panelTitle: $('picker-title'), panelClose: $('picker-close'),
   browse: $('picker-browse'), search: $('picker-search'), cats: $('picker-cats'), list: $('picker-list'),
@@ -155,6 +157,14 @@ function render() {
   analysis = analyzePlan(p, store.workouts);
   renderSchedule(p);
   renderWorkouts(p);
+  if (view === 'calendar') {
+    if (!p.start) p.start = isoDate(mondayOf(new Date()));   // początek cyklu planu: ten tydzień (zapisze się z planem)
+    renderCalendar(ui.calendar, { plan: p, schedule: analysis.schedule, workout, color, letter,
+      onPick: (iso, wid) => {
+        focusId = wid ?? null; render();
+        if (phone()) setTimeout(() => ui.calendar.querySelector('.cal-detail')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 0);   // szczegóły dnia pod kalendarzem
+      } });
+  }
   renderAnalysis(p);
   if (selected) renderDetailTop();
   // telefon: przy otwartym ćwiczeniu zakładki Plan/Analiza znikają (pasek dodawania albo nic)
@@ -603,7 +613,18 @@ function setMistake(m, instant = false) {
 }
 
 // ---------- Telefon: zakładki Plan / Analiza ----------
+// Widok lewego panelu: plan albo kalendarz (komputer – przełącznik w panelu, telefon – zakładki na dole)
+let view = 'plan';
+function setView(v) {
+  if (v === view) return;
+  view = v;
+  document.body.classList.toggle('view-calendar', v === 'calendar');
+  ui.leftSwitch.querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.view === v)));
+  render();
+}
+ui.leftSwitch.querySelectorAll('button').forEach((b) => (b.onclick = () => setView(b.dataset.view)));
 document.querySelectorAll('#mobile-tabs button').forEach((b) => (b.onclick = () => {
+  if (b.dataset.tab !== 'analysis') setView(b.dataset.tab);
   document.body.classList.toggle('tab-analysis', b.dataset.tab === 'analysis');
   document.querySelectorAll('#mobile-tabs button').forEach((x) => x.classList.toggle('active', x === b));
 }));

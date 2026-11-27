@@ -98,6 +98,20 @@ const mean = (ids, v) => ids.reduce((s, id) => s + v[id], 0) / ids.length;
 const GROUP_MEMBERS = Object.fromEntries(MUSCLE_GROUPS.map((g) => [g, MUSCLES.filter((m) => m.group === g).map((m) => m.id)]));
 const names = (ids) => ids.map((id) => MUSCLE_BY_ID[id].name).join(', ');
 
+// ---------- Daty (kalendarz) ----------
+// Daty w planie i zapisach treningów to napisy RRRR-MM-DD w czasie lokalnym (bez stref i godzin).
+export const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+export const parseDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+export const mondayOf = (d) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+export const dayIndex = (d) => (d.getDay() + 6) % 7;   // 0 = poniedziałek
+// Trening zaplanowany na dany dzień: tydzień cyklu liczony od plan.start (poniedziałek pierwszego tygodnia planu)
+export function plannedOn(plan, schedule, date) {
+  const start = plan.start ? parseDate(plan.start) : mondayOf(new Date());
+  const weeks = Math.round((mondayOf(date) - mondayOf(start)) / (7 * 864e5));
+  const wi = ((weeks % schedule.weeks) + schedule.weeks) % schedule.weeks;
+  return schedule.calendar[wi]?.[dayIndex(date)] ?? null;
+}
+
 // ---------- Harmonogram ----------
 const gcd = (a, b) => (b ? gcd(b, a % b) : a);
 function combos(n, k, start = 0, acc = [], out = []) {

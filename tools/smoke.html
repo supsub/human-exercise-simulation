@@ -120,6 +120,25 @@ const tests = {
     const row = $('#plan-days [data-ex]');
     check(row.querySelector('input[title^="Sekundy"]') && /\bs\b/.test(row.textContent), 'w planie brak jednostki sekund przy desce');
   },
+  async 'kalendarz: dni z treningami z planu, kliknięty dzień pokazuje swój trening'() {
+    await open(() => localStorage.setItem('hes.data.v2', JSON.stringify({ plans: [{ id: 'g1', name: 'Mój plan', sessions: 3, variants: ['gw'], days: null }],
+      workouts: [{ id: 'gw', name: 'Trening A', items: [{ exId: 'squat', sets: 3, reps: 10 }, { exId: 'plank', sets: 3, reps: 45 }] }], currentId: 'g1' })));
+    await waitFor(() => !visible('#app-loading') && $('#mobile-tabs [data-tab="calendar"]'), 'zakładka Kalendarz');
+    $('#mobile-tabs [data-tab="calendar"]').click();
+    await waitFor(() => visible('#calendar-view') && $('.cal-grid .cal-d'), 'siatka kalendarza');
+    check(!visible('.plan-scroll'), 'w widoku kalendarza dalej widać listę treningów planu');
+    const days = [...doc().querySelectorAll('.cal-d:not(.other)')], withW = days.filter((d) => d.querySelector('.wbadge'));
+    check(withW.length >= 12 && withW.length <= 15, `w miesiącu ${withW.length} dni treningowych (plan: 3 w tygodniu)`);
+    check($('.cal-d.today'), 'brak wyróżnionego dzisiejszego dnia');
+    withW[0].click();
+    await waitFor(() => /Trening A/.test($('.cal-detail')?.textContent ?? ''), 'trening klikniętego dnia');
+    check(/3 × 45 s/.test($('.cal-detail').textContent), 'w treningu dnia brak ćwiczeń z ilością (deska 3 × 45 s)');
+    check(data().plans[0].start, 'plan nie dostał daty początku cyklu');
+    days.find((d) => !d.querySelector('.wbadge')).click();
+    await waitFor(() => /odpoczynku/.test($('.cal-detail')?.textContent ?? ''), 'dzień odpoczynku');
+    $('#mobile-tabs [data-tab="plan"]').click();
+    await waitFor(() => visible('.plan-scroll') && !visible('#calendar-view'), 'powrót do planu');
+  },
   async 'gość: „+ Nowy” plan prosi o logowanie (bez okienka z nazwą)'() {
     await open();
     await waitFor(() => $('#plan-new'), 'przycisk „+ Nowy”');

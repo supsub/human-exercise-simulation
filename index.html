@@ -42,6 +42,7 @@
   <!-- telefon: zakładki pod modelem (na komputerze ukryte – oba panele widać naraz) -->
   <nav id="mobile-tabs" class="mobile-tabs">
     <button data-tab="plan" class="active">Plan</button>
+    <button data-tab="calendar">Kalendarz</button>
     <button data-tab="analysis">Analiza</button>
   </nav>
   <!-- telefon, wybrane ćwiczenie z listy: w miejscu zakładek – dodanie do treningu -->
@@ -55,6 +56,12 @@
         <button id="plan-rename" title="Zmień nazwę">✎</button>
         <button id="plan-delete" title="Usuń plan">🗑</button>
       </div>
+      <!-- komputer: plan albo kalendarz w lewym panelu (telefon: zakładki na dole) -->
+      <div id="left-switch" class="seg left-switch" role="radiogroup" aria-label="Widok">
+        <button type="button" role="radio" data-view="plan" aria-checked="true">Plan</button>
+        <button type="button" role="radio" data-view="calendar" aria-checked="false">Kalendarz</button>
+      </div>
+      <div id="calendar-view" class="calendar-view"></div>
       <div class="plan-scroll">
         <div id="plan-schedule" class="plan-schedule"></div>
         <div class="workouts-head">
