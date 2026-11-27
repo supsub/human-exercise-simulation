@@ -8,7 +8,7 @@ import { createFigure } from '../figure.js';
 import { CATALOG, CATALOG_BY_ID, CATEGORIES, isTime, defaultAmount, amountRange, fmtSets } from './catalog.js';
 import { renderCalendar } from './calendarView.js';
 import { renderSession, sessionFromWorkout, newSet, dateLabel } from './sessionView.js';
-import { DAYS, isoDate, mondayOf, worse, analyzePlan, emptyPlan, emptyWorkout, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
+import { DAYS, isoDate, parseDate, mondayOf, plannedOn, buildSchedule, worse, analyzePlan, emptyPlan, emptyWorkout, exampleData, migrateV1, volumeStatus, OPTIMAL_WEEKLY, LETTERS, WORKOUT_COLORS } from './analysis.js';
 
 // Jedyny widok aplikacji: plan treningowy z modelem 3D.
 // - treningi (warianty, np. „FBW A”) to bloki ćwiczeń niezależne od dni tygodnia,
@@ -47,6 +47,39 @@ let browseMuscle = null;    // lista „ćwiczenia na mięsień” (kliknięty m
 let browseCat = null;
 let browseSession = null;   // lista ćwiczeń otwarta z zapisu treningu (dodawanie do tego dnia, nie do planu)
 let openSessionId = null;   // otwarty zapis treningu (w widoku kalendarza)
+// ---------- Okresy realizacji planów (kalendarz): store.active = [{ planId, from: 'RRRR-MM-DD' }] ----------
+function periods() {
+  const list = [...(store.active ?? [])].sort((a, b) => (a.from < b.from ? -1 : 1));
+  return list.map((x, i) => {
+    const nxt = list[i + 1], to = nxt ? isoDate(new Date(parseDate(nxt.from).getTime() - 864e5)) : null;
+    return { plan: store.plans.find((p) => p.id === x.planId), from: x.from, to };
+  }).filter((x) => x.plan);
+}
+const activeOn = (iso) => periods().filter((x) => x.from <= iso).at(-1) ?? null;
+function plannedFor(date) {
+  const act = activeOn(isoDate(date));
+  if (!act) return null;
+  return plannedOn(act.plan, buildSchedule(act.plan, store.workouts), date, isoDate(mondayOf(parseDate(act.from))));   // cykl od tygodnia startu okresu
+}
+// od dnia `from` realizuj plan `planId` (późniejsze ustalenia zastępuje to nowe)
+function setActive(planId, from) {
+  const keep = (store.active ?? []).filter((x) => x.from < from);
+  if (keep.at(-1)?.planId !== planId) keep.push({ planId, from });
+  store.active = keep;
+  render();
+}
+// dawniej (wersje 0.17–0.18) cykl liczył się od plan.start – taki plan staje się pierwszym okresem
+function migrateActive() {
+  if (store.active?.length) return;
+  const started = store.plans.filter((p) => p.start).sort((a, b) => (a.start < b.start ? -1 : 1))[0];
+  if (started) store.active = [{ planId: started.id, from: started.start }];
+}
+// trening dnia: model 3D pokazuje bieżące ćwiczenie (pierwsze z niezrobionymi seriami, inaczej pierwsze)
+function showCurrentExercise(ses) {
+  const it = ses?.items.find((x) => x.sets.some((y) => !y.done)) ?? ses?.items[0];
+  const ex = it && CATALOG_BY_ID[it.exId];
+  if (ex) selectExercise(ex, 'plan');
+}
 const openSession = () => (openSessionId && store.sessions?.find((x) => x.id === openSessionId)) || null;
 let listHover = null;       // ćwiczenie wskazane na liście (podgląd mięśni)
 let muscleHover = null;     // mięsień wskazany w panelu
@@ -57,7 +90,7 @@ function load() {
   try {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
     const cur = localStorage.getItem(CURRENT_KEY) ?? s?.currentId;
-    if (s && s.plans?.length) return { plans: s.plans, workouts: s.workouts, sessions: s.sessions ?? [], currentId: s.plans.some((p) => p.id === cur) ? cur : s.plans[0].id };
+    if (s && s.plans?.length) return { plans: s.plans, workouts: s.workouts, sessions: s.sessions ?? [], active: s.active ?? [], currentId: s.plans.some((p) => p.id === cur) ? cur : s.plans[0].id };
   } catch {}
   // dane w starym formacie (ćwiczenia przypisane do dni) – przenosimy jako treningi
   try {
@@ -69,7 +102,7 @@ function load() {
   } catch {}
   // czysty start: bez planów i treningów (przykładowe tylko do testów: ?examples)
   if (new URLSearchParams(location.search).has('examples')) { const d = exampleData(); return { ...d, currentId: d.plans[0].id }; }
-  return { plans: [], workouts: [], sessions: [], currentId: null };
+  return { plans: [], workouts: [], sessions: [], active: [], currentId: null };
 }
 const saveListeners = [];
 // Tryb gościa (niezalogowany): domyślny plan „Mój plan” z pustym treningiem – można go od razu wypełniać
@@ -88,12 +121,12 @@ export function setGuest(on) {
   guest = on;
   if (on && !store.plans.length) {
     const w = emptyWorkout('Trening A'), p = emptyPlan('Mój plan', [w.id]);
-    store = { plans: [p], workouts: [w], sessions: store.sessions ?? [], currentId: p.id };
+    store = { plans: [p], workouts: [w], sessions: store.sessions ?? [], active: [], currentId: p.id };
     focusId = null;
   }
   if (started) render();
 }
-const contentJSON = () => JSON.stringify({ plans: store.plans, workouts: store.workouts, sessions: store.sessions ?? [] });
+const contentJSON = () => JSON.stringify({ plans: store.plans, workouts: store.workouts, sessions: store.sessions ?? [], active: store.active ?? [] });
 function save() {
   if (store.currentId) localStorage.setItem(CURRENT_KEY, store.currentId);
   const json = contentJSON();
@@ -106,7 +139,7 @@ function save() {
 export function applyExternal(data) {
   if (!data?.plans) return;
   const cur = store.currentId;
-  store = { plans: data.plans, workouts: data.workouts, sessions: data.sessions ?? [], currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
+  store = { plans: data.plans, workouts: data.workouts, sessions: data.sessions ?? [], active: data.active ?? [], currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
   if (focusId && !workout(focusId)) focusId = null;
   if (started) render();
 }
@@ -118,7 +151,7 @@ export const emptiedByUser = () => userEmptied;
 export function setData(data) {
   userEmptied = false;
   const cur = store.currentId;
-  store = { plans: data.plans, workouts: data.workouts, sessions: data.sessions ?? [], currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
+  store = { plans: data.plans, workouts: data.workouts, sessions: data.sessions ?? [], active: data.active ?? [], currentId: data.plans.some((p) => p.id === cur) ? cur : data.plans[0]?.id ?? null };
   localStorage.setItem(STORAGE_KEY, contentJSON());
   if (focusId && !workout(focusId)) focusId = null;
   render();
@@ -162,26 +195,34 @@ function render() {
   renderSchedule(p);
   renderWorkouts(p);
   if (view === 'calendar') {
-    if (!p.start) p.start = isoDate(mondayOf(new Date()));   // początek cyklu planu: ten tydzień (zapisze się z planem)
+    migrateActive();
     const ses = openSession();
     if (ses) renderSession(ui.calendar, { s: ses, badge,
       onChange: render,
       onClose: () => { openSessionId = null; render(); },
       onAdd: () => openBrowseSession(ses),
-      onOpenExercise: (ex) => selectExercise(ex, 'plan'),
+      selectedExId: selected?.ex.id ?? null,
+      onOpenExercise: (ex) => { if (selected?.ex !== ex) selectExercise(ex, 'plan'); },
       onDelete: () => { store.sessions = store.sessions.filter((x) => x !== ses); openSessionId = null; render(); } });
-    else renderCalendar(ui.calendar, { plan: p, schedule: analysis.schedule, workout, color, letter,
+    else renderCalendar(ui.calendar, { plannedFor, activeOn, periods: periods(), plans: store.plans, workout, color, letter,
+      onSetActive: setActive,
       sessionOn: (iso) => (store.sessions ?? []).find((x) => x.date === iso),
       onPick: (iso, wid) => {
-        focusId = wid ?? null; render();
+        // model pokazuje trening dnia: przełączamy edytor na plan z tego okresu (to tylko wybór widoku, nie zmiana danych)
+        const act = activeOn(iso);
+        if (act && act.plan.id !== store.currentId) store.currentId = act.plan.id;
+        focusId = wid && (act?.plan ?? plan()).variants.includes(wid) ? wid : null; render();
         if (phone()) setTimeout(() => ui.calendar.querySelector('.cal-detail')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 0);   // szczegóły dnia pod kalendarzem
       },
       onStart: (iso, wid) => {   // trening dnia: kopia szablonu z planu (z ostatnio użytymi ciężarami)
-        const sesNew = sessionFromWorkout(workout(wid), p, iso, store.sessions ?? []);
+        const sesNew = sessionFromWorkout(workout(wid), activeOn(iso)?.plan ?? p, iso, store.sessions ?? []);
         (store.sessions ??= []).push(sesNew);
-        openSessionId = sesNew.id; focusId = wid ?? null; render();
+        openSessionId = sesNew.id; focusId = wid ?? null; render(); showCurrentExercise(sesNew);
       },
-      onOpen: (id) => { openSessionId = id; focusId = store.sessions.find((x) => x.id === id)?.workoutId ?? null; if (focusId && !workout(focusId)) focusId = null; render(); } });
+      onOpen: (id) => {
+        const ses = store.sessions.find((x) => x.id === id);
+        openSessionId = id; focusId = ses?.workoutId ?? null; if (focusId && !workout(focusId)) focusId = null; render(); showCurrentExercise(ses);
+      } });
   }
   renderAnalysis(p);
   if (selected) renderDetailTop();

@@ -30,7 +30,7 @@ export function sessionFromWorkout(w, plan, iso, sessions) {
 }
 export const sessionStats = (s) => { const all = s.items.flatMap((it) => it.sets); return { done: all.filter((x) => x.done).length, total: all.length }; };
 
-// ctx: { s, badge(workoutId), onChange(), onClose(), onAdd(), onOpenExercise(ex), onDelete() }
+// ctx: { s, badge(workoutId), selectedExId, onChange(), onClose(), onAdd(), onOpenExercise(ex) – pokaż na modelu 3D, onDelete() }
 export function renderSession(el, ctx) {
   const { s } = ctx, st = sessionStats(s);
   el.innerHTML = `
@@ -40,7 +40,7 @@ export function renderSession(el, ctx) {
     ${s.items.map((it, i) => {
       const ex = CATALOG_BY_ID[it.exId]; if (!ex) return '';
       const load = loadOf(ex), r = amountRange(ex), d = it.sets.filter((x) => x.done).length;
-      return `<div class="ses-ex" data-i="${i}">
+      return `<div class="ses-ex${ex.id === ctx.selectedExId ? ' cur' : ''}" data-i="${i}" title="Pokaż na modelu">
         <div class="ses-ex-head"><button class="link ses-open" title="Pokaż ćwiczenie">${esc(ex.name)}</button>
           <span class="muted">${d}/${it.sets.length}</span><button class="icon ses-del" title="Usuń z tego treningu">✕</button></div>
         ${it.sets.map((x, j) => `<div class="ses-set${x.done ? ' done' : ''}" data-j="${j}">
@@ -65,7 +65,8 @@ export function renderSession(el, ctx) {
   el.querySelector('.ses-remove').onclick = () => { if (confirm(`Usunąć zapis treningu z dnia ${dateLabel(s.date)}?`)) ctx.onDelete(); };
   el.querySelectorAll('.ses-ex').forEach((box) => {
     const it = s.items[+box.dataset.i], ex = CATALOG_BY_ID[it.exId];
-    box.querySelector('.ses-open').onclick = () => ctx.onOpenExercise(ex);
+    // stuknięcie karty (poza polami i przyciskami) albo odhaczenie serii – model pokazuje to ćwiczenie
+    box.onclick = (e) => { if (!e.target.closest('input, button:not(.ses-open)')) ctx.onOpenExercise(ex); };
     box.querySelector('.ses-del').onclick = () => { s.items.splice(+box.dataset.i, 1); change(); };
     box.querySelector('.ses-addset').onclick = () => { const last = it.sets.at(-1); it.sets.push({ reps: last?.reps ?? defaultAmount(ex), kg: last?.kg ?? null, done: false }); change(); };
     box.querySelector('.ses-rmset')?.addEventListener('click', () => { it.sets.pop(); change(); });
@@ -73,7 +74,7 @@ export function renderSession(el, ctx) {
       const x = it.sets[+row.dataset.j], r = amountRange(ex);
       row.querySelector('.ses-amt').onchange = (e) => { const v = Math.round(+e.target.value); x.reps = v ? Math.min(r.max, Math.max(r.min, v)) : null; change(); };
       row.querySelector('.ses-kg')?.addEventListener('change', (e) => { const v = +e.target.value; x.kg = v > 0 ? Math.min(500, Math.round(v * 2) / 2) : null; change(); });
-      row.querySelector('.ses-done').onclick = () => { x.done = !x.done; change(); };
+      row.querySelector('.ses-done').onclick = () => { x.done = !x.done; change(); ctx.onOpenExercise(ex); };
     });
   });
 }

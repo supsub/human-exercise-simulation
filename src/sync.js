@@ -47,8 +47,8 @@ const setMeta = (m) => localStorage.setItem(META, JSON.stringify(m));
 const canon = (x) => JSON.stringify(x, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((key) => [key, v[key]])) : v));
 // v – numer formatu danych: baza odrzuca zapis z niższym numerem (stara wersja aplikacji nie nadpisze nowszych danych,
 // supabase/migrations/…_user_data_format_guard.sql). Podbijamy przy każdej zmianie formatu.
-const DATA_V = 3;   // 3: zapisy treningów (sessions)
-const payload = () => { const { plans, workouts, sessions = [] } = planner.getData(); return canon({ v: DATA_V, plans, workouts, sessions, settings: { sex: getSex() } }); };
+const DATA_V = 4;   // 3: zapisy treningów (sessions), 4: okresy realizacji planów (active)
+const payload = () => { const { plans, workouts, sessions = [], active = [] } = planner.getData(); return canon({ v: DATA_V, plans, workouts, sessions, active, settings: { sex: getSex() } }); };
 // treningi z dwóch stron: każdy osobno, wygrywa nowsza wersja (upd) – zmiana dnia na telefonie nie gubi zmiany innego dnia na komputerze
 function mergeSessions(remote = [], local = []) {
   const byId = new Map(remote.map((x) => [x.id, x]));
@@ -59,7 +59,7 @@ const applySettings = (st) => { if (st?.sex) setSex(st.sex); };
 
 // --- scalanie: dane z konta + lokalne plany (po nazwie) i treningi, których na koncie brak ---
 function merge(remote, local) {
-  const out = { v: DATA_V, plans: [...remote.plans], workouts: [...remote.workouts], sessions: mergeSessions(remote.sessions, local.sessions), settings: remote.settings ?? local.settings };
+  const out = { v: DATA_V, plans: [...remote.plans], workouts: [...remote.workouts], sessions: mergeSessions(remote.sessions, local.sessions), active: remote.active?.length ? remote.active : local.active ?? [], settings: remote.settings ?? local.settings };
   const names = new Set(out.plans.map((p) => p.name)), wIds = new Set(out.workouts.map((w) => w.id));
   const wNames = new Set(out.workouts.map((w) => w.name));
   const used = (p) => p.variants.some((id) => local.workouts.find((w) => w.id === id)?.items.length);
@@ -92,12 +92,12 @@ async function pull() {
     else if (remoteChanged) {
       // nowe urządzenie / logowanie z trybu gościa: konto z planami wygrywa w całości (plany gościa tylko w kopii hes.backup);
       // do pustego konta trafia to, co ułożono jako gość. Niewysłane zmiany z tego samego konta są scalane.
-      const fresh = { ...row.data, v: DATA_V, sessions: row.data.sessions ?? [], settings: row.data.settings ?? local.settings };
+      const fresh = { ...row.data, v: DATA_V, sessions: row.data.sessions ?? [], active: row.data.active ?? [], settings: row.data.settings ?? local.settings };
       const next = dirty ? merge(row.data, local) : !known && !row.data.plans?.length ? merge(row.data, local) : fresh;
       // kopia zapasowa planów z tej przeglądarki, zanim zastąpią je dane z konta (hes.backup – do ręcznego odzyskania)
       if (local.plans.length && canon({ plans: next.plans, workouts: next.workouts }) !== canon({ plans: local.plans, workouts: local.workouts })) localStorage.setItem('hes.backup', JSON.stringify({ at: new Date().toISOString(), data: local }));
       setMeta({ uid: user.id, at: row.updated_at, sent: canon(row.data) });
-      planner.setData({ plans: next.plans, workouts: next.workouts, sessions: next.sessions ?? [] });
+      planner.setData({ plans: next.plans, workouts: next.workouts, sessions: next.sessions ?? [], active: next.active ?? [] });
       applySettings(next.settings);
       send = canon(next) !== canon(row.data);
     }

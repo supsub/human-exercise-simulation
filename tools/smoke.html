@@ -83,6 +83,18 @@ function fakeServer() {
   return srv;
 }
 
+// kalendarz: „realizuj plan … od …” (formularz nad miesiącem)
+async function setPlanFrom(planId, iso) {
+  await waitFor(() => $('.cal-plan'), 'okienko realizowanego planu');
+  if ($('.cal-plan-edit')) $('.cal-plan-edit').click();
+  await waitFor(() => $('.cal-plan-set'), 'formularz zmiany planu');
+  if (planId) $('.cal-plan-sel').value = planId;
+  if (iso) $('.cal-plan-from').value = iso;
+  $('.cal-plan-set').click();
+  await waitFor(() => $('.cal-plan-edit'), 'plan ustawiony');
+}
+const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 const tests = {
   'gość: domyślny „Mój plan” z pustym treningiem'() {
     return open().then(async () => {
@@ -125,15 +137,17 @@ const tests = {
       workouts: [{ id: 'gw', name: 'Trening A', items: [{ exId: 'squat', sets: 3, reps: 10 }, { exId: 'plank', sets: 3, reps: 45 }] }], currentId: 'g1' })));
     await waitFor(() => !visible('#app-loading') && $('#mobile-tabs [data-tab="calendar"]'), 'zakładka Kalendarz');
     $('#mobile-tabs [data-tab="calendar"]').click();
-    await waitFor(() => visible('#calendar-view') && $('.cal-grid .cal-d'), 'siatka kalendarza');
-    check(!visible('.plan-scroll'), 'w widoku kalendarza dalej widać listę treningów planu');
+    await waitFor(() => visible('#calendar-view') && $('.cal-plan-set'), 'pytanie, który plan realizujesz');
+    check(!visible('.plan-scroll') && !visible('.plan-head'), 'w kalendarzu dalej widać edytor planu');
+    await setPlanFrom(null, isoOf(new Date(Date.now() - 45 * 864e5)));   // ten plan od półtora miesiąca (cały bieżący miesiąc zaplanowany)
+    await waitFor(() => $('.cal-grid .cal-d'), 'siatka kalendarza');
     const days = [...doc().querySelectorAll('.cal-d:not(.other)')], withW = days.filter((d) => d.querySelector('.wbadge'));
     check(withW.length >= 12 && withW.length <= 15, `w miesiącu ${withW.length} dni treningowych (plan: 3 w tygodniu)`);
     check($('.cal-d.today'), 'brak wyróżnionego dzisiejszego dnia');
     withW[0].click();
     await waitFor(() => /Trening A/.test($('.cal-detail')?.textContent ?? ''), 'trening klikniętego dnia');
     check(/3 × 45 s/.test($('.cal-detail').textContent), 'w treningu dnia brak ćwiczeń z ilością (deska 3 × 45 s)');
-    check(data().plans[0].start, 'plan nie dostał daty początku cyklu');
+    check(data().active?.[0]?.planId === 'g1', 'kalendarz nie zapamiętał realizowanego planu');
     days.find((d) => !d.querySelector('.wbadge')).click();
     await waitFor(() => /odpoczynku/.test($('.cal-detail')?.textContent ?? ''), 'dzień odpoczynku');
     $('#mobile-tabs [data-tab="plan"]').click();
@@ -145,7 +159,8 @@ const tests = {
       workouts: [{ id: 'gw', name: 'Trening A', items: [{ exId: 'bench', sets: 3, reps: 8 }, { exId: 'plank', sets: 2, reps: 45 }] }], currentId: 'g1' })));
     await waitFor(() => !visible('#app-loading'), 'start');
     $('#mobile-tabs [data-tab="calendar"]').click();
-    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const iso = isoOf;
+    await setPlanFrom('g1', iso(new Date(Date.now() - 30 * 864e5)));
     const today = new Date(), yest = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
     const dayBtn = async (d) => { await waitFor(() => $('.cal-grid'), 'kalendarz'); let b = $(`.cal-d[data-iso="${iso(d)}"]`); if (!b) { $('.cal-prev').click(); b = $(`.cal-d[data-iso="${iso(d)}"]`); } return b; };
     // wczoraj: zapis wykonanego treningu z ciężarem 40 kg
@@ -156,6 +171,11 @@ const tests = {
     await waitFor(() => doc().querySelectorAll('.ses-ex').length === 2, 'trening z ćwiczeniami z planu');
     check(doc().querySelectorAll('.ses-ex')[0].querySelectorAll('.ses-set').length === 3, 'wyciskanie: 3 serie jak w planie');
     check(doc().querySelectorAll('.ses-ex')[1].querySelector('.ses-amt').value === '45', 'deska: 45 s jak w planie');
+    // model 3D pokazuje bieżące ćwiczenie, stuknięcie innej karty przełącza model
+    await waitFor(() => /Wyciskanie sztangi/.test($('#pb-name')?.textContent ?? '') && $('.ses-ex.cur'), 'model pokazuje pierwsze ćwiczenie treningu');
+    doc().querySelectorAll('.ses-ex')[1].click();
+    await waitFor(() => /Deska/.test($('#pb-name')?.textContent ?? '') && doc().querySelectorAll('.ses-ex')[1].classList.contains('cur'), 'stuknięta karta: model pokazuje deskę');
+    check(visible('#calendar-view') && $('.ses-ex'), 'po wybraniu ćwiczenia zniknął widok treningu');
     const kg = $('.ses-ex .ses-kg'); kg.value = '40'; kg.dispatchEvent(new (win().Event)('change'));
     await waitFor(() => data()?.sessions?.[0]?.items[0].sets[0].kg === 40, 'ciężar zapisany');
     $('.ses-ex .ses-done').click();
@@ -176,6 +196,33 @@ const tests = {
     await waitFor(() => $('.ses-ex .ses-kg'), 'dzisiejszy trening');
     check($('.ses-ex .ses-kg').value === '40', `dzisiejszy trening nie podpowiada ostatniego ciężaru (jest „${$('.ses-ex .ses-kg').value}”)`);
     check(data().sessions.length === 2, 'drugi zapis treningu nie powstał');
+  },
+  async 'kalendarz niezależny od planu: zmiana planu od dnia, wcześniejsze dni i wykonane treningi zostają'() {
+    const ALL = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    await open(() => localStorage.setItem('hes.data.v2', JSON.stringify({
+      plans: [{ id: 'px', name: 'Plan X', sessions: 7, variants: ['wx'], days: ALL }, { id: 'py', name: 'Plan Y', sessions: 7, variants: ['wy'], days: ALL }],
+      workouts: [{ id: 'wx', name: 'Trening X', items: [{ exId: 'squat', sets: 3, reps: 10 }] }, { id: 'wy', name: 'Trening Y', items: [{ exId: 'bench', sets: 3, reps: 8 }] }], currentId: 'px' })));
+    await waitFor(() => !visible('#app-loading'), 'start');
+    $('#mobile-tabs [data-tab="calendar"]').click();
+    const today = new Date(), d = (n) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + n);
+    await setPlanFrom('px', isoOf(d(-20)));
+    // wczoraj: wykonany trening z planu X
+    const cell = async (date) => { for (let i = 0; i < 2 && !$(`.cal-d[data-iso="${isoOf(date)}"]`); i++) $(date < today ? '.cal-prev' : '.cal-next').click(); return $(`.cal-d[data-iso="${isoOf(date)}"]`); };
+    (await cell(d(-1))).click();
+    await waitFor(() => /Trening X/.test($('.cal-detail')?.textContent ?? '') && $('.cal-start'), 'wczoraj: trening z planu X');
+    $('.cal-start').click();
+    await waitFor(() => $('.ses-finish'), 'zapis treningu');
+    $('.ses-finish').click(); $('.ses-back').click();
+    // zmiana planu na Y od przedwczoraj – wcześniejsze dni zostają przy X, wykonany trening zostaje w historii
+    await setPlanFrom('py', isoOf(d(-2)));
+    check(/Wcześniej: Plan X/.test($('.cal-plan').textContent) && /Plan Y/.test($('.cal-plan').textContent), `okres planów nieopisany: ${$('.cal-plan').textContent.trim().slice(0, 120)} [zapisane: ${JSON.stringify(data().active)}]`);
+    (await cell(d(-3))).click();
+    await waitFor(() => /Trening X/.test($('.cal-detail')?.textContent ?? ''), 'dzień przed zmianą: dalej plan X');
+    (await cell(d(1))).click();
+    await waitFor(() => /Trening Y/.test($('.cal-detail')?.textContent ?? ''), 'dzień po zmianie: plan Y');
+    (await cell(d(-1))).click();
+    await waitFor(() => /Wykonany/.test($('.cal-detail')?.textContent ?? '') && /Trening X/.test($('.cal-detail').textContent), 'wykonany trening X zostaje w historii po zmianie planu');
+    check(data().plans.length === 2 && data().workouts.length === 2, 'zmiana planu w kalendarzu zmieniła plany');
   },
   async 'gość: „+ Nowy” plan prosi o logowanie (bez okienka z nazwą)'() {
     await open();
@@ -401,7 +448,7 @@ const tests = {
   async 'treningi z dwóch urządzeń naraz: konto ma oba dni, nowsza wersja dnia wygrywa'() {
     const srv = fakeServer();
     const ses = (id, date, upd, kg) => ({ id, date, planId: 'p1', workoutId: 'w1', name: 'Konto A', finished: true, upd, items: [{ exId: 'squat', sets: [{ reps: 10, kg, done: true }] }] });
-    srv.row = { data: jsonb({ v: 3, ...ACCOUNT, settings: { sex: 'm' }, sessions: [ses('s1', '2026-11-20', 100, 50), ses('s3', '2026-11-22', 500, 70)] }), updated_at: 't2' };   // inne urządzenie dopisało dzień 22
+    srv.row = { data: jsonb({ v: 4, ...ACCOUNT, settings: { sex: 'm' }, sessions: [ses('s1', '2026-11-20', 100, 50), ses('s3', '2026-11-22', 500, 70)] }), updated_at: 't2' };   // inne urządzenie dopisało dzień 22
     await open(() => {
       localStorage.setItem(AUTH, fakeSession(3600));
       const mine = { ...ACCOUNT, sessions: [ses('s1', '2026-11-20', 300, 55), ses('s2', '2026-11-21', 200, 60)] };   // tu: poprawka dnia 20 (nowsza) i nowy dzień 21
@@ -427,7 +474,7 @@ const tests = {
     await waitFor(() => srv.row.data.workouts[0].items.length === 2, 'zmiana zapisana na koncie', 8000)
       .catch(async (e) => { const l = await win().navigator.locks.query(); throw new Error(`${e.message} (stan: ${$('#auth-open').dataset.state}, lokalnie: ${data()?.workouts[0]?.items.length} ćw., zapytania: ${srv.calls?.join(', ')}, blokady: ${JSON.stringify(l)})`); });
     await waitFor(() => $('#auth-open').dataset.state === 'ok', 'stan „Zapisane” po zapisie', 5000);   // odpowiedź serwera jeszcze się przetwarza
-    check(srv.row.data.v === 3, `zapis z numerem formatu ${srv.row.data.v} zamiast 3 (z treningami)`);
+    check(srv.row.data.v === 4, `zapis z numerem formatu ${srv.row.data.v} zamiast 4`);
   },
 };
 

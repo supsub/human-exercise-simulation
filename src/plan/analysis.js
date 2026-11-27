@@ -104,9 +104,9 @@ export const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).pad
 export const parseDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 export const mondayOf = (d) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
 export const dayIndex = (d) => (d.getDay() + 6) % 7;   // 0 = poniedziałek
-// Trening zaplanowany na dany dzień: tydzień cyklu liczony od plan.start (poniedziałek pierwszego tygodnia planu)
-export function plannedOn(plan, schedule, date) {
-  const start = plan.start ? parseDate(plan.start) : mondayOf(new Date());
+// Trening zaplanowany na dany dzień: tydzień cyklu liczony od początku okresu realizacji planu (startIso)
+export function plannedOn(plan, schedule, date, startIso = plan.start) {
+  const start = startIso ? parseDate(startIso) : mondayOf(new Date());
   const weeks = Math.round((mondayOf(date) - mondayOf(start)) / (7 * 864e5));
   const wi = ((weeks % schedule.weeks) + schedule.weeks) % schedule.weeks;
   return schedule.calendar[wi]?.[dayIndex(date)] ?? null;
