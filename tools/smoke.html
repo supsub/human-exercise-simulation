@@ -224,6 +224,22 @@ const tests = {
     await waitFor(() => /Wykonany/.test($('.cal-detail')?.textContent ?? '') && /Trening X/.test($('.cal-detail').textContent), 'wykonany trening X zostaje w historii po zmianie planu');
     check(data().plans.length === 2 && data().workouts.length === 2, 'zmiana planu w kalendarzu zmieniła plany');
   },
+  async 'harmonogram: kliknięcie kafelka zmienia trening na następny (dowolny wzór, np. same B)'() {
+    await open(() => localStorage.setItem('hes.data.v2', JSON.stringify({ plans: [{ id: 'g1', name: 'Mój plan', sessions: 4, variants: ['wa', 'wb'], days: null }],
+      workouts: [{ id: 'wa', name: 'Trening A', items: [{ exId: 'squat', sets: 3, reps: 10 }] }, { id: 'wb', name: 'Trening B', items: [{ exId: 'bench', sets: 3, reps: 8 }] }], currentId: 'g1' })));
+    await waitFor(() => !visible('#app-loading') && $('.plan-schedule .cal-cell.on'), 'harmonogram');
+    const letters = () => [...doc().querySelectorAll('.plan-schedule .cal-cell.on')].map((b) => b.textContent.trim()).join('');
+    const before = letters();
+    $('.plan-schedule .cal-cell.on').click();
+    await waitFor(() => letters() !== before, 'kafelek zmienił trening');
+    check(letters()[0] !== before[0] && letters().slice(1) === before.slice(1), `zmienił się nie tylko kliknięty kafelek: ${before} → ${letters()}`);
+    check(data().plans[0].order?.cal, 'ręczna kolejność nie zapisała się w planie');
+    for (let i = 0; i < 12 && /A/.test(letters()); i++) { [...doc().querySelectorAll('.plan-schedule .cal-cell.on')].find((b) => b.textContent.trim() === 'A').click(); await sleep(50); }
+    check(!/A/.test(letters()), `nie da się ustawić samych B: ${letters()}`);
+    check(/ręcznie/.test($('.plan-schedule').textContent), 'brak informacji o ręcznej kolejności');
+    $('#sch-order-auto').click();
+    await waitFor(() => /A/.test(letters()) && !data().plans[0].order, 'powrót do kolejności automatycznej');
+  },
   async 'gość: „+ Nowy” plan prosi o logowanie (bez okienka z nazwą)'() {
     await open();
     await waitFor(() => $('#plan-new'), 'przycisk „+ Nowy”');

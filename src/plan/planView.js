@@ -240,8 +240,12 @@ function renderSchedule(p) {
   const sch = analysis.schedule;
   const inPlan = p.variants.filter((id) => workout(id));
   const cell = (id) => id
-    ? `<button class="cal-cell on${focusId === id ? ' focused' : ''}" data-id="${id}" style="--c:${color(id)}" title="${esc(workout(id).name)}">${letter(id)}</button>`
+    ? `<button class="cal-cell on${focusId === id ? ' focused' : ''}" data-id="${id}" style="--c:${color(id)}" title="${esc(workout(id).name)} – kliknij, aby zmienić na następny trening">${letter(id)}</button>`
     : '<span class="cal-cell"></span>';
+  // informacja o kolejności: przy ręcznej – ile razy który wariant w cyklu
+  const order = sch.custom
+    ? `kolejność ustawiona ręcznie (${inPlan.map((id, i) => `${letter(id)} ${sch.counts[i]}×`).join(', ')}${sch.weeks > 1 ? ' w cyklu' : ' w tygodniu'}) <button class="link small" id="sch-order-auto">↺ kolejność automatyczna</button>`
+    : `każdy wariant ${sch.perVariant}× ${sch.weeks > 1 ? 'w cyklu' : 'w tygodniu'}`;
   ui.schedule.innerHTML = `
     <div class="sch-row">
       <span>Treningów w tygodniu</span>
@@ -249,14 +253,14 @@ function renderSchedule(p) {
     </div>
     <div class="cal">
       <span></span>${DAYS.map((d, i) => `<button class="cal-day${sch.dayIdx.includes(i) ? ' train' : ''}" data-day="${d.id}" title="Kliknij, aby ręcznie włączyć/wyłączyć ten dzień">${d.short}</button>`).join('')}
-      ${sch.calendar.map((week, w) => `<span class="cal-week">${sch.weeks > 1 ? `Tydz. ${w + 1}` : 'Tydzień'}</span>${week.map(cell).join('')}`).join('')}
+      ${sch.calendar.map((week, w) => `<span class="cal-week">${sch.weeks > 1 ? `Tydz. ${w + 1}` : 'Tydzień'}</span>${week.map((id, d) => cell(id).replace('<button ', `<button data-w="${w}" data-d="${d}" `)).join('')}`).join('')}
     </div>
     <div class="sch-info">${inPlan.length
-      ? `${sch.weeks > 1 ? `Cykl ${sch.weeks} tyg. – ` : ''}każdy wariant ${sch.perVariant}× ${sch.weeks > 1 ? 'w cyklu' : 'w tygodniu'} · dni ${sch.auto ? 'dobrane automatycznie' : 'wybrane ręcznie <button class="link small" id="sch-auto">↺ dobierz automatycznie</button>'}`
+      ? `${sch.weeks > 1 ? `Cykl ${sch.weeks} tyg. – ` : ''}${order} · dni ${sch.auto ? 'dobrane automatycznie' : 'wybrane ręcznie <button class="link small" id="sch-auto">↺ dobierz automatycznie</button>'}`
       : 'Zaznacz poniżej treningi, które mają wejść do planu.'}</div>`;
   ui.schedule.querySelectorAll('.stepper button').forEach((b) => (b.onclick = () => {
     p.sessions = Math.min(7, Math.max(1, sch.n + +b.dataset.d));
-    p.days = null;                 // zmiana liczby treningów = nowy dobór dni
+    p.days = null; p.order = null;  // zmiana liczby treningów = nowy dobór dni i kolejności
     render();
   }));
   ui.schedule.querySelectorAll('.cal-day').forEach((b) => (b.onclick = () => {
@@ -264,10 +268,18 @@ function renderSchedule(p) {
     if (days.has(b.dataset.day)) { if (days.size > 1) days.delete(b.dataset.day); } else days.add(b.dataset.day);
     p.days = DAYS.map((d) => d.id).filter((id) => days.has(id));
     p.sessions = p.days.length;
+    p.order = null;                // inne dni = kolejność dobierana od nowa
     render();
   }));
-  ui.schedule.querySelector('#sch-auto')?.addEventListener('click', () => { p.days = null; render(); });
-  ui.schedule.querySelectorAll('.cal-cell.on').forEach((b) => (b.onclick = () => toggleFocus(b.dataset.id)));
+  ui.schedule.querySelector('#sch-auto')?.addEventListener('click', () => { p.days = null; p.order = null; render(); });
+  ui.schedule.querySelector('#sch-order-auto')?.addEventListener('click', () => { p.order = null; render(); });
+  // kafelek: następny wariant (A → B → C → A…) – dowolny wzór, np. ABBB albo BABA
+  ui.schedule.querySelectorAll('.cal-cell.on').forEach((b) => (b.onclick = () => {
+    const cal = sch.calendar.map((wk) => [...wk]), w = +b.dataset.w, d = +b.dataset.d;
+    cal[w][d] = inPlan[(inPlan.indexOf(cal[w][d]) + 1) % inPlan.length];
+    p.order = { cal };
+    render();
+  }));
 }
 
 function toggleFocus(id) {
@@ -295,6 +307,7 @@ function renderWorkouts(p) {
       <div class="day-items"></div>`;
     card.querySelector('input').onchange = (e) => {
       p.variants = e.target.checked ? [...p.variants, w.id] : p.variants.filter((id) => id !== w.id);
+      p.order = null;   // inne warianty = kolejność dobierana od nowa
       render();
     };
     card.querySelector('.switch').addEventListener('click', (e) => e.stopPropagation());
@@ -307,7 +320,7 @@ function renderWorkouts(p) {
       e.stopPropagation();
       if (!confirm(`Usunąć trening „${w.name}”? Zniknie ze wszystkich planów.`)) return;
       store.workouts = store.workouts.filter((x) => x !== w);
-      for (const pl of store.plans) pl.variants = pl.variants.filter((id) => id !== w.id);
+      for (const pl of store.plans) { if (pl.variants.includes(w.id)) pl.order = null; pl.variants = pl.variants.filter((id) => id !== w.id); }
       render();
     };
     card.title = selected ? `Wybierz „${w.name}” – potem „Dodaj do”` : `Pokaż na modelu mięśnie z treningu „${w.name}”`;
@@ -551,7 +564,7 @@ function addToWorkout(ex, id) {
   if (!w || inWorkout(ex.id, id)) return;
   w.items.push({ exId: ex.id, sets: 3, reps: defaultAmount(ex) });
   const p = plan();
-  if (!p.variants.includes(id)) p.variants.push(id);
+  if (!p.variants.includes(id)) { p.variants.push(id); p.order = null; }
   render();
 }
 
@@ -781,6 +794,7 @@ ui.workoutNew.onclick = () => {
   const w = emptyWorkout(name.trim());
   store.workouts.push(w);
   plan().variants.push(w.id);
+  plan().order = null;
   focusId = w.id;
   render();
 };

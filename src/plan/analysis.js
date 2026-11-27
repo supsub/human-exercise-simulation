@@ -139,6 +139,13 @@ export function buildSchedule(plan, workouts) {
   const n = manual ? manual.length : Math.min(7, Math.max(1, plan.sessions | 0));
   const k = vars.length;
   if (!k) return { weeks: 1, dayIdx: [], calendar: [Array(7).fill(null)], perVariant: 0, n, auto: !manual };
+  // ręczna kolejność (plan.order.cal – klikane kafelki w planie): obowiązuje, póki zawiera tylko warianty planu
+  const ids = new Set(vars.map((w) => w.id)), cal = plan.order?.cal;
+  if (cal?.length && cal.every((wk) => wk.length === 7 && wk.every((id) => id === null || ids.has(id))) && cal.flat().some(Boolean)) {
+    const dayIdx = [...Array(7).keys()].filter((d) => cal.some((wk) => wk[d]));
+    const counts = vars.map((w) => cal.flat().filter((id) => id === w.id).length);
+    return { weeks: cal.length, dayIdx, calendar: cal.map((wk) => [...wk]), perVariant: Math.max(...counts), counts, n: dayIdx.length, auto: !manual, custom: true };
+  }
   const vols = Object.fromEntries(vars.map((w) => [w.id, volumeOf(w.items)]));
   const key = JSON.stringify([n, manual, vars.map((w) => [w.id, w.items])]);
   if (scheduleCache.has(key)) return scheduleCache.get(key);
