@@ -21,8 +21,8 @@ export const calendarDay = () => day;
 export function resetCalendar() { month = null; day = null; }
 
 // ctx: { plannedFor(date) → id treningu | null, activeOn(iso) → { plan, from, to } | null, periods: [{ plan, from, to }], plans: [plan],
-//        planColor(planId), workout(id), color(id), letter(id), sessionOn(iso),
-//        onPick(iso, workoutId), onStart(iso, workoutId), onOpen(sessionId), onSetActive(planId, fromIso) }
+//        planColor(planId), workout(id), allWorkouts, color(id), letter(id), sessionOn(iso),
+//        onPick(iso, workoutId), onStart(iso, workoutId), onQuickDone(iso, workoutId), onUndo(sessionId), onOpen(sessionId), onSetActive(planId, fromIso) }
 export function renderCalendar(el, ctx) {
   const today = new Date(), todayIso = isoDate(today);
   day ??= todayIso;
@@ -76,12 +76,25 @@ export function renderCalendar(el, ctx) {
   const label = `${day === todayIso ? 'Dziś · ' : ''}${WEEKDAYS[(picked.getDay() + 6) % 7]}, ${picked.getDate()} ${MONTHS_GEN[picked.getMonth()]}`;
   const ses = ctx.sessionOn(day), canLog = day <= todayIso;
   const others = (act?.plan.variants ?? []).map((id) => ctx.workout(id)).filter((w) => w && w.id !== pid);
+  const isToday = day === todayIso;
+  const chip = (w, cls) => `<button class="chip ${cls}" data-w="${w.id}"><i class="wbadge" style="--c:${ctx.color(w.id)}">${ctx.letter(w.id)}</i> ${esc(w.name)}</button>`;
+  // warianty do wyboru: z planu tego dnia; dzień bez planu (np. przed pierwszym okresem) – z obecnego planu, inaczej wszystkie treningi
+  const all = (act ?? ctx.activeOn(todayIso))?.plan.variants.map((id) => ctx.workout(id)).filter(Boolean) ?? ctx.allWorkouts;
   const actions = ses
-    ? (() => { const st = sessionStats(ses); return `<div class="cal-ses ${ses.finished ? 'done' : ''}">${ses.finished ? '✓ Wykonany' : '● W trakcie'}: <b>${esc(ses.name)}</b> · ${st.done}/${st.total} serii</div>
+    ? (() => { const st = sessionStats(ses); return `<div class="cal-ses ${ses.finished ? 'done' : ''}">${ses.finished ? '✓ Wykonany' : '● W trakcie'}: <b>${esc(ses.name)}</b> · ${st.done}/${st.total} serii
+          <button class="link small cal-undo" title="Usuń zapis tego dnia">cofnij</button></div>
         <button class="primary cal-open">${ses.finished ? 'Pokaż trening' : 'Wróć do treningu'}</button>`; })()
     : !canLog ? ''
-    : `${pw ? `<button class="primary cal-start" data-w="${pid}">▶ ${day === todayIso ? 'Zacznij trening' : 'Zapisz wykonany trening'}</button>` : ''}
-       ${others.length ? `<div class="cal-other">${pw ? 'albo inny:' : `${day === todayIso ? 'Zacznij' : 'Zapisz'} trening:`} ${others.map((w) => `<button class="chip cal-start" data-w="${w.id}"><i class="wbadge" style="--c:${ctx.color(w.id)}">${ctx.letter(w.id)}</i> ${esc(w.name)}</button>`).join(' ')}</div>` : ''}`;
+    : pw
+      // dzień z treningiem w planie: dziś – start (szybkie odhaczenie obok), wcześniej – szybkie odhaczenie (szczegóły obok)
+      ? `${isToday ? `<button class="primary cal-start" data-w="${pid}">▶ Zacznij trening</button>
+           <button class="chip done-chip cal-quick" data-w="${pid}">✓ Oznacz jako wykonany</button>`
+         : `<button class="primary done-btn cal-quick" data-w="${pid}">✓ Oznacz jako wykonany</button>
+           <button class="link small cal-start" data-w="${pid}">zapisz ze szczegółami (serie, ciężary)</button>`}
+         ${others.length ? `<div class="cal-other">inny trening: ${others.map((w) => chip(w, isToday ? 'cal-start' : 'cal-quick')).join(' ')}</div>` : ''}`
+      // dzień bez treningu w planie (np. dodatkowy trening w niedzielę)
+      : all.length ? `<div class="cal-other">${isToday ? 'Zacznij trening:' : 'Oznacz jako wykonany:'} ${all.map((w) => chip(w, isToday ? 'cal-start' : 'cal-quick')).join(' ')}</div>
+          ${isToday ? `<div class="cal-other">albo szybko oznacz jako wykonany: ${all.map((w) => chip(w, 'cal-quick')).join(' ')}</div>` : ''}` : '';
 
   const layout = `${month.getTime()}|${JSON.stringify(ctx.periods.map((x) => [x.plan.id, x.from]))}`;
   const animate = layout !== lastLayout;
@@ -111,6 +124,8 @@ export function renderCalendar(el, ctx) {
   const pick = () => ctx.onPick(day, ctx.plannedFor(parseDate(day)));
   el.querySelector('.cal-today')?.addEventListener('click', () => { day = todayIso; month = null; pick(); });
   el.querySelectorAll('.cal-start').forEach((b) => (b.onclick = () => ctx.onStart(day, b.dataset.w)));
+  el.querySelectorAll('.cal-quick').forEach((b) => (b.onclick = () => ctx.onQuickDone(day, b.dataset.w)));
+  el.querySelector('.cal-undo')?.addEventListener('click', () => ctx.onUndo(ses.id));
   el.querySelector('.cal-plan-edit')?.addEventListener('click', () => { editing = true; renderCalendar(el, ctx); });
   el.querySelector('.cal-plan-cancel')?.addEventListener('click', () => { editing = false; renderCalendar(el, ctx); });
   el.querySelector('.cal-plan-set')?.addEventListener('click', () => {

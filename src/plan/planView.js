@@ -207,7 +207,7 @@ function render() {
       selectedExId: selected?.ex.id ?? null,
       onOpenExercise: (ex) => { if (selected?.ex !== ex) selectExercise(ex, 'plan'); },
       onDelete: () => { store.sessions = store.sessions.filter((x) => x !== ses); openSessionId = null; render(); } });
-    else renderCalendar(ui.calendar, { plannedFor, activeOn, periods: periods(), plans: store.plans, workout, color, letter, planColor,
+    else renderCalendar(ui.calendar, { plannedFor, activeOn, periods: periods(), plans: store.plans, workout, allWorkouts: store.workouts, color, letter, planColor,
       onSetActive: setActive,
       sessionOn: (iso) => (store.sessions ?? []).find((x) => x.date === iso),
       onPick: (iso, wid) => {
@@ -222,6 +222,14 @@ function render() {
         (store.sessions ??= []).push(sesNew);
         openSessionId = sesNew.id; focusId = wid ?? null; render(); showCurrentExercise(sesNew);
       },
+      onQuickDone: (iso, wid) => {   // szybkie „wykonany”: trening z planu, wszystkie serie odhaczone, bez otwierania
+        const q = sessionFromWorkout(workout(wid), activeOn(iso)?.plan ?? p, iso, store.sessions ?? []);
+        for (const it of q.items) for (const x of it.sets) x.done = true;
+        q.finished = true;
+        (store.sessions ??= []).push(q);
+        render();
+      },
+      onUndo: (id) => { store.sessions = store.sessions.filter((x) => x.id !== id); render(); },
       onOpen: (id) => {
         const ses = store.sessions.find((x) => x.id === id);
         openSessionId = id; focusId = ses?.workoutId ?? null; if (focusId && !workout(focusId)) focusId = null; render(); showCurrentExercise(ses);
